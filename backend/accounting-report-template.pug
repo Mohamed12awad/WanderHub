@@ -1,0 +1,51 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+    title Accounting Report #{startDate} to #{endDate}
+    link(rel="stylesheet", href="./static/css/bootstrap.min.css")
+    link(rel="stylesheet", href="./static/css/style.css")
+  body
+    h1 Accounting Report
+    p Period: #{startDate} to #{endDate}
+    
+    // Bookings
+    if bookings.length > 0
+      h2 Bookings
+      each booking in bookings
+        p Customer: #{booking.customer.name}
+        p Room: #{booking.room.roomNumber}
+        p Total Price: #{booking.price}
+        p Total Paid: #{booking.totalPaid}
+        p Status: #{booking.status}
+        hr
+
+    // Payments
+    if payments.length > 0
+      h2 Payments
+      each payment in payments
+        p Booking: #{payment.booking._id}
+        p Amount: #{payment.amount}
+        p Date: #{payment.date}
+        hr
+
+    // Purchases
+    if purchases.length > 0
+      h2 Purchases
+      each purchase in purchases
+        p Item: #{purchase.itemName}
+        p Quantity: #{purchase.quantity}
+        p Price: #{purchase.price}
+        p Landed Cost: #{purchase.landedCost}
+        hr
+
+    // Expenses
+    if expenses.length > 0
+      h2 Expenses
+      each expense in expenses
+        p Description: #{expense.description}
+        p Amount: #{expense.amount}
+        p Date: #{expense.date}
+        p Category: #{expense.category}
+        hr
