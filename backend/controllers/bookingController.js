@@ -1,13 +1,17 @@
 const Booking = require("../models/bookingModel");
 const Customer = require("../models/customerModel");
 const PartialPayment = require("../models/partialPaymentModel");
-// const Purchase = require("../models/purchaseModel");
-// const Expense = require("../models/expensesModel");
 const generateInvoice = require("../utils/generateInvoice");
 
 exports.createBooking = async (req, res) => {
   try {
-    const { customer: customerId, room: roomId, startDate, endDate } = req.body;
+    const {
+      customer: customerId,
+      room: roomId,
+      startDate,
+      endDate,
+      totalPaid,
+    } = req.body;
 
     // Check for overlapping bookings
     const overlappingBooking = await Booking.findOne({
@@ -30,6 +34,17 @@ exports.createBooking = async (req, res) => {
       await customer.save();
     }
 
+    // Record initial payment if provided
+    if (totalPaid && totalPaid > 0) {
+      const payment = new PartialPayment({
+        booking: booking._id,
+        amount: totalPaid,
+        date: new Date(),
+        createdBy: req.user.id,
+      });
+      await payment.save();
+    }
+
     res.status(201).json(booking);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -40,7 +55,8 @@ exports.getBookings = async (req, res) => {
   try {
     const bookings = await Booking.find()
       .populate("customer", "name")
-      .populate("room", "roomNumber");
+      .populate("room", "roomNumber")
+      .sort({ createdAt: -1 });
     res.json(bookings);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -49,10 +65,20 @@ exports.getBookings = async (req, res) => {
 exports.getBookingById = async (req, res) => {
   try {
     const { id } = req.params;
+    const includePayments = req.query.includePayments === "true";
+
     const bookings = await Booking.findById(id)
       .populate("customer", "name")
       .populate("room", "roomNumber");
-    res.json(bookings);
+
+    let payments = [];
+    if (includePayments) {
+      payments = await PartialPayment.find({
+        booking: id,
+      }).populate("createdBy", "name");
+    }
+
+    res.json({ bookings, payments });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -68,6 +94,9 @@ exports.getInvoice = async (req, res) => {
     }
 
     const payments = await PartialPayment.find({ booking: req.params.id });
+    // if (!payments) {
+    //   return res.status(404).json({ message: "Payments not found" });
+    // }
 
     const pdfBuffer = await generateInvoice(booking, payments);
 

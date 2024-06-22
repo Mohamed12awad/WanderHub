@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BookingRow from "./BookingRow";
-import { deleteCustomer, getBookings, downloadInvoice } from "@/utils/api";
+import { deleteBooking, getBookings, downloadInvoice } from "@/utils/api";
 import { Link } from "react-router-dom";
 
 type Booking = {
@@ -62,7 +62,7 @@ export function Bookings() {
 
   // console.log(Bookings?.data);
 
-  const mutation = useMutation(deleteCustomer, {
+  const mutation = useMutation(deleteBooking, {
     onSuccess: () => {
       queryClient.invalidateQueries("bookings"); // Invalidate and refetch the 'customers' query
     },
@@ -75,6 +75,8 @@ export function Bookings() {
   if (isLoading || downloadLoading) return <div>Loading...</div>;
   if (error || downloadError) return <div>Error loading Bookings</div>;
   if (error || isDownloadError) return <div>Error loading Bookings</div>;
+
+  const bookingsData = Array.isArray(Bookings?.data) ? Bookings.data : [];
 
   return (
     <main className="grid flex-1 mt-4 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
@@ -155,33 +157,20 @@ export function Bookings() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {Bookings?.data.map((item: Booking, index: number) => (
-                    <BookingRow
-                      key={index}
-                      name={item.customer.name}
-                      state={item.status}
-                      price={item.room.roomNumber}
-                      totalSales={item.bookingLocation}
-                      date={new Date(item.createdAt).toLocaleString()}
-                      id={item._id}
-                      handleDelete={handleDelete}
-                      handleDownload={download}
-                    />
-                  ))}
-                  {/* <CustomerRow
-                    name="Laser Lemonade Machine"
-                    state="Draft"
-                    price="$499.99"
-                    totalSales="25"
-                    date="2023-07-12 10:42 AM"
-                  />
-                  <CustomerRow
-                    name="Hypernova Headphones"
-                    state="Active"
-                    price="$129.99"
-                    totalSales="100"
-                    date="2023-10-18 03:21 PM"
-                  /> */}
+                  {bookingsData &&
+                    bookingsData.map((item: Booking, index: number) => (
+                      <BookingRow
+                        key={index}
+                        name={item.customer.name}
+                        state={item.status}
+                        price={item.room.roomNumber}
+                        totalSales={item.bookingLocation}
+                        date={new Date(item.createdAt).toLocaleString()}
+                        id={item._id}
+                        handleDelete={handleDelete}
+                        handleDownload={download}
+                      />
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>

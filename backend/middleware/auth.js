@@ -42,8 +42,6 @@ exports.requireSignin = (req, res, next) => {
 exports.isAuthorized = (role) => {
   return async (req, res, next) => {
     try {
-      // console.log(req.user);
-
       const user = await User.findById(req.user.id).populate("role");
       if (!role.includes(user.role.name) || user.active === false) {
         return res.status(403).json({ message: "Access denied" });

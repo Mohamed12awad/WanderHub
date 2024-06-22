@@ -4,7 +4,10 @@ const userController = require("../controllers/userController");
 const { isAuthorized } = require("../middleware/auth");
 
 router.get("/", userController.getUsers);
+router.get("/:id", userController.getUserById);
+
 router.post("/", isAuthorized("admin"), userController.createUser);
+router.put("/:id", isAuthorized("admin"), userController.updateUser);
 router.put("/role/:id", isAuthorized("admin"), userController.updateUserRole);
 router.put(
   "/active/:id",

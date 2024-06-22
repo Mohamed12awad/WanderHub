@@ -5,6 +5,7 @@ const roomSchema = new mongoose.Schema({
   type: { type: String }, // single, double, suite, etc.
   capacity: { type: Number },
   location: { type: String },
+  notes: { type: String },
 });
 
 const Room = mongoose.model("Room", roomSchema);

@@ -57,7 +57,8 @@ const EditBooking = () => {
   useEffect(() => {
     const fetchBookingData = async () => {
       try {
-        const { data } = await getBookingById(bookingId!);
+        let { data } = await getBookingById(bookingId!);
+        data = data.bookings;
         setFormData({
           ...data,
           customer: data.customer._id,
@@ -217,10 +218,11 @@ const EditBooking = () => {
                   Total Paid
                 </Label>
                 <Input
+                  disabled
                   id="totalPaid"
                   name="totalPaid"
                   value={formData.totalPaid}
-                  onChange={handleChange}
+                  // onChange={handleChange}
                   required
                 />
               </div>

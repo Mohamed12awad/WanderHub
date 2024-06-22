@@ -17,7 +17,7 @@ const bookingSchema = new Schema(
     totalPaid: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ["booked", "checked-in", "checked-out", "cancelled"],
+      enum: ["booked", "pending", "checked-in", "checked-out", "cancelled"],
       default: "booked",
     },
     numberOfPeople: {

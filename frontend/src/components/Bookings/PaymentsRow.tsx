@@ -10,13 +10,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
-
 import React from "react";
-import { Link } from "react-router-dom";
 
 interface CustomerRowProps {
   id: string;
-  name: string;
+  name?: string;
   state: string;
   price: string;
   totalSales: string;
@@ -38,6 +36,9 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   return (
     <TableRow>
       <TableCell className="font-medium">{name}</TableCell>
+      <TableCell className="hidden md:table-cell capitalize">
+        {totalSales}
+      </TableCell>
       <TableCell>
         <Badge
           variant="outline"
@@ -47,9 +48,6 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
-      <TableCell className="hidden md:table-cell capitalize">
-        {totalSales}
-      </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
       <TableCell>
         <DropdownMenu>
@@ -61,9 +59,9 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <Link to={`/users/${id}/edit`}>
+            {/* <Link to={`/bookings/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
-            </Link>
+            </Link> */}
             {user?.role === "admin" && (
               <DropdownMenuItem onClick={() => handleDelete(id)}>
                 Delete

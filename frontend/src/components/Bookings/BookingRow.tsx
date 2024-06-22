@@ -67,7 +67,9 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
             <DropdownMenuItem onClick={() => handleDownload(id)}>
               Download Invoice
             </DropdownMenuItem>
-
+            <Link to={`/bookings/${id}`}>
+              <DropdownMenuItem>View</DropdownMenuItem>
+            </Link>
             <Link to={`/bookings/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>

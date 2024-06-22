@@ -2,10 +2,10 @@
 import axios from "axios";
 
 export interface UserData {
-  email: string;
-  password: string;
-  name: string;
-  role: string;
+  email?: string;
+  password?: string;
+  name?: string;
+  role?: string;
 }
 interface BookingData {
   customer: string;
@@ -94,26 +94,21 @@ api.interceptors.response.use(
 
 // Bookings API Requests
 export const getBookings = () => api.get("/bookings");
-export const getBookingById = (id: string) => api.get(`/bookings/${id}`);
+export const getBookingById = (id: string) =>
+  api.get(`/bookings/${id}?includePayments=true`);
 export const createBooking = (data: BookingData) => api.post("/bookings", data);
 export const updateBooking = (id: string, data: BookingData) =>
   api.put(`/bookings/${id}`, data);
-export const deleteBooking = (BookingId: string) =>
-  api.delete(`/bookings/${BookingId}`);
-// export const getInvoice = (bookingId: string) =>
-//   api.get(`bookings/${bookingId}/invoice`, {
-//     responseType: "blob",
-//   });
+export const deleteBooking = (id: string) => api.delete(`/bookings/${id}`);
 export const downloadInvoice = async (bookingId: string) => {
   try {
     const response = await api.get(`bookings/${bookingId}/invoice`, {
       responseType: "blob",
     });
-
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `invoice_${bookingId}.pdf`); // Specify the file name
+    link.setAttribute("download", `invoice_${bookingId}.pdf`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -121,14 +116,21 @@ export const downloadInvoice = async (bookingId: string) => {
     console.error("Error downloading the invoice:", error);
   }
 };
+// export const getBookingPayment = (id: string) => api.get(`/bookings/${id}`);
+
+// Payment API Customers
+export const deletePayment = (PaymentId: string) =>
+  api.delete(`/partialPayments/${PaymentId}`);
 
 // Roles API Customers
 export const getRoles = () => api.get("/roles");
 
 // User API Requests
 export const getUsers = () => api.get("/users");
-export const getUsersById = () => api.get("/users");
+export const getUserById = (id: string) => api.get(`/users/${id}`);
 export const createUser = (data: UserData) => api.post("/users", data);
+export const updateUser = (userId: string, data: UserData) =>
+  api.put(`/users/${userId}`, data);
 export const deleteUser = (userId: string) => api.delete(`/users/${userId}`);
 export const toggleUserState = (id: string) => api.put(`/users/active/${id}`);
 

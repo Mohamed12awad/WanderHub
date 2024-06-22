@@ -34,10 +34,10 @@ router.get(
   bookingController.getInvoice
 );
 router.delete(
-  "/invoice/:id",
+  "/:id",
   requireSignin,
   isAuthorized(["admin"]),
-  bookingController.updateBooking
+  bookingController.deleteBooking
 );
 
 // And so on for other CRUD operations...

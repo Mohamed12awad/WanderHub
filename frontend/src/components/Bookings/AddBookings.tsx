@@ -24,7 +24,7 @@ const initialFormData = {
   endDate: "",
   price: "",
   currency: "EGP",
-  totalPaid: "",
+  totalPaid: "0",
   status: "booked",
   numberOfPeople: "",
   bookingLocation: "",

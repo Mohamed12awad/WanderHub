@@ -12,6 +12,8 @@ import { Users } from "@/components/Users/Users";
 import PrivateRoute from "@/components/PrivateRoute";
 import AddBooking from "@/components/Bookings/AddBookings";
 import EditBooking from "@/components/Bookings/EditBookings";
+import EditUser from "@/components/Users/EditUser";
+import ViewBooking from "@/components/Bookings/ViewBooking";
 
 const DefaultLayout: React.FC = () => {
   // This will conditionally render the Sidebar and NavBar
@@ -34,7 +36,9 @@ const DefaultLayout: React.FC = () => {
             }
           />
           <Route path="/users/add" element={<AddUser />} />
+          <Route path="/users/:id/edit" element={<EditUser />} />
           <Route path="/bookings" element={<Bookings />} />
+          <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/add" element={<AddBooking />} />
           <Route path="/bookings/:id/edit" element={<EditBooking />} />
         </Routes>
