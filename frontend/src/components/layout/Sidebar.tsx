@@ -4,13 +4,13 @@ import { Button } from "../ui/button";
 import { Link } from "react-router-dom";
 import NavItem from "./NavItem"; // Adjust the import path according to your project structure
 import {
-  Home,
-  ShoppingCart,
+  // Home,
+  // ShoppingCart,
   Users2,
-  LineChart,
+  // LineChart,
   Bell,
   Plane,
-  Package,
+  // Package,
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
@@ -54,7 +54,7 @@ export default function Sidebar() {
                 active={location.pathname.includes("/users")}
               />
             )}
-
+            {/* 
             <NavItem
               href="/"
               icon={Home}
@@ -79,7 +79,7 @@ export default function Sidebar() {
               icon={LineChart}
               label="Analytics"
               active={location.pathname === "/analytics"}
-            />
+            /> */}
           </nav>
         </div>
       </div>
