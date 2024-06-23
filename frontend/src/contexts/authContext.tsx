@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           "Authorization"
         ] = `Bearer ${response.data.token}`; // Set default header for axios
         // console.log("you logged in ", response.data.user);
-        navigate("/");
+        navigate("/customers");
       }
     } catch (error) {
       setError("Login failed. Please check your credentials and try again.");

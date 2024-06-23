@@ -15,6 +15,7 @@ const App: React.FC = () => {
         <QueryClientProvider client={queryClient}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Login />} />
             <Route path="/*" element={<DefaultLayout />} />
             {/* <Route path="/signup" element={<Signup />} /> */}
             {/* <Route
