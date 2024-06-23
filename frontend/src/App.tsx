@@ -10,9 +10,9 @@ const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <Router>
+    <Router>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/*" element={<DefaultLayout />} />
@@ -28,9 +28,9 @@ const App: React.FC = () => {
             {/* <Route path="/admin" element={<RoleRoute roles={['admin']}><AdminPage /></RoleRoute>} /> */}
             {/* <Route path="/user" element={<PrivateRoute><UserPage /></PrivateRoute>} /> */}
           </Routes>
-        </Router>
-      </QueryClientProvider>
-    </AuthProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </Router>
   );
 };
 
