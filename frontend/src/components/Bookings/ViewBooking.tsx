@@ -10,11 +10,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { getBookingById, deletePayment } from "@/utils/api";
 import { Link, useParams } from "react-router-dom";
-import { CircleArrowLeft } from "lucide-react";
+import { CircleArrowLeft, Edit } from "lucide-react";
 import PaymentRow from "./PaymentsRow";
 import { useQuery, useMutation, useQueryClient } from "react-query";
+import { PaymentDialog } from "../common/Dialog";
+import { Button } from "../ui/button";
 
 interface BookingData {
+  _id: string;
   customer: string;
   room: string;
   startDate: Date;
@@ -107,13 +110,22 @@ const ViewBooking = () => {
   return (
     <main className="p-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex">
+        <CardHeader className="flex flex-row justify-between">
+          <CardTitle className="flex items-center space-x-3">
             <Link to="/bookings">
               <CircleArrowLeft className="me-3" />
             </Link>
             View Booking
           </CardTitle>
+          <div className="buttons gap-x-3 flex">
+            <Link to={`/bookings/${bookingId}/edit`}>
+              <Button size="sm" className="h-8 gap-1 px-5">
+                <Edit className="h-3.5 w-3.5 me-1" />
+                Edit
+              </Button>
+            </Link>
+            <PaymentDialog id={formData._id} />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

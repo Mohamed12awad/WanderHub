@@ -16,7 +16,7 @@ const roleRoutes = require("./routes/roles");
 const authRoutes = require("./routes/auth");
 const logRoutes = require("./routes/logs");
 const { requireSignin, isAuthorized } = require("./middleware/auth");
-const dbConfig = require("./config/database");
+// const dbConfig = require("./config/database");
 
 // app.use(cookieParser());
 app.use(express.json());
@@ -28,8 +28,8 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
-
-mongoose.connect(dbConfig.uri);
+// uri
+mongoose.connect(process.env.uri);
 
 app.use("/api/auth", authRoutes);
 app.use(

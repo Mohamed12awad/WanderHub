@@ -124,15 +124,12 @@ exports.deletePartialPayment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Fetch the partial payment to be deleted
+    // Fetch the partial payment and delete it
     const partialPayment = await PartialPayment.findByIdAndDelete(id);
 
     if (!partialPayment) {
       return res.status(404).json({ message: "Partial payment not found" });
     }
-
-    // Remove the partial payment
-    // await partialPayment.remove();
 
     // Update the totalPaid amount in the booking
     const bookingToUpdate = await Booking.findById(partialPayment.booking);

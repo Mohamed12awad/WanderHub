@@ -7,6 +7,11 @@ export interface UserData {
   name?: string;
   role?: string;
 }
+interface PaymentData {
+  booking: string;
+  amount: number;
+  date: Date | string;
+}
 interface BookingData {
   customer: string;
   room: string;
@@ -119,6 +124,8 @@ export const downloadInvoice = async (bookingId: string) => {
 // export const getBookingPayment = (id: string) => api.get(`/bookings/${id}`);
 
 // Payment API Customers
+export const createPayment = (data: PaymentData) =>
+  api.post(`/partialPayments`, data);
 export const deletePayment = (PaymentId: string) =>
   api.delete(`/partialPayments/${PaymentId}`);
 

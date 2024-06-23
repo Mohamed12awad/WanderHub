@@ -146,7 +146,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Customer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="overflow-y-auto max-h-[10rem]">
                     {customers?.data.map((customer: Customer) => (
                       <SelectItem key={customer._id} value={customer._id}>
                         {customer.name}
@@ -170,7 +170,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Room" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="overflow-y-auto max-h-[10rem]">
                     {rooms?.data.map((room: Room) => (
                       <SelectItem key={room._id} value={room._id}>
                         {room.roomNumber}
@@ -296,7 +296,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="overflow-y-auto max-h-[10rem]">
                     <SelectItem value="booked">Booked</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -316,7 +316,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Booking Location" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="overflow-y-auto max-h-[10rem]">
                     <SelectItem value="Matrouh">Matrouh</SelectItem>
                     <SelectItem value="Cairo">Cairo</SelectItem>
                     <SelectItem value="Luxor">Luxor</SelectItem>
