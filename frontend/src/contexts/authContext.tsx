@@ -12,6 +12,7 @@ interface User {
   email: string;
   role: string;
 }
+import { useNavigate } from "react-router-dom";
 
 // TypeScript interface for the AuthContext
 interface AuthContextProps {
@@ -35,13 +36,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const navigate = useNavigate();
+
   // Function to handle login
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.post(
-        "http://127.0.0.1:5000/api/auth/signin",
+        `${process.env.VITE_API_URL}/auth/signin`,
         { email, password }
       );
       if (response.status === 200) {
@@ -53,7 +56,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           "Authorization"
         ] = `Bearer ${response.data.token}`; // Set default header for axios
         // console.log("you logged in ", response.data.user);
-        location.href = "/";
+        navigate("/");
       }
     } catch (error) {
       setError("Login failed. Please check your credentials and try again.");
@@ -70,7 +73,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     delete axios.defaults.headers.common["Authorization"]; // Remove default header for axios
-    location.href = "/login";
+    navigate("/login");
   };
 
   // Check if user is already logged in on component mount
