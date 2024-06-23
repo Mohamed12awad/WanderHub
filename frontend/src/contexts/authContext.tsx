@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     setError(null);
     try {
       const response = await axios.post(
-        `${process.env.VITE_API_URL}/auth/signin`,
+        `${import.meta.env.VITE_API_URL}auth/signin`,
         { email, password }
       );
       if (response.status === 200) {
