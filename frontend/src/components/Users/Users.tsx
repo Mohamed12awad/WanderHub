@@ -28,6 +28,7 @@ import UserRow from "./UserRow";
 import { deleteUser, getUsers } from "@/utils/api";
 import { Link } from "react-router-dom";
 import { User } from "@/types/types";
+import LoadingSpinner from "../common/spinner";
 
 export function Users() {
   const queryClient = useQueryClient();
@@ -41,12 +42,12 @@ export function Users() {
   const handleDelete = async (id: string) => {
     mutation.mutate(id);
   };
-  // console.log(Users?.data);
-  if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading Users</div>;
 
   return (
     <main className="grid flex-1 mt-4 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      <LoadingSpinner loading={isLoading} />
+
       <Tabs defaultValue="all">
         <div className="flex items-center">
           <TabsList>

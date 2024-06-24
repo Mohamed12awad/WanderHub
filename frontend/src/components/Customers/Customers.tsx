@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CustomerRow from "./customerRow";
 import { deleteCustomer, getCustomers } from "@/utils/api";
 import { Link } from "react-router-dom";
+import LoadingSpinner from "../common/spinner";
 
 type Customer = {
   _id: string;
@@ -56,11 +57,12 @@ export function Customers() {
     mutation.mutate(id);
   };
   // console.log(customers?.data);
-  if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading customers</div>;
 
   return (
     <main className="grid flex-1 mt-4 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      <LoadingSpinner loading={isLoading} />
+
       <Tabs defaultValue="all">
         <div className="flex items-center">
           <TabsList>

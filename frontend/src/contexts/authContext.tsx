@@ -6,15 +6,14 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-// TypeScript interface for the user object
+import { useNavigate } from "react-router-dom";
+
 interface User {
   name: string;
   email: string;
   role: string;
 }
-import { useNavigate } from "react-router-dom";
 
-// TypeScript interface for the AuthContext
 interface AuthContextProps {
   user: User | null;
   isLoggedIn: boolean;
@@ -24,21 +23,18 @@ interface AuthContextProps {
   error: string | null;
 }
 
-// Create the AuthContext with a default value of undefined
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-// AuthProvider component
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Initially true to indicate loading
   const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
-  // Function to handle login
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
@@ -51,11 +47,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setIsLoggedIn(true);
         setUser(response.data.user);
         localStorage.setItem("user", JSON.stringify(response.data.user));
-        localStorage.setItem("token", response.data.token); // Store token in localStorage
+        localStorage.setItem("token", response.data.token);
         axios.defaults.headers.common[
           "Authorization"
-        ] = `Bearer ${response.data.token}`; // Set default header for axios
-        // console.log("you logged in ", response.data.user);
+        ] = `Bearer ${response.data.token}`;
         navigate("/customers");
       }
     } catch (error) {
@@ -66,31 +61,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  // Function to handle logout
   const logout = () => {
     setIsLoggedIn(false);
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    delete axios.defaults.headers.common["Authorization"]; // Remove default header for axios
+    delete axios.defaults.headers.common["Authorization"];
     navigate("/login");
   };
 
-  // Check if user is already logged in on component mount
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     const storedToken = localStorage.getItem("token");
+
     if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
       setIsLoggedIn(true);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`; // Set default header for axios
+      axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
     }
+    setLoading(false); // Set loading to false after checking localStorage
   }, []);
-  // useEffect(() => {
-  //   if (user) {
-  //     navigate("postConsent");
-  //   }
-  // }, [user]);
 
   return (
     <AuthContext.Provider
@@ -101,7 +91,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   );
 };
 
-// Custom hook to use the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

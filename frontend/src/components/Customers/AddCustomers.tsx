@@ -14,6 +14,8 @@ import { createCustomer, getUsers } from "@/utils/api";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
+import { AxiosError } from "axios";
+import { ErrorResponse } from "@/types/types";
 
 interface User {
   _id: string;
@@ -93,7 +95,6 @@ const AddCustomer = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log(formData);
     try {
       setIsLoading(true);
       await createCustomer(formData);
@@ -102,6 +103,10 @@ const AddCustomer = () => {
     } catch (error) {
       setIsLoading(false);
       console.error("Error adding customer:", error);
+      const axiosError = error as AxiosError<ErrorResponse>;
+      const errMsg = axiosError.response?.data?.message;
+      console.error("Error creating user:", errMsg);
+      alert(errMsg);
     }
   };
 
@@ -117,7 +122,10 @@ const AddCustomer = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <form
+            onSubmit={handleSubmit}
+            className="md:grid md:grid-cols-2 gap-4"
+          >
             {/* Personal Information */}
             <div>
               <h2 className="text-lg font-semibold mb-2">
@@ -173,7 +181,9 @@ const AddCustomer = () => {
 
             {/* Work Related */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">Work Related</h2>
+              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
+                Work Related
+              </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="location">
                   Location
@@ -231,7 +241,7 @@ const AddCustomer = () => {
                     <SelectItem value="Draft">Draft</SelectItem>
                     <SelectItem value="Called">Called</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Deal Closed">Offer Sent</SelectItem>
+                    <SelectItem value="Offer Sent">Offer Sent</SelectItem>
                     <SelectItem value="Deal Closed">Deal Closed</SelectItem>
                     <SelectItem value="Deal Lost">Deal Lost</SelectItem>
                   </SelectContent>
@@ -251,7 +261,7 @@ const AddCustomer = () => {
             </div>
             {/* Address Information */}
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
                 Address Information
               </h2>
               <div className="flex flex-col">
@@ -313,7 +323,7 @@ const AddCustomer = () => {
 
             {/* Identification Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
                 Identification Information
               </h2>
               <div className="flex flex-col">
@@ -425,7 +435,7 @@ const AddCustomer = () => {
 
             {/* Loyalty Program Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
                 Loyalty Program Information
               </h2>
               <div className="flex flex-col">

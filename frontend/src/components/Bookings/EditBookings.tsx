@@ -19,6 +19,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
+import LoadingSpinner from "../common/spinner";
 
 interface Customer {
   _id: string;
@@ -116,6 +117,7 @@ const EditBooking = () => {
 
   return (
     <main className="p-4">
+      <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader>
           <CardTitle className="flex">

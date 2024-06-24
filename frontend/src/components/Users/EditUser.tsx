@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AxiosError, AxiosResponse } from "axios";
 import { ErrorResponse } from "@/types/types";
+import LoadingSpinner from "../common/spinner";
 
 interface Roles {
   name: string;
@@ -69,7 +70,6 @@ const EditUser: React.FC = () => {
     }
   }, [userData]);
 
-  if (rolesLoading || userLoading) return <div>Loading...</div>;
   if (rolesError || userError) return <div>Error loading data</div>;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,6 +100,8 @@ const EditUser: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center py-0">
+      <LoadingSpinner loading={rolesLoading || userLoading} />
+
       <div className="mx-auto grid gap-6">
         <div className="grid gap-2 text-center">
           <h1 className="text-3xl font-bold">Edit user</h1>

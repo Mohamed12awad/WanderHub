@@ -4,13 +4,14 @@ import { useAuth } from "../contexts/authContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import LoadingSpinner from "@/components/common/spinner";
+// import { Link } from "react-router-dom";
 
 // console.log(import.meta.env.VITE_API_URL);
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -19,6 +20,7 @@ const Login = () => {
 
   return (
     <div className="w-full lg:grid  lg:grid-cols-2 ">
+      <LoadingSpinner loading={loading} />
       <div className="flex items-center justify-center py-12">
         <div className="mx-auto grid w-[350px] gap-6">
           <div className="grid gap-2 text-center">
@@ -42,17 +44,18 @@ const Login = () => {
             <div className="grid gap-2">
               <div className="flex items-center">
                 <Label htmlFor="password">Password</Label>
-                <Link
+                {/* <Link
                   to="/forgot-password"
                   className="ml-auto inline-block text-sm underline"
                 >
                   Forgot your password?
-                </Link>
+                </Link> */}
               </div>
               <Input
                 id="password"
                 type="password"
                 required
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -60,21 +63,21 @@ const Login = () => {
             <Button type="submit" className="w-full">
               Login
             </Button>
-            <Button variant="outline" className="w-full">
+            <Button disabled variant="outline" className="w-full">
               Login with Google
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
+          {/* <div className="mt-4 text-center text-sm">
             Don&apos;t have an account?{" "}
             <Link to="/" className="underline">
               Sign up
             </Link>
-          </div>
+          </div> */}
         </div>
       </div>
       <div className="hidden bg-muted lg:block h-svh">
         <img
-          src="/public/see.jpg"
+          src="/see.jpg"
           alt="Image"
           className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
         />

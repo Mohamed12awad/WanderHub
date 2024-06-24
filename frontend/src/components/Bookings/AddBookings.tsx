@@ -16,6 +16,7 @@ import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
 import { ErrorResponse, Customer, Room, BookingData } from "@/types/types";
+import LoadingSpinner from "../common/spinner";
 
 const initialFormData = {
   customer: "",
@@ -119,6 +120,7 @@ const AddBooking = () => {
 
   return (
     <main className="p-4">
+      <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader>
           <CardTitle className="flex">

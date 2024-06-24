@@ -1,67 +1,7 @@
 // src/utils/api.js
 import axios from "axios";
-
-export interface UserData {
-  email?: string;
-  password?: string;
-  name?: string;
-  role?: string;
-}
-interface PaymentData {
-  booking: string;
-  amount: number;
-  date: Date | string;
-}
-interface BookingData {
-  customer: string;
-  room: string;
-  startDate: Date;
-  endDate: Date;
-  price: number;
-  currency: string;
-  totalPaid: number;
-  status: string;
-  numberOfPeople: number;
-  extraBusSeats: number;
-  bookingLocation: string;
-  notes: string;
-}
-type FormData = {
-  name: string;
-  phone: string;
-  mobile: string;
-  email: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zip: string;
-    country: string;
-  };
-  identification: {
-    passportNumber: string;
-    nationalId: string;
-  };
-  dateOfBirth: string; // Adjust based on actual type (e.g., Date)
-  gender: string;
-  preferredContactMethod: string;
-  paymentInformation: {
-    cardType: string;
-    cardNumber: string;
-    expirationDate: string;
-  };
-  loyaltyProgram: {
-    memberId: string;
-    points: string;
-  };
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  location: string;
-  // Add more fields as per your form schema
-};
+import { BookingData, PaymentData, UserData } from "@/types/types";
+import { useAuth } from "@/contexts/authContext";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -88,10 +28,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Redirect to login page if token is expired
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      delete axios.defaults.headers.common["Authorization"];
-      window.location.href = "/login";
+      const { logout } = useAuth();
+      logout();
     }
     return Promise.reject(error);
   }

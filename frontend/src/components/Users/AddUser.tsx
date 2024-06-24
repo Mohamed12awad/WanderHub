@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AxiosError } from "axios";
 import { ErrorResponse } from "@/types/types";
+import LoadingSpinner from "../common/spinner";
 
 interface Roles {
   name: string;
@@ -41,7 +42,6 @@ const AddUser: React.FC = () => {
 
   const { data: roles, isLoading, error } = useQuery("roles", getRoles);
 
-  if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading roles</div>;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +72,7 @@ const AddUser: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center py-0">
+      <LoadingSpinner loading={isLoading} />
       <div className="mx-auto grid gap-6">
         <div className="grid gap-2 text-center">
           <h1 className="text-3xl font-bold">Add a new user</h1>

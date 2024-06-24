@@ -13,8 +13,9 @@ import { Link, useParams } from "react-router-dom";
 import { CircleArrowLeft, Edit } from "lucide-react";
 import PaymentRow from "./PaymentsRow";
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { PaymentDialog } from "../common/Dialog";
+import { PaymentDialog } from "../common/PaymentDialog";
 import { Button } from "../ui/button";
+import LoadingSpinner from "../common/spinner";
 
 interface BookingData {
   _id: string;
@@ -98,17 +99,15 @@ const ViewBooking = () => {
   }, [bookingId, bookingData]);
 
   if (!formData) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner loading={!formData} />;
   }
 
-  if (isLoading) {
-    return <div>Loading.......</div>;
-  }
   if (error) {
     return <div>Error loading Bookings</div>;
   }
   return (
     <main className="p-4">
+      <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader className="flex flex-row justify-between">
           <CardTitle className="flex items-center space-x-3">

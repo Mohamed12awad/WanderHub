@@ -86,3 +86,66 @@ export interface BookingData {
   extraBusSeats: number;
   notes: string;
 }
+export interface UserData {
+  email?: string;
+  password?: string;
+  name?: string;
+  role?: string;
+}
+export interface PaymentData {
+  booking: string;
+  amount: number;
+  date: Date | string;
+}
+export interface BookingData {
+  customer: string;
+  room: string;
+  startDate: Date;
+  endDate: Date;
+  price: number;
+  currency: string;
+  totalPaid: number;
+  status: string;
+  numberOfPeople: number;
+  extraBusSeats: number;
+  bookingLocation: string;
+  notes: string;
+}
+export type FormData = {
+  name: string;
+  phone: string;
+  mobile: string;
+  email: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  identification: {
+    passportNumber: string;
+    nationalId: string;
+  };
+  dateOfBirth: string; // Adjust based on actual type (e.g., Date)
+  gender: string;
+  preferredContactMethod: string;
+  paymentInformation: {
+    cardType: string;
+    cardNumber: string;
+    expirationDate: string;
+  };
+  loyaltyProgram: {
+    memberId: string;
+    points: string;
+  };
+  emergencyContact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  location: string;
+  owner: string;
+  notes: string;
+  status: string;
+};

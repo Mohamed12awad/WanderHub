@@ -9,7 +9,7 @@ import EditCustomer from "@/components/Customers/EditCustomer";
 import { Bookings } from "@/components/Bookings/Bookings";
 import ViewCustomer from "@/components/Customers/ViewCustomer";
 import { Users } from "@/components/Users/Users";
-import PrivateRoute from "@/components/PrivateRoute";
+// import PrivateRoute from "@/components/PrivateRoute";
 import AddBooking from "@/components/Bookings/AddBookings";
 import EditBooking from "@/components/Bookings/EditBookings";
 import EditUser from "@/components/Users/EditUser";
@@ -27,14 +27,15 @@ const DefaultLayout: React.FC = () => {
           <Route path="/customers/:id" element={<ViewCustomer />} />
           <Route path="/customers/add" element={<AddCustomer />} />
           <Route path="/customers/:id/edit" element={<EditCustomer />} />
-          <Route
+          {/* <Route
             path="/users"
             element={
               <PrivateRoute>
                 <Users />
               </PrivateRoute>
             }
-          />
+          /> */}
+          <Route path="/users" element={<Users />} />
           <Route path="/users/add" element={<AddUser />} />
           <Route path="/users/:id/edit" element={<EditUser />} />
           <Route path="/bookings" element={<Bookings />} />

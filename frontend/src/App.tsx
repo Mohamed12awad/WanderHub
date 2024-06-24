@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "react-query";
 
 import { AuthProvider } from "./contexts/authContext";
 import DefaultLayout from "./pages/main";
+import PrivateRoute from "./components/PrivateRoute";
 
 const queryClient = new QueryClient();
 
@@ -15,19 +16,15 @@ const App: React.FC = () => {
         <QueryClientProvider client={queryClient}>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Login />} />
-            <Route path="/*" element={<DefaultLayout />} />
-            {/* <Route path="/signup" element={<Signup />} /> */}
-            {/* <Route
-              path="/dashboard"
+            {/* <Route path="/" element={<Login />} /> */}
+            <Route
+              path="/*"
               element={
                 <PrivateRoute>
-                  <Dashboard />
+                  <DefaultLayout />
                 </PrivateRoute>
               }
-            /> */}
-            {/* <Route path="/admin" element={<RoleRoute roles={['admin']}><AdminPage /></RoleRoute>} /> */}
-            {/* <Route path="/user" element={<PrivateRoute><UserPage /></PrivateRoute>} /> */}
+            />
           </Routes>
         </QueryClientProvider>
       </AuthProvider>

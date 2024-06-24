@@ -7,6 +7,7 @@ import { Link, useParams } from "react-router-dom";
 import { CircleArrowLeft, Edit } from "lucide-react";
 import { Customer } from "@/types/types";
 import { Button } from "../ui/button";
+import LoadingSpinner from "../common/spinner";
 
 const ViewCustomer: React.FC = () => {
   const [customerData, setCustomerData] = useState<Customer | null>(null);
@@ -30,6 +31,7 @@ const ViewCustomer: React.FC = () => {
 
   return (
     <main className="p-4">
+      <LoadingSpinner loading={!customerData} />
       <Card>
         <CardHeader className="flex flex-row justify-between">
           <CardTitle className="flex items-center space-x-3">

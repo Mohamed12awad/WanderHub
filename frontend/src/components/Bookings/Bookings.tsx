@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BookingRow from "./BookingRow";
 import { deleteBooking, getBookings, downloadInvoice } from "@/utils/api";
 import { Link } from "react-router-dom";
+import LoadingSpinner from "@/components/common/spinner";
 
 type Booking = {
   _id: string;
@@ -72,7 +73,6 @@ export function Bookings() {
     mutation.mutate(id);
   };
   // console.log(customers?.data);
-  if (isLoading || downloadLoading) return <div>Loading...</div>;
   if (error || downloadError) return <div>Error loading Bookings</div>;
   if (error || isDownloadError) return <div>Error loading Bookings</div>;
 
@@ -80,6 +80,7 @@ export function Bookings() {
 
   return (
     <main className="grid flex-1 mt-4 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+      {<LoadingSpinner loading={isLoading || downloadLoading} />}
       <Tabs defaultValue="all">
         <div className="flex items-center">
           <TabsList>
