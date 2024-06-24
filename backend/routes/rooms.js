@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const roomController = require("../controllers/roomController");
+const { isAuthorized } = require("../middleware/auth");
 
 // GET all rooms
 router.get("/", roomController.getRooms);
@@ -15,7 +16,7 @@ router.post("/", roomController.createRoom);
 router.put("/:id", roomController.updateRoom);
 
 // DELETE delete a room
-router.delete("/:id", roomController.deleteRoom);
+router.delete("/:id", isAuthorized("admin"), roomController.deleteRoom);
 
 // And so on for other CRUD operations...
 
