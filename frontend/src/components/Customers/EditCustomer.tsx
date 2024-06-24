@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { updateCustomer, getCustomerById, getUsers } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
+import { Customer } from "@/types/types";
 // import { useQuery } from "react-query";
 
 interface User {
@@ -21,6 +22,7 @@ interface User {
 }
 
 const initialFormData = {
+  _id: "",
   name: "",
   phone: "",
   mobile: "",
@@ -54,7 +56,7 @@ const initialFormData = {
     relationship: "",
   },
   location: "",
-  status: "",
+  status: "Draft",
   owner: "",
   notes: "",
 };
@@ -114,8 +116,9 @@ const EditCustomer = () => {
     if (!id) return;
 
     try {
+      const customerData: Customer = formData;
       setIsLoading(true);
-      await updateCustomer(id, formData);
+      await updateCustomer(id, customerData);
       setIsLoading(false);
       navigate("/customers/" + id);
     } catch (error) {
@@ -250,6 +253,7 @@ const EditCustomer = () => {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent className="overflow-y-auto max-h-[10rem]">
+                    <SelectItem value="Draft">Draft</SelectItem>
                     <SelectItem value="Called">Called</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
                     <SelectItem value="Deal Closed">Offer Sent</SelectItem>

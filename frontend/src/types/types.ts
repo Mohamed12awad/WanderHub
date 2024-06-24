@@ -15,7 +15,7 @@ export interface EmergencyContact {
 
 export interface LoyaltyProgram {
   memberId: string;
-  points: number;
+  points: number | string;
 }
 
 export interface PaymentInformation {
@@ -25,14 +25,17 @@ export interface PaymentInformation {
 }
 
 export interface Customer {
+  _id?: string;
   name: string;
   phone: string;
   mobile: string;
   email: string;
   location: string;
-  owner: {
-    name: string;
-  };
+  owner:
+    | string
+    | {
+        name: string;
+      };
   status: string;
   notes: string;
   address: Address;
@@ -62,10 +65,10 @@ export interface ErrorResponse {
   message?: string;
 }
 
-export interface Customer {
-  _id: string;
-  name: string;
-}
+// export interface Customer {
+//   _id: string;
+//   name: string;
+// }
 
 export interface Room {
   _id: string;
@@ -111,41 +114,41 @@ export interface BookingData {
   bookingLocation: string;
   notes: string;
 }
-export type FormData = {
-  name: string;
-  phone: string;
-  mobile: string;
-  email: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zip: string;
-    country: string;
-  };
-  identification: {
-    passportNumber: string;
-    nationalId: string;
-  };
-  dateOfBirth: string; // Adjust based on actual type (e.g., Date)
-  gender: string;
-  preferredContactMethod: string;
-  paymentInformation: {
-    cardType: string;
-    cardNumber: string;
-    expirationDate: string;
-  };
-  loyaltyProgram: {
-    memberId: string;
-    points: string;
-  };
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  location: string;
-  owner: string;
-  notes: string;
-  status: string;
-};
+// export interface FormData {
+//   name: string;
+//   phone: string;
+//   mobile: string;
+//   email: string;
+//   address: {
+//     street: string;
+//     city: string;
+//     state: string;
+//     zip: string;
+//     country: string;
+//   };
+//   identification: {
+//     passportNumber: string;
+//     nationalId: string;
+//   };
+//   dateOfBirth: string;
+//   gender: string;
+//   preferredContactMethod: string;
+//   paymentInformation: {
+//     cardType: string;
+//     cardNumber: string;
+//     expirationDate: string;
+//   };
+//   loyaltyProgram: {
+//     memberId: string;
+//     points: string;
+//   };
+//   emergencyContact: {
+//     name: string;
+//     phone: string;
+//     relationship: string;
+//   };
+//   location: string;
+//   owner: string;
+//   notes: string;
+//   status: string;
+// }

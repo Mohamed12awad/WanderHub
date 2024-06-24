@@ -9,7 +9,7 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   const { isLoggedIn, loading } = useAuth();
 
   if (loading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner loading={loading} />;
   }
 
   if (!isLoggedIn) {

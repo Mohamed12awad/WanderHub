@@ -15,7 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
-import { ErrorResponse } from "@/types/types";
+import { Customer, ErrorResponse } from "@/types/types";
 
 interface User {
   _id: string;
@@ -96,8 +96,9 @@ const AddCustomer = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      const customerData: Customer = formData;
       setIsLoading(true);
-      await createCustomer(formData);
+      await createCustomer(customerData);
       setIsLoading(false);
       navigate("/customers");
     } catch (error) {

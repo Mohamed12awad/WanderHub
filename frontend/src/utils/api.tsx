@@ -1,7 +1,6 @@
 // src/utils/api.js
 import axios from "axios";
-import { BookingData, PaymentData, UserData } from "@/types/types";
-import { useAuth } from "@/contexts/authContext";
+import { BookingData, Customer, PaymentData, UserData } from "@/types/types";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -28,8 +27,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Redirect to login page if token is expired
-      const { logout } = useAuth();
-      logout();
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      delete axios.defaults.headers.common["Authorization"];
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
@@ -82,10 +83,10 @@ export const toggleUserState = (id: string) => api.put(`/users/active/${id}`);
 // User API Customers
 export const getCustomers = () => api.get("/customers");
 export const getCustomerById = (id: string) => api.get(`/customers/${id}`);
-export const createCustomer = (data: FormData) => api.post("/customers", data);
+export const createCustomer = (data: Customer) => api.post("/customers", data);
 export const deleteCustomer = (customerId: string) =>
   api.delete(`/customers/${customerId}`);
-export const updateCustomer = (customerId: string, data: FormData) =>
+export const updateCustomer = (customerId: string, data: Customer) =>
   api.put(`/customers/${customerId}`, data);
 
 // Rooms API Customers
