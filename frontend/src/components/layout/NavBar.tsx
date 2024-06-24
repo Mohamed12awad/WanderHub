@@ -10,16 +10,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
 import { FaUserCircle, FaBars, FaSearch } from "react-icons/fa";
 
 import {
-  Home,
-  ShoppingCart,
+  // Home,
+  // ShoppingCart,
   Users2,
-  LineChart,
+  Users,
+  // LineChart,
   Plane,
-  Package,
+  // Package,
 } from "lucide-react";
 
 import NavItem from "./NavItem"; // Adjust the import path according to your project structure
@@ -27,7 +27,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext.tsx";
 
 export default function NavBar() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <div className="flex flex-col">
@@ -52,11 +52,31 @@ export default function NavBar() {
                 <Plane className="h-6 w-6" />
                 <span>Sahab Tours</span>
               </Link>
-              <NavItem href="#" icon={Home} label="Dashboard" />
+              {/* <NavItem href="#" icon={Home} label="Dashboard" />
               <NavItem href="#" icon={ShoppingCart} label="Orders" badge="6" />
               <NavItem href="#" icon={Package} label="Products" active />
               <NavItem href="#" icon={Users2} label="Customers" />
-              <NavItem href="#" icon={LineChart} label="Analytics" />
+              <NavItem href="#" icon={LineChart} label="Analytics" /> */}
+              <NavItem
+                href="/customers"
+                icon={Users2}
+                label="Customers"
+                active={location.pathname.includes("/customers")}
+              />
+              <NavItem
+                href="/bookings"
+                icon={Plane}
+                label="Bookings"
+                active={location.pathname.includes("/bookings")}
+              />
+              {user?.role == "admin" && (
+                <NavItem
+                  href="/users"
+                  icon={Users}
+                  label="Users"
+                  active={location.pathname.includes("/users")}
+                />
+              )}
             </nav>
           </SheetContent>
         </Sheet>
