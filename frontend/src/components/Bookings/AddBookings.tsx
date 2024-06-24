@@ -150,7 +150,14 @@ const AddBooking = () => {
                   </SelectTrigger>
                   <SelectContent className="overflow-y-auto max-h-[10rem]">
                     {customers?.data.map((customer: Customer) => (
-                      <SelectItem key={customer._id} value={customer._id}>
+                      <SelectItem
+                        key={customer._id}
+                        value={
+                          typeof customer._id !== "undefined"
+                            ? customer._id
+                            : "N/A"
+                        }
+                      >
                         {customer.name}
                       </SelectItem>
                     ))}
