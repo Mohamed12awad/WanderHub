@@ -64,11 +64,11 @@ app.use(
   roomPriceRoutes
 );
 app.use("/api/trips", requireSignin, isAuthorized("manager"), tripRoutes);
-app.use("/api/reports", reportRoutes);
+app.use("/api/reports", requireSignin, isAuthorized("admin"), reportRoutes);
 app.use("/api/expenses", requireSignin, isAuthorized("admin"), expenseRoutes);
 app.use("/api/users", requireSignin, userRoutes);
 app.use("/api/roles", requireSignin, roleRoutes);
-app.use("/api/logs", requireSignin, logRoutes);
+app.use("/api/logs", requireSignin, isAuthorized("admin"), logRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

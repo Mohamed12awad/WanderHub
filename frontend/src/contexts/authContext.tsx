@@ -9,6 +9,7 @@ import React, {
 import { useNavigate } from "react-router-dom";
 
 interface User {
+  id: string;
   name: string;
   email: string;
   role: string;

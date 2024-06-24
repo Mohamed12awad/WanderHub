@@ -13,6 +13,8 @@ import { useAuth } from "@/contexts/authContext";
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { toggleUserState } from "@/utils/api";
+import { useQueryClient } from "react-query";
 
 interface CustomerRowProps {
   id: string;
@@ -33,7 +35,13 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   date,
   handleDelete,
 }) => {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  const handleToggleState = async (id: string) => {
+    await toggleUserState(id);
+    queryClient.invalidateQueries("Users"); // Invalidate and refetch the 'Users' query
+  };
 
   return (
     <TableRow>
@@ -64,6 +72,14 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
             <Link to={`/users/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
+
+            <DropdownMenuItem
+              disabled={user?.id == id ? true : false}
+              onClick={() => handleToggleState(id)}
+            >
+              Toggle Active
+            </DropdownMenuItem>
+
             {user?.role === "admin" && (
               <DropdownMenuItem onClick={() => handleDelete(id)}>
                 Delete

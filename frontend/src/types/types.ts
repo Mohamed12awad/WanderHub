@@ -23,6 +23,9 @@ export interface PaymentInformation {
   cardNumber: string;
   expirationDate: string;
 }
+export interface Owner {
+  name: string;
+}
 
 export interface Customer {
   _id?: string;
@@ -31,11 +34,7 @@ export interface Customer {
   mobile: string;
   email: string;
   location: string;
-  owner:
-    | string
-    | {
-        name: string;
-      };
+  owner: Owner | string;
   status: string;
   notes: string;
   address: Address;

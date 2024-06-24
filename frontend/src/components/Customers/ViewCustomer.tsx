@@ -9,6 +9,10 @@ import { Customer } from "@/types/types";
 import { Button } from "../ui/button";
 import LoadingSpinner from "../common/spinner";
 
+// type Owner = {
+//   name: string;
+// };
+
 const ViewCustomer: React.FC = () => {
   const [customerData, setCustomerData] = useState<Customer | null>(null);
   const { id } = useParams<{ id: string }>();
@@ -63,7 +67,14 @@ const ViewCustomer: React.FC = () => {
             <section>
               <h2 className="text-lg font-semibold mb-3">Work Related</h2>
               <InfoItem label="Location" value={customerData.location} />
-              <InfoItem label="Owner" value={customerData.owner.name} />
+              <InfoItem
+                label="Owner"
+                value={
+                  typeof customerData.owner !== "string"
+                    ? customerData.owner.name
+                    : "N/A"
+                }
+              />
               <InfoItem label="Status" value={customerData.status} />
               <InfoItem label="Notes" value={customerData.notes} />
             </section>

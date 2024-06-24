@@ -256,7 +256,7 @@ const EditCustomer = () => {
                     <SelectItem value="Draft">Draft</SelectItem>
                     <SelectItem value="Called">Called</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Deal Closed">Offer Sent</SelectItem>
+                    <SelectItem value="Offer Sent">Offer Sent</SelectItem>
                     <SelectItem value="Deal Closed">Deal Closed</SelectItem>
                     <SelectItem value="Deal Lost">Deal Lost</SelectItem>
                   </SelectContent>

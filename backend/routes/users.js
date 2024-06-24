@@ -4,7 +4,7 @@ const userController = require("../controllers/userController");
 const { isAuthorized } = require("../middleware/auth");
 
 router.get("/", userController.getUsers);
-router.get("/:id", userController.getUserById);
+router.get("/:id", isAuthorized("admin"), userController.getUserById);
 
 router.post("/", isAuthorized("admin"), userController.createUser);
 router.put("/:id", isAuthorized("admin"), userController.updateUser);
