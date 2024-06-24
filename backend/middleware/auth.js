@@ -43,12 +43,17 @@ exports.isAuthorized = (role) => {
   return async (req, res, next) => {
     try {
       const user = await User.findById(req.user.id).populate("role");
-      if (!role.includes(user.role.name) || user.active === false) {
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.active === false) {
+        return res.status(403).json({ message: "User is blocked" });
+      }
+
+      if (!role.includes("all") && !role.includes(user.role.name)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      // if (user.active === false) {
-      //   return res.status(400).json({ message: "User is Blocked" });
-      // }
       next();
     } catch (error) {
       res.status(500).json({ message: "Server error" });

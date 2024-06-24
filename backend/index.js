@@ -32,22 +32,12 @@ app.use(cors(corsOptions));
 mongoose.connect(process.env.uri);
 
 app.use("/api/auth", authRoutes);
-app.use(
-  "/api/customers",
-  requireSignin,
-  isAuthorized(["admin", "manager"]),
-  customerRoutes
-);
-app.use(
-  "/api/bookings",
-  requireSignin,
-  isAuthorized(["admin", "manager"]),
-  bookingRoutes
-);
+app.use("/api/customers", requireSignin, isAuthorized("all"), customerRoutes);
+app.use("/api/bookings", requireSignin, isAuthorized("all"), bookingRoutes);
 app.use(
   "/api/partialPayments",
   requireSignin,
-  isAuthorized(["admin", "manager"]),
+  isAuthorized("all"),
   partialPaymentRoutes
 );
 app.use("/api/purchases", requireSignin, isAuthorized("admin"), purchaseRoutes);
@@ -63,7 +53,7 @@ app.use(
   isAuthorized("admin"),
   roomPriceRoutes
 );
-app.use("/api/trips", requireSignin, isAuthorized("manager"), tripRoutes);
+app.use("/api/trips", requireSignin, isAuthorized("all"), tripRoutes);
 app.use("/api/reports", requireSignin, isAuthorized("admin"), reportRoutes);
 app.use("/api/expenses", requireSignin, isAuthorized("admin"), expenseRoutes);
 app.use("/api/users", requireSignin, userRoutes);
