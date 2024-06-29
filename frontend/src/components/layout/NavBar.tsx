@@ -1,4 +1,4 @@
-// NavBar.js
+// import { useState } from "react";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "../ui/input";
@@ -13,22 +13,25 @@ import {
 import { FaUserCircle, FaBars, FaSearch } from "react-icons/fa";
 
 import {
-  // Home,
-  // ShoppingCart,
   Users2,
   Users,
-  // LineChart,
   Plane,
   LayoutDashboard,
-  // Package,
+  WalletCards,
+  // ArrowDownIcon,
 } from "lucide-react";
 
-import NavItem from "./NavItem"; // Adjust the import path according to your project structure
+import NavItem from "./NavItem";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext.tsx";
 
 export default function NavBar() {
   const { user, logout } = useAuth();
+  // const [searchContext, setSearchContext] = useState("customers");
+
+  // const handleSearchContextChange = (context: string) => {
+  //   setSearchContext(context);
+  // };
 
   return (
     <div className="flex flex-col print:hidden">
@@ -50,16 +53,9 @@ export default function NavBar() {
                 to="/"
                 className="flex items-center gap-2 text-lg font-semibold"
               >
-                {/* <Plane className="h-6 w-6" /> */}
                 <img src="/logo.png" className="h-6 w-6" />
-
                 <span>WonderHub</span>
               </Link>
-              {/* <NavItem href="#" icon={Home} label="Dashboard" />
-              <NavItem href="#" icon={ShoppingCart} label="Orders" badge="6" />
-              <NavItem href="#" icon={Package} label="Products" active />
-              <NavItem href="#" icon={Users2} label="Customers" />
-              <NavItem href="#" icon={LineChart} label="Analytics" /> */}
               <NavItem
                 href="/customers"
                 icon={Users2}
@@ -80,6 +76,12 @@ export default function NavBar() {
                   active={location.pathname.includes("/users")}
                 />
               )}
+              <NavItem
+                href="/reports"
+                icon={WalletCards}
+                label="Reports"
+                active={location.pathname.includes("/reports")}
+              />
               {user?.role == "admin" && (
                 <NavItem
                   href="/dashboard"
@@ -91,13 +93,32 @@ export default function NavBar() {
             </nav>
           </SheetContent>
         </Sheet>
-        <div className="w-full flex-1">
-          <form>
+        <div className="w-full flex-1 flex items-center">
+          {/* <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="">
+                {searchContext.charAt(0).toUpperCase() + searchContext.slice(1)}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                onClick={() => handleSearchContextChange("customers")}
+              >
+                Customers
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleSearchContextChange("bookings")}
+              >
+                Bookings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu> */}
+          <form className="w-full" method="get">
             <div className="relative">
               <FaSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search products..."
+                placeholder={`Search ${"customers"}...`}
                 className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
               />
             </div>

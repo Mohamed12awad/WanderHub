@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { ChangeEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -312,6 +312,47 @@ const EditBooking = () => {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="method">
+                  Currency
+                </Label>
+                <div className="col-span-3">
+                  <Select
+                    required
+                    value={formData.currency}
+                    defaultValue="EGP"
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev!, currency: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent className="overflow-y-auto max-h-[15rem]">
+                      <SelectItem value="EGP">EGP</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <Label htmlFor="notes" className="my-3">
+                  Notes
+                </Label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                    setFormData((prev) => ({
+                      ...prev!,
+                      notes: e.target.value,
+                    }))
+                  }
+                  className="col-span-3 border-[hsl('214.3 31.8% 91.4%')] border rounded-lg"
+                />
               </div>
             </div>
             <div className="col-span-2">
