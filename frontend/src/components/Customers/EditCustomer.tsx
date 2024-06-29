@@ -14,6 +14,7 @@ import { updateCustomer, getCustomerById, getUsers } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import { Customer } from "@/types/types";
+import { useAuth } from "@/contexts/authContext";
 // import { useQuery } from "react-query";
 
 interface User {
@@ -66,6 +67,7 @@ const EditCustomer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { id } = useParams<{ id: string }>();
   const [users, setUsers] = useState([]);
+  const { user } = useAuth();
   //   const { data: users } = useQuery("users", getUsers);
   const navigate = useNavigate();
 
@@ -222,6 +224,7 @@ const EditCustomer = () => {
                 <Select
                   value={formData.owner}
                   required
+                  disabled={user?.role === "admin" ? false : true}
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, owner: value }))
                   }

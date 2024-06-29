@@ -13,11 +13,20 @@ const partialPaymentSchema = new Schema(
       required: true,
       min: [1, "Amount can not be less than 1"],
     },
-    currency: { type: String, default: "EGP" },
+    currency: {
+      type: String,
+      enum: ["EGP", "USD", "Other"],
+      default: "EGP",
+    },
     date: { type: Date, required: true },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
+    },
+    method: {
+      type: String,
+      enum: ["cash", "bank transfer", "vodafone cash", "cheque"],
+      default: "cash",
     },
     notes: { type: String },
   },

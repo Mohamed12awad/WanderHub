@@ -39,7 +39,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   return (
     <TableRow>
       <TableCell className="font-medium">{name}</TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell capitalize">
         <Badge
           variant="outline"
           // className={state == "Deal Closed" && "bg-emeradld-300"}
@@ -47,7 +47,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
           {state}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
+      <TableCell className="capitalize">{price}</TableCell>
       <TableCell className="hidden md:table-cell capitalize">
         {totalSales}
       </TableCell>

@@ -10,4 +10,6 @@ router.get(
   reportController.getAccountingReport
 );
 
+router.get("/bookings", reportController.getBookingReport);
+
 module.exports = router;

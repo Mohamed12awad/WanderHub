@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+test*.tsx 
+invoice.pug
+accounting-report-template.pug
 
 # Editor directories and files
 .vscode/*

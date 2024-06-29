@@ -19,6 +19,7 @@ interface CustomerRowProps {
   price: string;
   totalSales: string;
   date: string;
+  method: string;
   handleDelete: (id: string) => void;
 }
 
@@ -29,15 +30,18 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   price,
   totalSales,
   date,
+  method,
   handleDelete,
 }) => {
   const { user } = useAuth();
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{name}</TableCell>
+      <TableCell className="hidden md:table-cell capitalize">{name}</TableCell>
+      <TableCell className="font-medium">{totalSales}</TableCell>
+      <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
       <TableCell className="hidden md:table-cell capitalize">
-        {totalSales}
+        {method}
       </TableCell>
       <TableCell>
         <Badge
@@ -48,7 +52,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
+
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

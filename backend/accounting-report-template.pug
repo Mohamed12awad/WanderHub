@@ -4,48 +4,88 @@ html(lang="en")
     meta(charset="UTF-8")
     meta(name="viewport", content="width=device-width, initial-scale=1.0")
     title Accounting Report #{startDate} to #{endDate}
-    link(rel="stylesheet", href="./static/css/bootstrap.min.css")
+    link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous")
     link(rel="stylesheet", href="./static/css/style.css")
   body
-    h1 Accounting Report
-    p Period: #{startDate} to #{endDate}
-    
-    // Bookings
-    if bookings.length > 0
-      h2 Bookings
-      each booking in bookings
-        p Customer: #{booking.customer.name}
-        p Room: #{booking.room.roomNumber}
-        p Total Price: #{booking.price}
-        p Total Paid: #{booking.totalPaid}
-        p Status: #{booking.status}
-        hr
+    .container
+      h1.text-center.mt-5 Accounting Report
+      p.text-center Period: #{startDate} to #{endDate}
+      
+      // Bookings
+      if bookings.length > 0
+        h2.mt-4 Bookings
+        .row
+          each booking in bookings
+            .col-md-6.mb-3
+              .card
+                .card-body
+                  h5.card-title Customer: #{booking.customer.name}
+                  p.card-text
+                    | Room: #{booking.room.roomNumber}
+                    br
+                    | Total Price: #{booking.price}
+                    br
+                    | Total Paid: #{booking.totalPaid}
+                    br
+                    | Status: #{booking.status}
+      
+      // Payments
+      if payments.length > 0
+        h2.mt-4 Payments
+        .row
+          each payment in payments
+            .col-md-6.mb-3
+              .card
+                .card-body
+                  h5.card-title Payment Details
+                  p.card-text
+                    if payment.booking
+                      | Booking: #{payment.booking._id}
+                    else
+                      | Booking: Not available
+                    br
+                    | Amount: #{payment.amount}
+                    br
+                    | Date: #{payment.date}
+      
+      // Purchases
+      if purchases.length > 0
+        h2.mt-4 Purchases
+        .row
+          each purchase in purchases
+            .col-md-6.mb-3
+              .card
+                .card-body
+                  h5.card-title Purchase Details
+                  p.card-text
+                    | Item: #{purchase.itemName}
+                    br
+                    | Quantity: #{purchase.quantity}
+                    br
+                    | Price: #{purchase.price}
+                    br
+                    | Landed Cost: #{purchase.landedCost}
+      
+      // Expenses
+      if expenses.length > 0
+        h2.mt-4 Expenses
+        .row
+          each expense in expenses
+            .col-md-6.mb-3
+              .card
+                .card-body
+                  h5.card-title Expense Details
+                  p.card-text
+                    | Description: #{expense.description}
+                    br
+                    | Amount: #{expense.amount}
+                    br
+                    | Date: #{expense.date}
+                    br
+                    | Category: #{expense.category}
+      
+      // No data message
+      if bookings.length === 0 && payments.length === 0 && purchases.length === 0 && expenses.length === 0
+        p.text-center.mt-5 No data available for the selected period.
 
-    // Payments
-    if payments.length > 0
-      h2 Payments
-      each payment in payments
-        p Booking: #{payment.booking._id}
-        p Amount: #{payment.amount}
-        p Date: #{payment.date}
-        hr
-
-    // Purchases
-    if purchases.length > 0
-      h2 Purchases
-      each purchase in purchases
-        p Item: #{purchase.itemName}
-        p Quantity: #{purchase.quantity}
-        p Price: #{purchase.price}
-        p Landed Cost: #{purchase.landedCost}
-        hr
-
-    // Expenses
-    if expenses.length > 0
-      h2 Expenses
-      each expense in expenses
-        p Description: #{expense.description}
-        p Amount: #{expense.amount}
-        p Date: #{expense.date}
-        p Category: #{expense.category}
-        hr
+    script(src="./static/js/bootstrap.min.js")

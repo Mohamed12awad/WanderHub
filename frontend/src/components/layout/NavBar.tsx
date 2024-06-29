@@ -19,6 +19,7 @@ import {
   Users,
   // LineChart,
   Plane,
+  LayoutDashboard,
   // Package,
 } from "lucide-react";
 
@@ -30,7 +31,7 @@ export default function NavBar() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col print:hidden">
       <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
         <Sheet>
           <SheetTrigger asChild>
@@ -46,11 +47,13 @@ export default function NavBar() {
           <SheetContent side="left" className="flex flex-col">
             <nav className="grid gap-2 text-lg font-medium">
               <Link
-                to="#"
+                to="/"
                 className="flex items-center gap-2 text-lg font-semibold"
               >
-                <Plane className="h-6 w-6" />
-                <span>Sahab Tours</span>
+                {/* <Plane className="h-6 w-6" /> */}
+                <img src="/logo.png" className="h-6 w-6" />
+
+                <span>WonderHub</span>
               </Link>
               {/* <NavItem href="#" icon={Home} label="Dashboard" />
               <NavItem href="#" icon={ShoppingCart} label="Orders" badge="6" />
@@ -75,6 +78,14 @@ export default function NavBar() {
                   icon={Users}
                   label="Users"
                   active={location.pathname.includes("/users")}
+                />
+              )}
+              {user?.role == "admin" && (
+                <NavItem
+                  href="/dashboard"
+                  icon={LayoutDashboard}
+                  label="Dashboard"
+                  active={location.pathname.includes("/dashboard")}
                 />
               )}
             </nav>

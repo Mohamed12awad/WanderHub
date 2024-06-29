@@ -11,6 +11,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "lodash": "^4.17.21",
+    "react-select": "^5.8.0"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.5"
   }
 }

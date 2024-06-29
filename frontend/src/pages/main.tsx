@@ -14,12 +14,14 @@ import AddBooking from "@/components/Bookings/AddBookings";
 import EditBooking from "@/components/Bookings/EditBookings";
 import EditUser from "@/components/Users/EditUser";
 import ViewBooking from "@/components/Bookings/ViewBooking";
+import Reports from "./../components/Reports/Reports";
+import { Dashboard } from "./Dashboard";
 
 const DefaultLayout: React.FC = () => {
   // This will conditionally render the Sidebar and NavBar
   return (
     <>
-      <div className="grid min-h-screen w-full md:grid-cols-[220px_ 1fr] lg:grid-cols-[280px_1fr] lg:grid-rows-[60px_1fr]">
+      <div className="grid min-h-screen w-full md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr] lg:grid-rows-[60px_1fr]">
         <Sidebar />
         <NavBar />
         <Routes>
@@ -27,14 +29,6 @@ const DefaultLayout: React.FC = () => {
           <Route path="/customers/:id" element={<ViewCustomer />} />
           <Route path="/customers/add" element={<AddCustomer />} />
           <Route path="/customers/:id/edit" element={<EditCustomer />} />
-          {/* <Route
-            path="/users"
-            element={
-              <PrivateRoute>
-                <Users />
-              </PrivateRoute>
-            }
-          /> */}
           <Route path="/users" element={<Users />} />
           <Route path="/users/add" element={<AddUser />} />
           <Route path="/users/:id/edit" element={<EditUser />} />
@@ -42,6 +36,9 @@ const DefaultLayout: React.FC = () => {
           <Route path="/bookings/:id" element={<ViewBooking />} />
           <Route path="/bookings/add" element={<AddBooking />} />
           <Route path="/bookings/:id/edit" element={<EditBooking />} />
+          {/* <Route path="/test" element={<Test />} /> */}
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </div>
     </>

@@ -15,6 +15,7 @@ const userRoutes = require("./routes/users");
 const roleRoutes = require("./routes/roles");
 const authRoutes = require("./routes/auth");
 const logRoutes = require("./routes/logs");
+const summeryRoutes = require("./routes/summery");
 const { requireSignin, isAuthorized } = require("./middleware/auth");
 // const dbConfig = require("./config/database");
 
@@ -49,11 +50,12 @@ app.use(
   roomPriceRoutes
 );
 app.use("/api/trips", requireSignin, isAuthorized("all"), tripRoutes);
-app.use("/api/reports", requireSignin, isAuthorized("admin"), reportRoutes);
+app.use("/api/reports", requireSignin, reportRoutes);
 app.use("/api/expenses", requireSignin, isAuthorized("admin"), expenseRoutes);
 app.use("/api/users", requireSignin, userRoutes);
 app.use("/api/roles", requireSignin, roleRoutes);
 app.use("/api/logs", requireSignin, isAuthorized("admin"), logRoutes);
+app.use("/api/summery", requireSignin, isAuthorized("admin"), summeryRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

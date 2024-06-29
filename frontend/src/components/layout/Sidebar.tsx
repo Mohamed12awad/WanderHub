@@ -12,6 +12,8 @@ import {
   Plane,
   // Package,
   Users,
+  WalletCards,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 
@@ -20,12 +22,14 @@ export default function Sidebar() {
   const location = useLocation();
 
   return (
-    <div className="hidden border-r bg-muted/40 md:block row-start-1 row-end-3">
+    <div className="hidden border-r bg-muted/40 md:block row-start-1 row-end-3 print:hidden">
       <div className="flex h-full max-h-screen flex-col gap-2">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <Link to="#" className="flex items-center gap-2 font-semibold">
-            <Plane className="h-6 w-6" />
-            <span>Sahab Tours</span>
+          <Link to="/" className="flex items-center gap-2 font-semibold">
+            {/* <Plane className="h-6 w-6" /> */}
+            <img src="/logo.png" className="h-6 w-6" />
+
+            <span>WonderHub</span>
           </Link>
           <Button variant="outline" size="icon" className="ml-auto h-8 w-8">
             <Bell className="h-4 w-4" />
@@ -52,6 +56,20 @@ export default function Sidebar() {
                 icon={Users}
                 label="Users"
                 active={location.pathname.includes("/users")}
+              />
+            )}
+            <NavItem
+              href="/reports"
+              icon={WalletCards}
+              label="Reports"
+              active={location.pathname.includes("/reports")}
+            />
+            {user?.role == "admin" && (
+              <NavItem
+                href="/dashboard"
+                icon={LayoutDashboard}
+                label="Dashboard"
+                active={location.pathname.includes("/dashboard")}
               />
             )}
             {/* 

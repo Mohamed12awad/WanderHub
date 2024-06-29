@@ -98,6 +98,9 @@ export interface PaymentData {
   booking: string;
   amount: number;
   date: Date | string;
+  method: string;
+  notes: string;
+  currency: string;
 }
 export interface BookingData {
   customer: string;
@@ -113,6 +116,12 @@ export interface BookingData {
   bookingLocation: string;
   notes: string;
 }
+
+export interface ReportParams {
+  startDate: string;
+  endDate: string;
+}
+
 // export interface FormData {
 //   name: string;
 //   phone: string;

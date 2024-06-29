@@ -23,7 +23,7 @@ interface CustomerRowProps {
   totalSales: string;
   date: string;
   handleDelete: (id: string) => void;
-  handleDownload: (id: string) => void;
+  // handleDownload: (id: string) => void;
 }
 
 const CustomerRow: React.FC<CustomerRowProps> = ({
@@ -34,7 +34,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   totalSales,
   date,
   handleDelete,
-  handleDownload,
+  // handleDownload,
 }) => {
   const { user } = useAuth();
 
@@ -64,9 +64,12 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleDownload(id)}>
+            {/* <DropdownMenuItem
+              className="hidden"
+              onClick={() => handleDownload(id)}
+            >
               Download Invoice
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
             <Link to={`/bookings/${id}`}>
               <DropdownMenuItem>View</DropdownMenuItem>
             </Link>

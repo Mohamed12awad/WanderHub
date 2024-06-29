@@ -163,7 +163,7 @@ exports.updateBooking = async (req, res) => {
 exports.deleteBooking = async (req, res) => {
   try {
     const { id } = req.params;
-    const booking = await Booking.findByIdAndDelete(id);
+    const booking = await Booking.findById(id);
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -175,6 +175,12 @@ exports.deleteBooking = async (req, res) => {
       customer.bookingHistory.pull(booking._id);
       await customer.save();
     }
+
+    // Delete related payments
+    await PartialPayment.deleteMany({ booking: booking._id });
+
+    // Delete the booking itself
+    await Booking.findByIdAndDelete(id);
 
     res.json({ message: "Booking deleted" });
   } catch (error) {

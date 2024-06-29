@@ -24,16 +24,16 @@ interface Framework {
 
 interface ComboboxProps {
   fetchData: Array<{ name: string; _id: string }> | undefined;
-  queryKey: string;
+  queryKey?: string;
   placeholder: string;
 }
 
 const defaultFrameworks: Framework[] = [
-  { value: "next.js", label: "Next.js" },
-  { value: "sveltekit", label: "SvelteKit" },
-  { value: "nuxt.js", label: "Nuxt.js" },
-  { value: "remix", label: "Remix" },
-  { value: "astro", label: "Astro" },
+  { value: "1", label: "Next.js" },
+  { value: "2", label: "SvelteKit" },
+  { value: "3", label: "Nuxt.js" },
+  { value: "4", label: "Remix" },
+  { value: "5", label: "Astro" },
 ];
 
 export const Combobox: React.FC<ComboboxProps> = ({

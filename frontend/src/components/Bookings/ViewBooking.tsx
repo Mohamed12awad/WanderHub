@@ -10,12 +10,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { getBookingById, deletePayment } from "@/utils/api";
 import { Link, useParams } from "react-router-dom";
-import { CircleArrowLeft, Edit } from "lucide-react";
+import { CircleArrowLeft, Edit, Printer } from "lucide-react";
 import PaymentRow from "./PaymentsRow";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { PaymentDialog } from "../common/PaymentDialog";
 import { Button } from "../ui/button";
 import LoadingSpinner from "../common/spinner";
+import Invoice from "../common/Invoice";
 
 interface BookingData {
   _id: string;
@@ -31,12 +32,14 @@ interface BookingData {
   bookingLocation: string;
   extraBusSeats: number;
   notes: string;
+  createdAt: string;
 }
 interface PaymentData {
   _id: string;
   amount: number;
   currency: string;
   date: string;
+  method: string;
   createdAt: Date;
   createdBy: {
     name: string;
@@ -108,7 +111,7 @@ const ViewBooking = () => {
   return (
     <main className="p-4">
       <LoadingSpinner loading={isLoading} />
-      <Card>
+      <Card className="print:hidden">
         <CardHeader className="flex flex-row justify-between">
           <CardTitle className="flex items-center space-x-3">
             <Link to="/bookings">
@@ -116,14 +119,27 @@ const ViewBooking = () => {
             </Link>
             View Booking
           </CardTitle>
-          <div className="buttons gap-x-3 flex">
+          <div className="buttons md:gap-x-3 gap-x-1 flex">
             <Link to={`/bookings/${bookingId}/edit`}>
-              <Button size="sm" className="h-8 gap-1 px-5">
+              <Button size="sm" className="h-8 md:gap-1 md:px-5 px-3">
                 <Edit className="h-3.5 w-3.5 me-1" />
-                Edit
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                  Edit
+                </span>
               </Button>
             </Link>
             <PaymentDialog id={formData._id} />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 md:gap-1 md:px-5 px-3"
+              onClick={() => print()}
+            >
+              <Printer className="h-3.5 w-3.5 me-1" />
+              <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Invoice
+              </span>
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -183,7 +199,7 @@ const ViewBooking = () => {
           </div>
         </CardContent>
       </Card>
-      <Card className="mt-5">
+      <Card className="mt-5 print:hidden">
         <CardContent className="py-5">
           <Table>
             <TableHeader>
@@ -192,12 +208,11 @@ const ViewBooking = () => {
                   Payment No.
                 </TableHead>
                 <TableHead>Amount Recived</TableHead>
+                <TableHead className="hidden md:table-cell">Currency</TableHead>
+                <TableHead className="hidden md:table-cell">Method</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Created By
-                </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  Created at
                 </TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
@@ -212,7 +227,9 @@ const ViewBooking = () => {
                     name={(index + 1).toString()}
                     state={new Date(item.date).toISOString().split("T")[0]}
                     totalSales={item.amount.toString()}
-                    date={new Date(item.createdAt).toLocaleString()}
+                    // date={new Date(item.createdAt).toLocaleString()}
+                    date={item.currency}
+                    method={item.method}
                     price={item.createdBy?.name}
                     id={item._id}
                     handleDelete={handleDelete}
@@ -222,6 +239,7 @@ const ViewBooking = () => {
           </Table>
         </CardContent>
       </Card>
+      <Invoice payments={payments} booking={formData} />
     </main>
   );
 };

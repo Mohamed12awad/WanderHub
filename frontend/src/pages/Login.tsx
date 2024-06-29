@@ -77,7 +77,7 @@ const Login = () => {
       </div>
       <div className="hidden bg-muted lg:block h-svh">
         <img
-          src="/see.jpg"
+          src="/see.webp"
           alt="Image"
           className="h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
         />
