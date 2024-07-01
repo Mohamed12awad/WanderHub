@@ -60,7 +60,7 @@ const getExpenses = async (startDate, endDate) => {
     },
     {
       $match: {
-        "expenses.date": { $gte: new Date(startDate), $lte: new Date(endDate) },
+        createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
         approved: true,
       },
     },

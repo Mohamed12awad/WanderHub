@@ -21,6 +21,7 @@ import Invoice from "../common/Invoice";
 interface BookingData {
   _id: string;
   customer: string;
+  customerPhone: string;
   ownerName: string;
   ownerPhone: string;
   room: string;
@@ -88,6 +89,7 @@ const ViewBooking = () => {
         setFormData({
           ...data,
           customer: data.customer.name,
+          customerPhone: data.customer.phone,
           ownerName: data.customer.owner.name,
           ownerPhone: data.customer.owner.phone,
           room: data.room.roomNumber,

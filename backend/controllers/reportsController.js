@@ -10,7 +10,10 @@ const getBookingsReport = async (start, end) => {
 };
 const getBookingsReportByStartAndEndDate = async (start, end) => {
   return Booking.find({ startDate: { $gte: start, $lte: end } })
-    .populate("customer")
+    .populate({
+      path: "customer",
+      populate: { path: "owner", select: "name phone" },
+    })
     .populate("room");
 };
 

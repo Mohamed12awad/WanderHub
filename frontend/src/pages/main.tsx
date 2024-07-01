@@ -67,7 +67,7 @@ const routes = [
 
 const DefaultLayout: React.FC = () => {
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr] lg:grid-rows-[60px_1fr]">
+    <div className="grid min-h-screen dark:bg-gradient-to-br from-gray-50 to-gray-300 w-full md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr] lg:grid-rows-[60px_1fr]">
       <Sidebar />
       <NavBar />
       <Routes>

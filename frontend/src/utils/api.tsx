@@ -108,7 +108,7 @@ export const deleteRoom = (id: string): Promise<void> =>
   api.delete(`/rooms/${id}`);
 
 // Summery API Requests
-export const getSummery = (period: string) =>
+export const getSummery = (period?: string) =>
   api.get("/summery", {
     params: {
       timePeriod: period,

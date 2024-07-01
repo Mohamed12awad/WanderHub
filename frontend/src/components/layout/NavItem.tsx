@@ -19,11 +19,13 @@ const NavItem: React.FC<NavItemProps> = ({
 }) => (
   <Link
     to={href}
-    className={`flex items-center gap-2 p-2 font-[600] text-gray-800 ${
-      active ? "bg-gray-200 rounded-lg" : ""
+    className={`flex items-center gap-2 p-2 font-[600] text-gray-800 rounded-lg dark:text-white ${
+      active ? "bg-gray-200 dark:text-black" : ""
     }`}
   >
-    <Icon className="h-5 w-5 text-gray-500" />
+    <Icon
+      className={`h-5 w-5 text-gray-500  ${active ? "dark:text-black" : ""}`}
+    />
     <span>{label}</span>
     {badge && <Badge>{badge}</Badge>}
   </Link>

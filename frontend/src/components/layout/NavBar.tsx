@@ -15,6 +15,7 @@ import { FaUserCircle, FaBars, FaSearch } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext.tsx";
 import NavLinks from "./NavLinks.tsx";
+import { ModeToggle } from "../common/toggleTheme.tsx";
 
 export default function NavBar() {
   const { logout } = useAuth();
@@ -25,8 +26,8 @@ export default function NavBar() {
   // };
 
   return (
-    <div className="flex flex-col print:hidden">
-      <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
+    <div className="flex flex-col print:hidden dark:bg-slate-800">
+      <header className="flex h-14 items-center gap-4 border-b dark:border-slate-800 bg-muted/40 px-4 lg:h-[60px] lg:px-6">
         <Sheet>
           <SheetTrigger asChild>
             <Button
@@ -82,6 +83,7 @@ export default function NavBar() {
             </div>
           </form>
         </div>
+        <ModeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">

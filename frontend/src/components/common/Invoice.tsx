@@ -12,6 +12,7 @@ interface Booking {
   ownerName: string;
   ownerPhone: string;
   customer: string;
+  customerPhone: string;
   room: string;
   price: number;
   totalPaid: number;
@@ -73,6 +74,18 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
               </TableCell>
             </TableRow>
             <TableRow>
+              <TableCell className="border px-4 py-1">رقم الهاتف</TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.customerPhone}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1">مكان الحجز</TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.bookingLocation}
+              </TableCell>
+            </TableRow>
+            <TableRow>
               <TableCell className="border px-4 py-1">رقم الغرفة</TableCell>
               <TableCell className="border px-4 py-1">{booking.room}</TableCell>
             </TableRow>
@@ -124,15 +137,15 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-1">ملاحظات</TableCell>
+              <TableCell className="border px-4 py-1">مسئول الحجز</TableCell>
               <TableCell className="border px-4 py-1">
-                {booking.notes}
+                {`${booking.ownerName} - ${booking.ownerPhone}`}
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-1">بيانات التواصل</TableCell>
+              <TableCell className="border px-4 py-1">ملاحظات</TableCell>
               <TableCell className="border px-4 py-1">
-                {`${booking.ownerName} - ${booking.ownerPhone}`}
+                {booking.notes}
               </TableCell>
             </TableRow>
           </TableBody>
