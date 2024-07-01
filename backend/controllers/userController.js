@@ -55,9 +55,22 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
+    const { password, role, ...updateData } = req.body;
 
-    // Separate password from other fields
-    const { password, ...updateData } = req.body;
+    // Check if the update includes the role change
+    if (role) {
+      const user = await User.findById(id).populate("role");
+
+      // Prevent non-super admin from changing roles to or from super admin
+      if (
+        (user.role.name === "super admin" || role === "super admin") &&
+        req.user.role !== "super admin"
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Access denied. Super admin only." });
+      }
+    }
 
     // If password is provided, hash it
     if (password) {
@@ -67,7 +80,7 @@ exports.updateUser = async (req, res) => {
 
     const user = await User.findByIdAndUpdate(id, updateData, {
       new: true,
-      runValidators: true, // Ensure validators are run on update
+      runValidators: true,
       context: "query",
     });
 
@@ -84,10 +97,22 @@ exports.updateUser = async (req, res) => {
 exports.updateUserRole = async (req, res) => {
   try {
     const { id, role } = req.body;
-    const user = await User.findById(id);
+    const user = await User.findById(id).populate("role");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    // Prevent non-super admin from changing roles to or from super admin
+    if (
+      (user.role.name === "super admin" || role === "super admin") &&
+      req.user.role !== "super admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. Super admin only." });
+    }
+
     user.role = role;
     await user.save();
     res.json(user);
@@ -113,11 +138,19 @@ exports.updateUserActiveState = async (req, res) => {
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
+    const user = await User.findById(id).populate("role", "name");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(user);
+
+    // Check if the user is a super admin
+    if (user.role.name === "super admin") {
+      return res.status(403).json({ message: "Cannot delete super admin" });
+    }
+
+    await User.findByIdAndDelete(id);
+    res.json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

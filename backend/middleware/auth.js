@@ -51,6 +51,10 @@ exports.isAuthorized = (role) => {
         return res.status(403).json({ message: "User is blocked" });
       }
 
+      if (user.role.name === "super admin") {
+        return next();
+      }
+
       if (!role.includes("all") && !role.includes(user.role.name)) {
         return res.status(403).json({ message: "Access denied" });
       }

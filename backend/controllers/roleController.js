@@ -13,10 +13,14 @@ exports.createRole = async (req, res) => {
 exports.getRoles = async (req, res) => {
   try {
     const roles = await Role.find();
-    // console.log(roles);
-    res.status(201).json(roles);
+
+    // Filter out the super admin role
+    const filteredRoles = roles.filter((role) => role.name !== "super admin");
+
+    res.status(200).json(filteredRoles);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
+
 // other role-related operations can be defined here
