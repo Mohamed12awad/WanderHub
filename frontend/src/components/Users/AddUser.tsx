@@ -69,8 +69,12 @@ const AddUser: React.FC = () => {
     }
   };
 
-  if (!user || user.role !== "admin") {
-    return <p>You do not have permission to add users.</p>;
+  if (!user || !["admin", "super admin"].includes(user.role)) {
+    return (
+      <p className="text-xl text-center font-bold">
+        You do not have permission to edit users.
+      </p>
+    );
   }
 
   return (

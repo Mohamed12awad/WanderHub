@@ -66,7 +66,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
             <Link to={`/rooms/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
-            {user?.role === "admin" && (
+            {["admin", "super admin"].includes(user!.role) && (
               <DropdownMenuItem onClick={() => handleDelete(id)}>
                 Delete
               </DropdownMenuItem>

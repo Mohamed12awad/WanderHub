@@ -80,7 +80,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
               Toggle Active
             </DropdownMenuItem>
 
-            {user?.role === "admin" && (
+            {["admin", "super admin"].includes(user!.role) && (
               <DropdownMenuItem
                 disabled={user?.id == id ? true : false}
                 onClick={() => handleDelete(id)}

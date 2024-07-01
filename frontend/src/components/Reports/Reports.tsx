@@ -48,7 +48,9 @@ const Reports: React.FC = () => {
           <TabsList className="text-center print:hidden">
             <TabsTrigger value="Booking">Booking Report</TabsTrigger>
             <TabsTrigger
-              disabled={user?.role === "admin" ? false : true}
+              disabled={
+                ["admin", "super admin"].includes(user!.role) ? false : true
+              }
               value="full"
             >
               Full Report

@@ -224,7 +224,9 @@ const EditCustomer = () => {
                 <Select
                   value={formData.owner}
                   required
-                  disabled={user?.role === "admin" ? false : true}
+                  disabled={
+                    ["admin", "super admin"].includes(user!.role) ? false : true
+                  }
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, owner: value }))
                   }

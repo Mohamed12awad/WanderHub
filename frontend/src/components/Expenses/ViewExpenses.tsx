@@ -160,7 +160,7 @@ const ViewExpense = () => {
                       {expense.category}
                     </TableCell>
                     <TableCell>{expense.beneficiary}</TableCell>
-                    {user?.role == "admin" && (
+                    {["admin", "super admin"].includes(user!.role) && (
                       <TableCell>
                         <Button
                           variant="destructive"

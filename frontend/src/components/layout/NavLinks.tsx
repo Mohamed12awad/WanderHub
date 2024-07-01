@@ -31,7 +31,7 @@ function NavLinks() {
         label="Bookings"
         active={location.pathname.includes("/bookings")}
       />
-      {["admin", "manager"].includes(user!.role) && (
+      {["admin", "manager", "super admin"].includes(user!.role) && (
         <NavItem
           href="/rooms"
           icon={DoorOpen}
@@ -45,7 +45,7 @@ function NavLinks() {
         label="Expenses"
         active={location.pathname.includes("/expenses")}
       />
-      {user?.role == "admin" && (
+      {["admin", "super admin"].includes(user!.role) && (
         <NavItem
           href="/users"
           icon={Users}
@@ -59,7 +59,7 @@ function NavLinks() {
         label="Reports"
         active={location.pathname.includes("/reports")}
       />
-      {user?.role == "admin" && (
+      {["admin", "super admin"].includes(user!.role) && (
         <NavItem
           href="/dashboard"
           icon={LayoutDashboard}
