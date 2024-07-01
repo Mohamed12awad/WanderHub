@@ -3,8 +3,10 @@ import axios from "axios";
 import {
   BookingData,
   Customer,
+  ExpenseReportData,
   PaymentData,
   ReportParams,
+  Room,
   UserData,
 } from "@/types/types";
 
@@ -98,6 +100,12 @@ export const updateCustomer = (customerId: string, data: Customer) =>
 
 // Rooms API Requests
 export const getRooms = () => api.get("/rooms");
+export const getRoomById = (id: string) => api.get(`/rooms/${id}`);
+export const createRoom = (roomData: Room) => api.post("/rooms", roomData);
+export const updateRoom = (id: string, data: Room) =>
+  api.put(`/rooms/${id}`, data);
+export const deleteRoom = (id: string): Promise<void> =>
+  api.delete(`/rooms/${id}`);
 
 // Summery API Requests
 export const getSummery = (period: string) =>
@@ -112,3 +120,21 @@ export const getReport = (params: ReportParams) =>
   api.get("/reports", { params });
 export const getBookingReport = (params: ReportParams) =>
   api.get("/reports/bookings", { params });
+
+// // Expenses API Requests
+export const getExpenses = () => api.get("/expenses");
+export const getExpenseById = (id: string) => api.get(`/expenses/${id}`);
+export const createExpense = (data: ExpenseReportData) =>
+  api.post("/expenses", data);
+export const updateExpense = (id: string, data: ExpenseReportData) =>
+  api.put(`/expenses/${id}`, data);
+export const deleteExpense = (id: string): Promise<void> =>
+  api.delete(`/expenses/${id}`);
+export const approveExpense = (id: string, state: boolean) =>
+  api.patch(`/expenses/${id}/approval`, { approved: state });
+// export const updateExpenseReportItem = (id: string, expenseId: string, data) =>
+//   api.put(`/expenses/${id}/expense/${expenseId}`, data);
+export const deleteExpenseReportItem = (
+  id: string,
+  expenseId: string
+): Promise<void> => api.delete(`/expenses/${id}/expense/${expenseId}`);

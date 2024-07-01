@@ -12,21 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FaUserCircle, FaBars, FaSearch } from "react-icons/fa";
 
-import {
-  Users2,
-  Users,
-  Plane,
-  LayoutDashboard,
-  WalletCards,
-  // ArrowDownIcon,
-} from "lucide-react";
-
-import NavItem from "./NavItem";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext.tsx";
+import NavLinks from "./NavLinks.tsx";
 
 export default function NavBar() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   // const [searchContext, setSearchContext] = useState("customers");
 
   // const handleSearchContextChange = (context: string) => {
@@ -56,40 +47,7 @@ export default function NavBar() {
                 <img src="/logo.png" className="h-6 w-6" />
                 <span>WonderHub</span>
               </Link>
-              <NavItem
-                href="/customers"
-                icon={Users2}
-                label="Customers"
-                active={location.pathname.includes("/customers")}
-              />
-              <NavItem
-                href="/bookings"
-                icon={Plane}
-                label="Bookings"
-                active={location.pathname.includes("/bookings")}
-              />
-              {user?.role == "admin" && (
-                <NavItem
-                  href="/users"
-                  icon={Users}
-                  label="Users"
-                  active={location.pathname.includes("/users")}
-                />
-              )}
-              <NavItem
-                href="/reports"
-                icon={WalletCards}
-                label="Reports"
-                active={location.pathname.includes("/reports")}
-              />
-              {user?.role == "admin" && (
-                <NavItem
-                  href="/dashboard"
-                  icon={LayoutDashboard}
-                  label="Dashboard"
-                  active={location.pathname.includes("/dashboard")}
-                />
-              )}
+              <NavLinks />
             </nav>
           </SheetContent>
         </Sheet>

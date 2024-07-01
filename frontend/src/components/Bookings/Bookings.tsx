@@ -27,9 +27,9 @@ export function Bookings() {
       renderRow={(item, handleDelete) => (
         <BookingRow
           key={item._id}
-          name={item.customer.name}
+          name={item.customer ? item.customer.name : "No Customer"}
           state={item.status}
-          price={item.room.roomNumber}
+          price={item.room ? item.room.roomNumber : "No Room"}
           totalSales={item.bookingLocation}
           date={new Date(item.createdAt).toLocaleString()}
           id={item._id}

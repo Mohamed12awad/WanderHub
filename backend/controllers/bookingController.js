@@ -68,7 +68,11 @@ exports.getBookingById = async (req, res) => {
     const includePayments = req.query.includePayments === "true";
 
     const bookings = await Booking.findById(id)
-      .populate("customer", "name")
+      .populate({
+        path: "customer",
+        select: "name",
+        populate: { path: "owner", select: "name phone" },
+      })
       .populate("room", "roomNumber");
 
     let payments = [];

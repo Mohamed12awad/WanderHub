@@ -52,6 +52,7 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  phone: string;
   active: boolean;
   role: {
     name: string;
@@ -64,14 +65,14 @@ export interface ErrorResponse {
   message?: string;
 }
 
-// export interface Customer {
-//   _id: string;
-//   name: string;
-// }
-
 export interface Room {
-  _id: string;
+  _id?: string;
   roomNumber: string;
+  type: string;
+  capacity: number;
+  location: string;
+  notes: string;
+  createdAt?: string;
 }
 
 export interface BookingData {
@@ -122,41 +123,20 @@ export interface ReportParams {
   endDate: string;
 }
 
-// export interface FormData {
-//   name: string;
-//   phone: string;
-//   mobile: string;
-//   email: string;
-//   address: {
-//     street: string;
-//     city: string;
-//     state: string;
-//     zip: string;
-//     country: string;
-//   };
-//   identification: {
-//     passportNumber: string;
-//     nationalId: string;
-//   };
-//   dateOfBirth: string;
-//   gender: string;
-//   preferredContactMethod: string;
-//   paymentInformation: {
-//     cardType: string;
-//     cardNumber: string;
-//     expirationDate: string;
-//   };
-//   loyaltyProgram: {
-//     memberId: string;
-//     points: string;
-//   };
-//   emergencyContact: {
-//     name: string;
-//     phone: string;
-//     relationship: string;
-//   };
-//   location: string;
-//   owner: string;
-//   notes: string;
-//   status: string;
-// }
+export interface ExpenseItem {
+  _id?: string;
+  description: string;
+  amount: number;
+  date: Date | string;
+  category: string;
+  beneficiary: string;
+}
+
+export interface ExpenseReportData {
+  _id?: string;
+  title: string;
+  userId: string;
+  expenses: ExpenseItem[];
+  approved: boolean;
+  createdAt?: string;
+}

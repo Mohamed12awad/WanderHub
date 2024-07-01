@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
-
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -18,11 +17,10 @@ interface CustomerRowProps {
   id: string;
   name: string;
   state: string;
-  price: string;
+  price: number;
   totalSales: string;
   date: string;
   handleDelete: (id: string) => void;
-  // handleDownload: (id: string) => void;
 }
 
 const CustomerRow: React.FC<CustomerRowProps> = ({
@@ -33,7 +31,6 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   totalSales,
   date,
   handleDelete,
-  // handleDownload,
 }) => {
   const { user } = useAuth();
 
@@ -63,16 +60,10 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {/* <DropdownMenuItem
-              className="hidden"
-              onClick={() => handleDownload(id)}
-            >
-              Download Invoice
-            </DropdownMenuItem> */}
-            <Link to={`/bookings/${id}`}>
+            <Link to={`/rooms/${id}`}>
               <DropdownMenuItem>View</DropdownMenuItem>
             </Link>
-            <Link to={`/bookings/${id}/edit`}>
+            <Link to={`/rooms/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
             {user?.role === "admin" && (

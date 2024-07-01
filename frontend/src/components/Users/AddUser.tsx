@@ -27,6 +27,7 @@ const AddUser: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ const AddUser: React.FC = () => {
       password: string;
       name: string;
       role: string;
+      phone: string;
     }) => createUser(userData)
   );
 
@@ -52,6 +54,7 @@ const AddUser: React.FC = () => {
         password,
         name,
         role,
+        phone,
       });
 
       console.log(
@@ -90,6 +93,22 @@ const AddUser: React.FC = () => {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              name="phone"
+              placeholder="01234567890"
+              value={phone}
+              onChange={(e) => {
+                e.target.value = e.target.value
+                  .replace(/\D/g, "")
+                  .substring(0, 11);
+                setPhone(e.target.value);
+              }}
+              required
             />
           </div>
           <div className="grid gap-2">

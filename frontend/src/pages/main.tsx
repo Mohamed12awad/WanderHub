@@ -1,47 +1,81 @@
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+
+// Layout Components
 import NavBar from "@/components/layout/NavBar";
 import Sidebar from "@/components/layout/Sidebar";
-import { Routes, Route } from "react-router-dom";
-import React from "react";
-import AddCustomer from "@/components/Customers/AddCustomers";
-import AddUser from "../components/Users/AddUser";
-import { Customers } from "@/components/Customers/Customers";
-import EditCustomer from "@/components/Customers/EditCustomer";
-import { Bookings } from "@/components/Bookings/Bookings";
-import ViewCustomer from "@/components/Customers/ViewCustomer";
-import { Users } from "@/components/Users/Users";
-// import PrivateRoute from "@/components/PrivateRoute";
-import AddBooking from "@/components/Bookings/AddBookings";
-import EditBooking from "@/components/Bookings/EditBookings";
-import EditUser from "@/components/Users/EditUser";
-import ViewBooking from "@/components/Bookings/ViewBooking";
-import Reports from "./../components/Reports/Reports";
+
+// Dashboard Component
 import { Dashboard } from "./Dashboard";
 
+// Customer Components
+import { Customers } from "@/components/Customers/Customers";
+import AddCustomer from "@/components/Customers/AddCustomers";
+import EditCustomer from "@/components/Customers/EditCustomer";
+import ViewCustomer from "@/components/Customers/ViewCustomer";
+
+// User Components
+import { Users } from "@/components/Users/Users";
+import AddUser from "@/components/Users/AddUser";
+import EditUser from "@/components/Users/EditUser";
+
+// Booking Components
+import { Bookings } from "@/components/Bookings/Bookings";
+import AddBooking from "@/components/Bookings/AddBookings";
+import EditBooking from "@/components/Bookings/EditBookings";
+import ViewBooking from "@/components/Bookings/ViewBooking";
+
+// Room Components
+import { Rooms } from "@/components/Rooms/Rooms";
+import AddRoom from "@/components/Rooms/AddRoom";
+import EditRoom from "@/components/Rooms/EditRoom";
+import ViewRoom from "@/components/Rooms/ViewRoom";
+
+// Expense Components
+import { Expenses } from "@/components/Expenses/Expenses";
+import AddExpenseReport from "@/components/Expenses/AddExpenses";
+import EditExpenseReport from "@/components/Expenses/EditExpenses";
+import ViewExpense from "@/components/Expenses/ViewExpenses";
+
+// Report Component
+import Reports from "@/components/Reports/Reports";
+
+// Route Configuration
+const routes = [
+  { path: "/dashboard", element: <Dashboard /> },
+  { path: "/customers", element: <Customers /> },
+  { path: "/customers/add", element: <AddCustomer /> },
+  { path: "/customers/:id", element: <ViewCustomer /> },
+  { path: "/customers/:id/edit", element: <EditCustomer /> },
+  { path: "/users", element: <Users /> },
+  { path: "/users/add", element: <AddUser /> },
+  { path: "/users/:id/edit", element: <EditUser /> },
+  { path: "/bookings", element: <Bookings /> },
+  { path: "/bookings/add", element: <AddBooking /> },
+  { path: "/bookings/:id", element: <ViewBooking /> },
+  { path: "/bookings/:id/edit", element: <EditBooking /> },
+  { path: "/rooms", element: <Rooms /> },
+  { path: "/rooms/add", element: <AddRoom /> },
+  { path: "/rooms/:id", element: <ViewRoom /> },
+  { path: "/rooms/:id/edit", element: <EditRoom /> },
+  { path: "/expenses", element: <Expenses /> },
+  { path: "/expenses/add", element: <AddExpenseReport /> },
+  { path: "/expenses/:id", element: <ViewExpense /> },
+  { path: "/expenses/:id/edit", element: <EditExpenseReport /> },
+  { path: "/reports", element: <Reports /> },
+];
+
 const DefaultLayout: React.FC = () => {
-  // This will conditionally render the Sidebar and NavBar
   return (
-    <>
-      <div className="grid min-h-screen w-full md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr] lg:grid-rows-[60px_1fr]">
-        <Sidebar />
-        <NavBar />
-        <Routes>
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/customers/:id" element={<ViewCustomer />} />
-          <Route path="/customers/add" element={<AddCustomer />} />
-          <Route path="/customers/:id/edit" element={<EditCustomer />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/users/add" element={<AddUser />} />
-          <Route path="/users/:id/edit" element={<EditUser />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/bookings/:id" element={<ViewBooking />} />
-          <Route path="/bookings/add" element={<AddBooking />} />
-          <Route path="/bookings/:id/edit" element={<EditBooking />} />
-          {/* <Route path="/test" element={<Test />} /> */}
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
-      </div>
-    </>
+    <div className="grid min-h-screen w-full md:grid-cols-[200px_1fr] lg:grid-cols-[220px_1fr] lg:grid-rows-[60px_1fr]">
+      <Sidebar />
+      <NavBar />
+      <Routes>
+        {routes.map((route, index) => (
+          <Route key={index} path={route.path} element={route.element} />
+        ))}
+      </Routes>
+    </div>
   );
 };
 

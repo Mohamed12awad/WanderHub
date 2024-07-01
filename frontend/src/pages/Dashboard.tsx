@@ -45,8 +45,8 @@ export function Dashboard() {
     previousUnderCollection
   );
 
-  const expenses = currentData.expenses?.total?.EGP || 0;
-  const previousExpenses = previousData.expenses?.total?.EGP || 0;
+  const expenses = currentData.expenses?.total || 0;
+  const previousExpenses = previousData.expenses?.total || 0;
   const expensesChange = calculatePercentageChange(expenses, previousExpenses);
 
   return (

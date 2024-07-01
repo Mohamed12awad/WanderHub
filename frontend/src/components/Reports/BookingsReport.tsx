@@ -19,6 +19,10 @@ interface Booking {
   status: string;
   startDate: string;
   endDate: string;
+  numberOfPeople: number;
+  extraBusSeats: number;
+  bookingLocation: string;
+  notes: string;
 }
 
 interface BookingReportProps {
@@ -49,6 +53,14 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
           <p className="mb-1">
             <strong>Start Date:</strong> {booking.startDate.split("T")[0]}
           </p>
+          <p className="mb-1">
+            <strong>Number Of People:</strong> {booking.numberOfPeople}
+          </p>
+          {booking.extraBusSeats > 0 && (
+            <p className="mb-1">
+              <strong>Extra Bus Seats:</strong> {booking.extraBusSeats}
+            </p>
+          )}
         </div>
         <div>
           <p className="mb-1">
@@ -65,6 +77,14 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
           <p className="mb-1">
             <strong>End Date:</strong> {booking.endDate.split("T")[0]}
           </p>
+          <p className="mb-1">
+            <strong>Booking Location:</strong> {booking.bookingLocation}
+          </p>
+          {booking.notes != "" && (
+            <p className="mb-1">
+              <strong>Notes:</strong> {booking.notes}
+            </p>
+          )}
           {/* <p className="mb-1">
             <strong>Status:</strong> {booking.status}
           </p> */}

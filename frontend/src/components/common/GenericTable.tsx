@@ -78,7 +78,7 @@ export function GenericTable<T extends DataItem>({
       <LoadingSpinner loading={isLoading} />
       <Tabs defaultValue="all">
         <div className="flex items-center">
-          <TabsList>
+          <TabsList className="hidden">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="active" disabled>
               Active
@@ -93,7 +93,12 @@ export function GenericTable<T extends DataItem>({
           <div className="ml-auto flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="h-8 gap-1"
+                >
                   <ListFilter className="h-3.5 w-3.5" />
                   <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                     Filter

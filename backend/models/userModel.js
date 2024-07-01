@@ -15,6 +15,13 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
     },
+    phone: {
+      type: String,
+      required: true,
+      minlength: [11, "Phone can't be less than 11 characters"],
+      required: [true, "Please Provide a phone Number"],
+      trim: true,
+    },
     password: {
       type: String,
       required: true,
@@ -25,6 +32,7 @@ const userSchema = new Schema(
       type: Boolean,
       default: true,
     },
+
     role: {
       type: Schema.Types.ObjectId,
       ref: "Role",

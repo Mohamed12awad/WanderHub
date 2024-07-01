@@ -81,7 +81,10 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
             </DropdownMenuItem>
 
             {user?.role === "admin" && (
-              <DropdownMenuItem onClick={() => handleDelete(id)}>
+              <DropdownMenuItem
+                disabled={user?.id == id ? true : false}
+                onClick={() => handleDelete(id)}
+              >
                 Delete
               </DropdownMenuItem>
             )}

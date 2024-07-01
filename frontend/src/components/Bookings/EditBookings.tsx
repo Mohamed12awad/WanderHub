@@ -112,7 +112,7 @@ const EditBooking = () => {
   };
 
   if (!formData) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner loading={!formData} />;
   }
 
   return (

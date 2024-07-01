@@ -51,7 +51,7 @@ app.use(
 );
 app.use("/api/trips", requireSignin, isAuthorized("all"), tripRoutes);
 app.use("/api/reports", requireSignin, reportRoutes);
-app.use("/api/expenses", requireSignin, isAuthorized("admin"), expenseRoutes);
+app.use("/api/expenses", requireSignin, expenseRoutes);
 app.use("/api/users", requireSignin, userRoutes);
 app.use("/api/roles", requireSignin, roleRoutes);
 app.use("/api/logs", requireSignin, isAuthorized("admin"), logRoutes);

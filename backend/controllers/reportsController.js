@@ -8,6 +8,11 @@ const getBookingsReport = async (start, end) => {
     .populate("customer")
     .populate("room");
 };
+const getBookingsReportByStartAndEndDate = async (start, end) => {
+  return Booking.find({ startDate: { $gte: start, $lte: end } })
+    .populate("customer")
+    .populate("room");
+};
 
 const getPaymentsReport = async (start, end) => {
   return PartialPayment.find({ date: { $gte: start, $lte: end } }).populate(
@@ -63,7 +68,9 @@ exports.getBookingReport = async (req, res) => {
   const end = new Date(endDate);
 
   try {
-    const [bookings] = await Promise.all([getBookingsReport(start, end)]);
+    const [bookings] = await Promise.all([
+      getBookingsReportByStartAndEndDate(start, end),
+    ]);
 
     res.status(200).json(bookings);
   } catch (error) {

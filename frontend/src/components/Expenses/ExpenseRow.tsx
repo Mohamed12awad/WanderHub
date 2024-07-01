@@ -10,19 +10,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
-
 import React from "react";
 import { Link } from "react-router-dom";
-
+import { approveExpense } from "@/utils/api";
+import { useQueryClient } from "react-query";
 interface CustomerRowProps {
   id: string;
   name: string;
   state: string;
-  price: string;
+  price: number;
   totalSales: string;
   date: string;
   handleDelete: (id: string) => void;
-  // handleDownload: (id: string) => void;
 }
 
 const CustomerRow: React.FC<CustomerRowProps> = ({
@@ -33,25 +32,33 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   totalSales,
   date,
   handleDelete,
-  // handleDownload,
 }) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const handleApprove = async (id: string) => {
+    await approveExpense(id, true);
+    queryClient.invalidateQueries("expenses");
+  };
 
   return (
     <TableRow>
       <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="hidden md:table-cell capitalize">
-        {totalSales}
-      </TableCell>
+      <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
       <TableCell>
         <Badge
           variant="outline"
-          // className={state == "Deal Closed" && "bg-emeradld-300"}
+          className={
+            state == "Approved"
+              ? "bg-emerald-500 text-white"
+              : "bg-gray-500 text-white"
+          }
         >
           {state}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
+      <TableCell className="hidden md:table-cell capitalize">
+        {totalSales}
+      </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
       <TableCell>
         <DropdownMenu>
@@ -63,16 +70,18 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            {/* <DropdownMenuItem
-              className="hidden"
-              onClick={() => handleDownload(id)}
-            >
-              Download Invoice
-            </DropdownMenuItem> */}
-            <Link to={`/bookings/${id}`}>
+            <Link to={`/expenses/${id}`}>
               <DropdownMenuItem>View</DropdownMenuItem>
             </Link>
-            <Link to={`/bookings/${id}/edit`}>
+            {["admin", "manager"].includes(user!.role) && (
+              <DropdownMenuItem
+                disabled={state === "Approved"}
+                onClick={async () => await handleApprove(id)}
+              >
+                Approve
+              </DropdownMenuItem>
+            )}
+            <Link to={`/expenses/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
             {user?.role === "admin" && (

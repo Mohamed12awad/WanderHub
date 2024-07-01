@@ -31,7 +31,9 @@ const ViewCustomer: React.FC = () => {
     fetchCustomerData();
   }, [id]);
 
-  if (!customerData) return <p>Loading...</p>;
+  if (!customerData) {
+    return <LoadingSpinner loading={!customerData} />;
+  }
 
   return (
     <main className="p-4">

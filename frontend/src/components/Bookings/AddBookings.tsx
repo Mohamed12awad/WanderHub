@@ -181,7 +181,7 @@ const AddBooking = () => {
                   </SelectTrigger>
                   <SelectContent className="overflow-y-auto max-h-[10rem]">
                     {rooms?.data.map((room: Room) => (
-                      <SelectItem key={room._id} value={room._id}>
+                      <SelectItem key={room._id} value={room._id!}>
                         {room.roomNumber}
                       </SelectItem>
                     ))}

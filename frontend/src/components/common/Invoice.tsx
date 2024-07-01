@@ -9,6 +9,8 @@ import {
 } from "../ui/table";
 
 interface Booking {
+  ownerName: string;
+  ownerPhone: string;
   customer: string;
   room: string;
   price: number;
@@ -17,6 +19,9 @@ interface Booking {
   endDate: Date;
   numberOfPeople: number;
   createdAt: string;
+  extraBusSeats: number;
+  bookingLocation: string;
+  notes: string;
 }
 
 interface Payment {
@@ -46,7 +51,7 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
   ];
 
   const formatDate = (date: string) => format(new Date(date), "dd/MM/yyyy");
-
+  // console.log(booking);
   return (
     <div
       dir="rtl"
@@ -62,32 +67,32 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
         <Table className="w-full border-collapse mb-4">
           <TableBody>
             <TableRow>
-              <TableCell className="border px-4 py-2">عميل</TableCell>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">عميل</TableCell>
+              <TableCell className="border px-4 py-1">
                 {booking.customer}
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-2">رقم الغرفة</TableCell>
-              <TableCell className="border px-4 py-2">{booking.room}</TableCell>
+              <TableCell className="border px-4 py-1">رقم الغرفة</TableCell>
+              <TableCell className="border px-4 py-1">{booking.room}</TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-2">السعر الإجمالي</TableCell>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">السعر الإجمالي</TableCell>
+              <TableCell className="border px-4 py-1">
                 {booking.price}
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">
                 المدفوع الإجمالي
               </TableCell>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">
                 {booking.totalPaid}
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-2">الفترة</TableCell>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">الفترة</TableCell>
+              <TableCell className="border px-4 py-1">
                 من{" "}
                 {booking.startDate.toLocaleDateString("ar-eg", {
                   weekday: "long",
@@ -105,9 +110,29 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
               </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell className="border px-4 py-2">عدد الأفراد</TableCell>
-              <TableCell className="border px-4 py-2">
+              <TableCell className="border px-4 py-1">عدد الأفراد</TableCell>
+              <TableCell className="border px-4 py-1">
                 {booking.numberOfPeople}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1">
+                عدد الكراسى الأضافية
+              </TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.extraBusSeats}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1">ملاحظات</TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.notes}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1">بيانات التواصل</TableCell>
+              <TableCell className="border px-4 py-1">
+                {`${booking.ownerName} - ${booking.ownerPhone}`}
               </TableCell>
             </TableRow>
           </TableBody>
@@ -118,17 +143,17 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
         <Table className="w-full border-collapse mb-4">
           <TableHeader>
             <TableRow>
-              <TableCell className="border px-4 py-2">المبلغ</TableCell>
-              <TableCell className="border px-4 py-2">التاريخ</TableCell>
+              <TableCell className="border px-4 py-1">المبلغ</TableCell>
+              <TableCell className="border px-4 py-1">التاريخ</TableCell>
             </TableRow>
           </TableHeader>
           <TableBody>
             {payments.map((payment, index) => (
               <TableRow key={index}>
-                <TableCell className="border px-4 py-2">
+                <TableCell className="border px-4 py-1">
                   {payment.amount}
                 </TableCell>
-                <TableCell className="border px-4 py-2">
+                <TableCell className="border px-4 py-1">
                   {formatDate(payment.date)}
                 </TableCell>
               </TableRow>

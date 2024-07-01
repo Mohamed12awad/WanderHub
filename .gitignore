@@ -25,3 +25,4 @@ accounting-report-template.pug
 *.njsproj
 *.sln
 *.sw?
+FolderList.txt

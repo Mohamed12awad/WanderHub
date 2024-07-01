@@ -21,6 +21,8 @@ import Invoice from "../common/Invoice";
 interface BookingData {
   _id: string;
   customer: string;
+  ownerName: string;
+  ownerPhone: string;
   room: string;
   startDate: Date;
   endDate: Date;
@@ -55,12 +57,13 @@ const ViewBooking = () => {
     error,
   } = useQuery("bookings", () => getBookingById(bookingId!));
   // console.log(isLoading, error);
-  // console.log(bookingData);
+  console.log(bookingData?.data);
 
   const { id: bookingId } = useParams<{ id: string }>();
   const [formData, setFormData] = useState<BookingData | null>(null);
   const [payments, setPayments] = useState<PaymentData[]>([]);
   // deletePayment
+  // console.log(formData);
 
   const mutation = useMutation(deletePayment, {
     onSuccess: () => {
@@ -85,6 +88,8 @@ const ViewBooking = () => {
         setFormData({
           ...data,
           customer: data.customer.name,
+          ownerName: data.customer.owner.name,
+          ownerPhone: data.customer.owner.phone,
           room: data.room.roomNumber,
           startDate: new Date(data.startDate),
           endDate: new Date(data.endDate),

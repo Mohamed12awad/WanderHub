@@ -2,7 +2,7 @@
 const Booking = require("../models/bookingModel");
 // const PartialPayment = require("../models/partialPaymentModel");
 const Customer = require("../models/customerModel");
-const Expense = require("../models/expensesModel");
+const ExpenseReport = require("../models/expensesModel");
 
 const getRevenue = async (startDate, endDate) => {
   const payments = await Booking.aggregate([
@@ -54,40 +54,45 @@ const getUnderCollection = async (startDate, endDate) => {
 };
 
 const getExpenses = async (startDate, endDate) => {
-  const totalExpenses = await Expense.aggregate([
+  const totalExpenses = await ExpenseReport.aggregate([
     {
-      $match: { date: { $gte: new Date(startDate), $lte: new Date(endDate) } },
+      $unwind: "$expenses",
     },
-    { $group: { _id: "$currency", totalAmount: { $sum: "$amount" } } },
-  ]);
-  const categorizedExpenses = await Expense.aggregate([
     {
-      $match: { date: { $gte: new Date(startDate), $lte: new Date(endDate) } },
+      $match: {
+        "expenses.date": { $gte: new Date(startDate), $lte: new Date(endDate) },
+        approved: true,
+      },
+    },
+    { $group: { _id: null, totalAmount: { $sum: "$expenses.amount" } } },
+  ]);
+
+  const categorizedExpenses = await ExpenseReport.aggregate([
+    {
+      $unwind: "$expenses",
+    },
+    {
+      $match: {
+        "expenses.date": { $gte: new Date(startDate), $lte: new Date(endDate) },
+      },
     },
     {
       $group: {
-        _id: { category: "$category", currency: "$currency" },
-        totalAmount: { $sum: "$amount" },
+        _id: "$expenses.category",
+        totalAmount: { $sum: "$expenses.amount" },
       },
     },
   ]);
 
-  const expensesByCurrency = totalExpenses.reduce((acc, curr) => {
+  const totalAmount = totalExpenses.length ? totalExpenses[0].totalAmount : 0;
+
+  const expensesByCategory = categorizedExpenses.reduce((acc, curr) => {
     acc[curr._id] = curr.totalAmount;
     return acc;
   }, {});
 
-  const expensesByCategory = categorizedExpenses.reduce((acc, curr) => {
-    const { category, currency } = curr._id;
-    if (!acc[currency]) {
-      acc[currency] = {};
-    }
-    acc[currency][category] = curr.totalAmount;
-    return acc;
-  }, {});
-
   return {
-    total: expensesByCurrency,
+    total: totalAmount,
     categories: expensesByCategory,
   };
 };

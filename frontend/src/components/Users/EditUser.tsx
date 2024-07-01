@@ -26,6 +26,7 @@ interface Roles {
 interface User {
   email: string;
   name: string;
+  phone: string;
   role: Roles;
 }
 
@@ -33,6 +34,7 @@ const EditUser: React.FC = () => {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +46,7 @@ const EditUser: React.FC = () => {
       name: string;
       role: string;
       password?: string;
+      phone: string;
     }) => updateUser(userId!, userData)
   );
 
@@ -67,6 +70,7 @@ const EditUser: React.FC = () => {
       setEmail(user.email);
       setName(user.name);
       setRole(user.role._id);
+      setPhone(user.phone);
     }
   }, [userData]);
 
@@ -80,6 +84,7 @@ const EditUser: React.FC = () => {
         name,
         role,
         password,
+        phone,
       });
 
       console.log(
@@ -119,6 +124,22 @@ const EditUser: React.FC = () => {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              name="phone"
+              placeholder="01234567890"
+              value={phone}
+              onChange={(e) => {
+                e.target.value = e.target.value
+                  .replace(/\D/g, "")
+                  .substring(0, 11);
+                setPhone(e.target.value);
+              }}
+              required
             />
           </div>
           <div className="grid gap-2">
