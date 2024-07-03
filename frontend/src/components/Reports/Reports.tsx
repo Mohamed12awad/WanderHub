@@ -16,9 +16,14 @@ const Reports: React.FC = () => {
   const [bookingReportData, setBookingReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
-  const fetchReport = async (startDate: string, endDate: string) => {
+
+  const fetchReport = async (
+    startDate: string,
+    endDate: string,
+    location: string
+  ) => {
     try {
-      const params = { startDate, endDate };
+      const params = { startDate, endDate, location };
       setLoading(true);
       const response = await getReport(params);
       setReportData(response.data);
@@ -28,12 +33,18 @@ const Reports: React.FC = () => {
     }
   };
 
-  const fetchBookingReport = async (startDate: string, endDate: string) => {
+  const fetchBookingReport = async (
+    startDate: string,
+    endDate: string,
+    location: string
+  ) => {
     try {
-      const params = { startDate, endDate };
+      const params = { startDate, endDate, location };
       setLoading(true);
       const response = await getBookingReport(params);
       setBookingReportData(response.data);
+      // console.log(bookingReportData);
+      // console.log(response.data);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching booking report:", error);
@@ -70,7 +81,7 @@ const Reports: React.FC = () => {
         </div>
 
         <TabsContent value="full">
-          <DateForm onSubmit={fetchReport} />
+          <DateForm onSubmit={fetchReport} searchByLocation={false} />
           {/* <h2 className="text-center my-4 text-2xl font-bold">Full Report</h2> */}
           <Suspense fallback={<div>Loading report...</div>}>
             {reportData && <ReportComponent reportData={reportData} />}
@@ -78,7 +89,7 @@ const Reports: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="Booking">
-          <DateForm onSubmit={fetchBookingReport} />
+          <DateForm onSubmit={fetchBookingReport} searchByLocation={true} />
           {/* <h2 className="text-center my-4 text-2xl font-bold">
             Booking Report
           </h2> */}

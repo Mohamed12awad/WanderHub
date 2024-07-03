@@ -148,7 +148,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Customer" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     {customers?.data.map((customer: Customer) => (
                       <SelectItem
                         key={customer._id}
@@ -179,7 +179,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Room" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     {rooms?.data.map((room: Room) => (
                       <SelectItem key={room._id} value={room._id!}>
                         {room.roomNumber}
@@ -279,7 +279,7 @@ const AddBooking = () => {
                   onChange={handleChange}
                 />
               </div>
-              <div className="flex flex-col">
+              {/* <div className="flex flex-col">
                 <Label className="my-3" htmlFor="notes">
                   Notes
                 </Label>
@@ -289,7 +289,7 @@ const AddBooking = () => {
                   value={formData.notes}
                   onChange={handleChange}
                 />
-              </div>
+              </div> */}
             </div>
             <div>
               <h2 className="text-lg font-semibold mb-2">Other Information</h2>
@@ -305,7 +305,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     <SelectItem value="booked">Booked</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -325,7 +325,7 @@ const AddBooking = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select Booking Location" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     <SelectItem value="Matrouh">Matrouh</SelectItem>
                     <SelectItem value="Cairo">Cairo</SelectItem>
                     <SelectItem value="Luxor">Luxor</SelectItem>

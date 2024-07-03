@@ -4,6 +4,7 @@ import { Badge } from "../ui/badge";
 interface Customer {
   name: string;
   phone: string;
+  location: string;
   owner: {
     name: string;
     phone: string;
@@ -72,11 +73,10 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
         </div>
         <div>
           <p className="mb-1">
-            <strong>Total Price:</strong> {booking.price.toLocaleString()} EGP
+            <strong>Customer Location:</strong> {booking.customer.location}
           </p>
           <p className="mb-1">
-            <strong>Remaining:</strong>{" "}
-            {(booking.price - booking.totalPaid).toLocaleString()} EGP
+            <strong>Total Price:</strong> {booking.price.toLocaleString()} EGP
           </p>
           <p className="mb-1">
             <strong>Remaining:</strong>{" "}

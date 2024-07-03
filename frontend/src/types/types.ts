@@ -121,6 +121,7 @@ export interface BookingData {
 export interface ReportParams {
   startDate: string;
   endDate: string;
+  location: string;
 }
 
 export interface ExpenseItem {

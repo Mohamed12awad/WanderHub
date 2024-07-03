@@ -4,17 +4,40 @@ const Purchase = require("../models/purchaseModel");
 const Expense = require("../models/expensesModel");
 
 const getBookingsReport = async (start, end) => {
-  return Booking.find({ createdAt: { $gte: start, $lte: end } })
-    .populate("customer")
-    .populate("room");
+  const query = { createdAt: { $gte: start, $lte: end } };
+  return Booking.find(query).populate("customer").populate("room");
 };
-const getBookingsReportByStartAndEndDate = async (start, end) => {
-  return Booking.find({ startDate: { $gte: start, $lte: end } })
-    .populate({
-      path: "customer",
-      populate: { path: "owner", select: "name phone" },
-    })
-    .populate("room");
+
+const getBookingsReportByStartAndEndDate = async (start, end, location) => {
+  const pipeline = [
+    { $match: { startDate: { $gte: start, $lte: end } } },
+    {
+      $lookup: {
+        from: "customers",
+        localField: "customer",
+        foreignField: "_id",
+        as: "customer",
+      },
+    },
+    { $unwind: "$customer" },
+    {
+      $lookup: {
+        from: "users", // Assuming 'owners' is the name of the collection where owner data is stored
+        localField: "customer.owner",
+        foreignField: "_id",
+        as: "customer.owner",
+      },
+    },
+    { $unwind: "$customer.owner" },
+  ];
+
+  if (location) {
+    pipeline.push({ $match: { "customer.location": location } });
+  }
+
+  return Booking.aggregate(pipeline).then((results) =>
+    Booking.populate(results, { path: "room" })
+  );
 };
 
 const getPaymentsReport = async (start, end) => {
@@ -32,7 +55,7 @@ const getExpensesReport = async (start, end) => {
 };
 
 exports.getAccountingReport = async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, location } = req.query;
 
   if (!startDate || !endDate) {
     return res
@@ -45,7 +68,7 @@ exports.getAccountingReport = async (req, res) => {
 
   try {
     const [bookings, payments, purchases, expenses] = await Promise.all([
-      getBookingsReport(start, end),
+      getBookingsReport(start, end, location),
       getPaymentsReport(start, end),
       getPurchasesReport(start, end),
       getExpensesReport(start, end),
@@ -59,7 +82,7 @@ exports.getAccountingReport = async (req, res) => {
 };
 
 exports.getBookingReport = async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const { startDate, endDate, location } = req.query;
 
   if (!startDate || !endDate) {
     return res
@@ -71,9 +94,11 @@ exports.getBookingReport = async (req, res) => {
   const end = new Date(endDate);
 
   try {
-    const [bookings] = await Promise.all([
-      getBookingsReportByStartAndEndDate(start, end),
-    ]);
+    const bookings = await getBookingsReportByStartAndEndDate(
+      start,
+      end,
+      location
+    );
 
     res.status(200).json(bookings);
   } catch (error) {

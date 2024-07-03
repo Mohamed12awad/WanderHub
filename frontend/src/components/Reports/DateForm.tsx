@@ -2,19 +2,29 @@ import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 interface DateFormProps {
-  onSubmit: (startDate: string, endDate: string) => void;
+  onSubmit: (startDate: string, endDate: string, location: string) => void;
+  searchByLocation: boolean;
 }
 
-const DateForm: React.FC<DateFormProps> = ({ onSubmit }) => {
+const DateForm: React.FC<DateFormProps> = ({ onSubmit, searchByLocation }) => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [location, setLocation] = useState("");
+  const [key, setKey] = React.useState(+new Date());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (startDate && endDate) {
-      onSubmit(startDate, endDate);
+      onSubmit(startDate, endDate, location);
     }
   };
 
@@ -41,6 +51,39 @@ const DateForm: React.FC<DateFormProps> = ({ onSubmit }) => {
           onChange={(e) => setEndDate(e.target.value)}
         />
       </div>
+      {searchByLocation && (
+        <div className="flex flex-col md:col-span-2">
+          <Label htmlFor="location">Location:</Label>
+          {/* <Input
+          id="location"
+          type="text"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Optional"
+        /> */}
+          <Select key={key} onValueChange={(value) => setLocation(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Location" />
+            </SelectTrigger>
+            <SelectContent className="overflow-y-auto max-h-[10rem]">
+              <SelectItem value="Alex">Alex</SelectItem>
+              <SelectItem value="Cairo">Cairo</SelectItem>
+              <Button
+                className="w-full px-2 mt-3"
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLocation("");
+                  setKey(+new Date());
+                }}
+              >
+                Clear
+              </Button>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Button className="md:col-span-2" type="submit">
         Generate Report
       </Button>

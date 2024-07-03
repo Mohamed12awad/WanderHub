@@ -211,7 +211,7 @@ const EditCustomer = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Location" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     <SelectItem value="Alex">Alex</SelectItem>
                     <SelectItem value="Cairo">Cairo</SelectItem>
                   </SelectContent>
@@ -234,7 +234,7 @@ const EditCustomer = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Owner" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     {users?.map((item: User) => (
                       <SelectItem key={item._id} value={item._id}>
                         {item.name}
@@ -257,7 +257,7 @@ const EditCustomer = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     <SelectItem value="Draft">Draft</SelectItem>
                     <SelectItem value="Called">Called</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
@@ -394,7 +394,7 @@ const EditCustomer = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Gender" />
                   </SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[10rem]">
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
                     <SelectItem value="Male">Male</SelectItem>
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>

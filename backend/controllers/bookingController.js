@@ -4,19 +4,23 @@ const PartialPayment = require("../models/partialPaymentModel");
 const generateInvoice = require("../utils/generateInvoice");
 
 exports.createBooking = async (req, res) => {
-  try {
-    const {
-      customer: customerId,
-      room: roomId,
-      startDate,
-      endDate,
-      totalPaid,
-    } = req.body;
+  const {
+    customer: customerId,
+    room: roomId,
+    startDate,
+    endDate,
+    totalPaid,
+  } = req.body;
 
+  try {
     // Check for overlapping bookings
     const overlappingBooking = await Booking.findOne({
       room: roomId,
-      $or: [{ startDate: { $lte: endDate }, endDate: { $gte: startDate } }],
+      $or: [
+        { startDate: { $lt: endDate }, endDate: { $gt: startDate } },
+        { startDate: { $lte: startDate }, endDate: { $gte: endDate } },
+        { startDate: { $gte: startDate }, endDate: { $lte: endDate } },
+      ],
     });
 
     if (overlappingBooking) {
@@ -26,6 +30,7 @@ exports.createBooking = async (req, res) => {
     }
 
     const booking = new Booking(req.body);
+
     await booking.save();
 
     const customer = await Customer.findById(customerId);
@@ -47,7 +52,7 @@ exports.createBooking = async (req, res) => {
 
     res.status(201).json(booking);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: "Server Error: " + error.message });
   }
 };
 
