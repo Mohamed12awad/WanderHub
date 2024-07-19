@@ -138,9 +138,10 @@ const AddBooking = () => {
               </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="customer">
-                  Customer
+                  Customer <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Select
+                  required
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, customer: value }))
                   }
@@ -169,9 +170,10 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="room">
-                  Room
+                  Room <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Select
+                  required
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, room: value }))
                   }
@@ -193,7 +195,7 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="startDate">
-                  Start Date
+                  Start Date <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="startDate"
@@ -209,7 +211,7 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="endDate">
-                  End Date
+                  End Date <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="endDate"
@@ -225,7 +227,7 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="price">
-                  Price
+                  Price <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="price"
@@ -240,7 +242,7 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="totalPaid">
-                  Total Paid
+                  Total Paid <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="totalPaid"
@@ -255,7 +257,8 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="numberOfPeople">
-                  Number of People
+                  Number of People{" "}
+                  <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="numberOfPeople"
@@ -298,6 +301,7 @@ const AddBooking = () => {
                   Status
                 </Label>
                 <Select
+                  defaultValue="booked"
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, status: value }))
                   }
@@ -314,7 +318,8 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="bookingLocation">
-                  Booking Location
+                  Booking Location{" "}
+                  <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Select
                   required
@@ -341,7 +346,7 @@ const AddBooking = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="method">
-                  Currency
+                  Currency <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <div className="col-span-3">
                   <Select

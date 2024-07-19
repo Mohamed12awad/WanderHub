@@ -79,7 +79,7 @@ const EditCustomer = () => {
         const { data: users } = await getUsers();
         setUsers(users);
         const { data } = await getCustomerById(id);
-        setFormData({ ...data, owner: data.owner._id });
+        setFormData({ ...data, owner: data.owner._id || "" });
       } catch (error) {
         console.error("Error fetching customer data:", error);
       }

@@ -72,7 +72,8 @@ const ViewCustomer: React.FC = () => {
               <InfoItem
                 label="Owner"
                 value={
-                  typeof customerData.owner !== "string"
+                  typeof customerData.owner !== "string" &&
+                  customerData.owner !== null
                     ? customerData.owner.name
                     : "N/A"
                 }

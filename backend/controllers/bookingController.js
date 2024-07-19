@@ -130,7 +130,11 @@ exports.updateBooking = async (req, res) => {
     const overlappingBooking = await Booking.findOne({
       _id: { $ne: id },
       room: roomId,
-      $or: [{ startDate: { $lte: endDate }, endDate: { $gte: startDate } }],
+      $or: [
+        { startDate: { $lt: endDate }, endDate: { $gt: startDate } },
+        { startDate: { $lte: startDate }, endDate: { $gte: endDate } },
+        { startDate: { $gte: startDate }, endDate: { $lte: endDate } },
+      ],
     });
 
     if (overlappingBooking) {

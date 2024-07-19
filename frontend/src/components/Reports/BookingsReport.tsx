@@ -66,10 +66,12 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
               <strong>Extra Bus Seats:</strong> {booking.extraBusSeats}
             </p>
           )}
-          <p className="mb-1">
-            <strong>Owner:</strong> {booking.customer.owner.name} -{" "}
-            {booking.customer.owner.phone}
-          </p>
+          {booking.customer.owner !== null && (
+            <p className="mb-1">
+              <strong>Owner:</strong> {booking.customer.owner.name} -{" "}
+              {booking.customer.owner.phone}
+            </p>
+          )}
         </div>
         <div>
           <p className="mb-1">
