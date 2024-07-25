@@ -4,6 +4,7 @@ import { Badge } from "../ui/badge";
 interface Customer {
   name: string;
   phone: string;
+  mobile: string;
   location: string;
   owner: {
     name: string;
@@ -50,7 +51,8 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
             <span className="font-normal">{booking.customer.name}</span>
           </h5>
           <p className="mb-1">
-            <strong>Phone:</strong> {booking.customer.phone}
+            <strong>Phone:</strong> {booking.customer.phone} -{" "}
+            {booking.customer.mobile}
           </p>
           <p className="mb-1">
             <strong>Room:</strong> {booking.room.roomNumber}

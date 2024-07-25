@@ -108,21 +108,34 @@ const getSummeryData = async (timePeriod) => {
       previousEndDate = new Date(now.setDate(now.getDate() + 7));
       break;
     case "month":
-      currentStartDate = new Date(now.setMonth(now.getMonth() - 1));
-      previousStartDate = new Date(now.setMonth(now.getMonth() - 1));
-      previousEndDate = new Date(now.setMonth(now.getMonth() + 1));
+      currentStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      previousStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      previousEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
       break;
     case "quarter":
-      currentStartDate = new Date(now.setMonth(now.getMonth() - 3));
-      previousStartDate = new Date(now.setMonth(now.getMonth() - 6));
-      previousEndDate = new Date(now.setMonth(now.getMonth() + 3));
+      const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+      currentStartDate = new Date(
+        now.getFullYear(),
+        (currentQuarter - 1) * 3,
+        1
+      );
+      previousStartDate = new Date(
+        now.getFullYear(),
+        (currentQuarter - 2) * 3,
+        1
+      );
+      previousEndDate = new Date(
+        now.getFullYear(),
+        (currentQuarter - 1) * 3,
+        0
+      );
       break;
     default:
       currentStartDate = new Date(now.setDate(now.getDate() - 30)); // default to last month
       previousStartDate = new Date(now.setDate(now.getDate() - 60));
       previousEndDate = new Date(now.setDate(now.getDate() + 30));
   }
-  const currentEndDate = new Date();
+  const currentEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const currentRevenue = await getRevenue(currentStartDate, currentEndDate);
   const previousRevenue = await getRevenue(previousStartDate, previousEndDate);
