@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Badge } from "../ui/badge";
+import { Link } from "react-router-dom";
 
 interface Customer {
   name: string;
@@ -40,70 +41,72 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
     document.body.style.overflow = "auto";
   }, []);
   const renderBooking = (booking: Booking) => (
-    <div
-      key={booking._id}
-      className="p-6 mb-4 print:py-2 print:mb-2 border rounded-lg shadow-sm bg-white"
-    >
-      <div className="grid print:grid-cols-2 grid-cols-1 md:grid-cols-2 gap-4 print:text-sm">
-        <div>
-          <h5 className="text-lg print:text-base print:mb-0 font-medium mb-2">
-            Customer:{" "}
-            <span className="font-normal">{booking.customer.name}</span>
-          </h5>
-          <p className="mb-1">
-            <strong>Phone:</strong> {booking.customer.phone} -{" "}
-            {booking.customer.mobile}
-          </p>
-          <p className="mb-1">
-            <strong>Room:</strong> {booking.room.roomNumber}
-          </p>
-          <p className="mb-1">
-            <strong>Start Date:</strong> {booking.startDate.split("T")[0]}
-          </p>
-          <p className="mb-1">
-            <strong>Number Of People:</strong> {booking.numberOfPeople}
-          </p>
-          {booking.extraBusSeats > 0 && (
+    <Link to={`/bookings/${booking._id}`}>
+      <div
+        key={booking._id}
+        className="p-6 mb-4 print:py-2 print:mb-2 border rounded-lg shadow-sm bg-white"
+      >
+        <div className="grid print:grid-cols-2 grid-cols-1 md:grid-cols-2 gap-4 print:text-sm">
+          <div>
+            <h5 className="text-lg print:text-base print:mb-0 font-medium mb-2">
+              Customer:{" "}
+              <span className="font-normal">{booking.customer.name}</span>
+            </h5>
             <p className="mb-1">
-              <strong>Extra Bus Seats:</strong> {booking.extraBusSeats}
+              <strong>Phone:</strong> {booking.customer.phone} -{" "}
+              {booking.customer.mobile}
             </p>
-          )}
-          {booking.customer.owner !== null && (
             <p className="mb-1">
-              <strong>Owner:</strong> {booking.customer.owner.name} -{" "}
-              {booking.customer.owner.phone}
+              <strong>Room:</strong> {booking.room.roomNumber}
             </p>
-          )}
-        </div>
-        <div>
-          <p className="mb-1">
-            <strong>Customer Location:</strong> {booking.customer.location}
-          </p>
-          <p className="mb-1">
-            <strong>Total Price:</strong> {booking.price.toLocaleString()} EGP
-          </p>
-          <p className="mb-1">
-            <strong>Remaining:</strong>{" "}
-            {(booking.price - booking.totalPaid).toLocaleString()} EGP
-          </p>
+            <p className="mb-1">
+              <strong>Start Date:</strong> {booking.startDate.split("T")[0]}
+            </p>
+            <p className="mb-1">
+              <strong>Number Of People:</strong> {booking.numberOfPeople}
+            </p>
+            {booking.extraBusSeats > 0 && (
+              <p className="mb-1">
+                <strong>Extra Bus Seats:</strong> {booking.extraBusSeats}
+              </p>
+            )}
+            {booking.customer.owner !== null && (
+              <p className="mb-1">
+                <strong>Owner:</strong> {booking.customer.owner.name} -{" "}
+                {booking.customer.owner.phone}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="mb-1">
+              <strong>Customer Location:</strong> {booking.customer.location}
+            </p>
+            <p className="mb-1">
+              <strong>Total Price:</strong> {booking.price.toLocaleString()} EGP
+            </p>
+            <p className="mb-1">
+              <strong>Remaining:</strong>{" "}
+              {(booking.price - booking.totalPaid).toLocaleString()} EGP
+            </p>
 
-          <p className="mb-1">
-            <strong>End Date:</strong> {booking.endDate.split("T")[0]}
-          </p>
-          <p className="mb-1">
-            <strong>Booking Location:</strong> {booking.bookingLocation}
-          </p>
-          {booking.notes != "" && (
             <p className="mb-1">
-              <strong>Notes:</strong> {booking.notes}
+              <strong>End Date:</strong> {booking.endDate.split("T")[0]}
             </p>
-          )}
-          {/* <p className="mb-1">
+            <p className="mb-1">
+              <strong>Booking Location:</strong> {booking.bookingLocation}
+            </p>
+            {booking.notes != "" && (
+              <p className="mb-1">
+                <strong>Notes:</strong> {booking.notes}
+              </p>
+            )}
+            {/* <p className="mb-1">
             <strong>Status:</strong> {booking.status}
           </p> */}
+          </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 
   return (

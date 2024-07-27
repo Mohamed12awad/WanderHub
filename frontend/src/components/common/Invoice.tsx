@@ -13,6 +13,7 @@ interface Booking {
   ownerPhone: string;
   customer: string;
   customerPhone: string;
+  customerMobile: string;
   room: string;
   price: number;
   totalPaid: number;
@@ -76,7 +77,7 @@ const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
             <TableRow>
               <TableCell className="border px-4 py-1">رقم الهاتف</TableCell>
               <TableCell className="border px-4 py-1">
-                {booking.customerPhone}
+                {booking.customerPhone} - {booking.customerMobile}
               </TableCell>
             </TableRow>
             <TableRow>

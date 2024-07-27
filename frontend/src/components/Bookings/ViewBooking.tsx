@@ -20,8 +20,10 @@ import Invoice from "../common/Invoice";
 
 interface BookingData {
   _id: string;
+  customerID: string;
   customer: string;
   customerPhone: string;
+  customerMobile: string;
   ownerName: string;
   ownerPhone: string;
   room: string;
@@ -58,7 +60,7 @@ const ViewBooking = () => {
     error,
   } = useQuery("bookings", () => getBookingById(bookingId!));
   // console.log(isLoading, error);
-  console.log(bookingData?.data);
+  // console.log(bookingData?.data);
 
   const { id: bookingId } = useParams<{ id: string }>();
   const [formData, setFormData] = useState<BookingData | null>(null);
@@ -88,8 +90,10 @@ const ViewBooking = () => {
         // console.log(bookingData);
         setFormData({
           ...data,
+          customerID: data.customer._id,
           customer: data.customer.name,
           customerPhone: data.customer.phone,
+          customerMobile: data.customer.mobile,
           ownerName: data.customer.owner.name,
           ownerPhone: data.customer.owner.phone,
           room: data.room.roomNumber,
@@ -157,7 +161,11 @@ const ViewBooking = () => {
               </h2>
               <div className="grid grid-cols-2">
                 <Label className="my-3">Customer</Label>
-                <p>{formData.customer}</p>
+                <Link to={`/customers/${formData.customerID}`}>
+                  <p className="text-blue-500 capitalize">
+                    {formData.customer}
+                  </p>
+                </Link>
               </div>
               <div className="grid grid-cols-2">
                 <Label className="my-3">Room</Label>
