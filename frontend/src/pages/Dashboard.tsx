@@ -63,13 +63,19 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Number(revenue).toLocaleString()} L.E
+                {Number(revenue).toLocaleString()} L.E{" "}
+                {revenueChange >= 0 ? (
+                  <span className="text-emerald-600 text-xs">
+                    +{revenueChange.toFixed(1)}%
+                  </span>
+                ) : (
+                  <span className="text-red-600 text-xs">
+                    {revenueChange.toFixed(1)}%
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {revenueChange >= 0
-                  ? `+${revenueChange.toFixed(1)}%`
-                  : `${revenueChange.toFixed(1)}%`}{" "}
-                from last month
+                Last month : {Number(previousRevenue).toLocaleString()}
               </p>
             </CardContent>
           </Card>
@@ -79,12 +85,20 @@ export function Dashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{newCustomers}</div>
+              <div className="text-2xl font-bold">
+                {newCustomers}{" "}
+                {customersChange >= 0 ? (
+                  <span className="text-emerald-600 text-xs">
+                    +{customersChange.toFixed(1)}%
+                  </span>
+                ) : (
+                  <span className="text-red-600 text-xs">
+                    {customersChange.toFixed(1)}%
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {customersChange >= 0
-                  ? `+${customersChange.toFixed(1)}%`
-                  : `${customersChange.toFixed(1)}%`}{" "}
-                from last month
+                last month : {previousCustomers}
               </p>
             </CardContent>
           </Card>
@@ -97,13 +111,19 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Number(underCollection).toLocaleString()} L.E
+                {Number(underCollection).toLocaleString()} L.E{" "}
+                {underCollectionChange >= 0 ? (
+                  <span className="text-emerald-600 text-xs">
+                    +{underCollectionChange.toFixed(1)}%
+                  </span>
+                ) : (
+                  <span className="text-red-600 text-xs">
+                    {underCollectionChange.toFixed(1)}%
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {underCollectionChange >= 0
-                  ? `+${underCollectionChange.toFixed(1)}%`
-                  : `${underCollectionChange.toFixed(1)}%`}{" "}
-                from last month
+                last month : {Number(previousUnderCollection).toLocaleString()}
               </p>
             </CardContent>
           </Card>
@@ -114,13 +134,19 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {Number(expenses).toLocaleString()} L.E
+                {Number(expenses).toLocaleString()} L.E{" "}
+                {expensesChange >= 0 ? (
+                  <span className="text-emerald-600 text-xs">
+                    +{expensesChange.toFixed(1)}%
+                  </span>
+                ) : (
+                  <span className="text-red-600 text-xs">
+                    {expensesChange.toFixed(1)}%
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {expensesChange >= 0
-                  ? `+${expensesChange.toFixed(1)}%`
-                  : `${expensesChange.toFixed(1)}%`}{" "}
-                from last month
+                last month : {Number(previousExpenses).toLocaleString()}
               </p>
             </CardContent>
           </Card>
