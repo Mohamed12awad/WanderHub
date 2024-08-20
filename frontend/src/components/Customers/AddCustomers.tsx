@@ -56,7 +56,7 @@ const initialFormData = {
     relationship: "",
   },
   location: "",
-  status: "",
+  status: "Draft",
   owner: "",
   notes: "",
 };

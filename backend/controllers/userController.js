@@ -61,6 +61,7 @@ exports.updateUser = async (req, res) => {
     if (role) {
       const user = await User.findById(id).populate("role");
 
+      updateData.role = role;
       // Prevent non-super admin from changing roles to or from super admin
       if (
         (user.role.name === "super admin" || role === "super admin") &&
