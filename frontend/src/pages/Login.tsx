@@ -9,8 +9,8 @@ import LoadingSpinner from "@/components/common/spinner";
 
 // console.log(import.meta.env.VITE_API_URL);
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("Viewer@wonderhub.com");
+  const [password, setPassword] = useState("123456");
   const { login, loading } = useAuth();
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
