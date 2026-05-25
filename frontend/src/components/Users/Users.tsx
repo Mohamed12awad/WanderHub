@@ -11,7 +11,7 @@ export function Users() {
   return (
     <GenericTable<User>
       queryKey="users"
-      fetchData={getUsers}
+      fetchData={({ page, limit, q }) => getUsers({ page, limit, q })}
       deleteData={deleteUser}
       headers={u.headers}
       renderRow={(item, handleDelete) => (

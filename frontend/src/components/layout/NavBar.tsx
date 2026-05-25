@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Input } from "../ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,41 +9,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, Search, LogOut } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import NavLinks from "./NavLinks";
-
-const SEARCH_ROUTES: Record<string, string> = {
-  deals: "/deals",
-  customers: "/customers",
-  contacts: "/customers",
-  products: "/products",
-  expenses: "/expenses",
-  pipeline: "/pipeline",
-};
-
 export default function NavBar() {
   const { logout, user } = useAuth();
   const { lang, tr } = useLanguage();
-  const navigate = useNavigate();
-  const [query, setQuery] = useState("");
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim().toLowerCase();
-    if (!q) return;
-    const match = Object.keys(SEARCH_ROUTES).find((k) => q.includes(k));
-    navigate(match ? SEARCH_ROUTES[match] : "/customers");
-    setQuery("");
-  };
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
   return (
-    <header className="flex h-[60px] items-center gap-3 border-b bg-white dark:bg-[hsl(var(--card))] dark:border-border px-4 lg:px-5 print:hidden shrink-0">
+    <header className="flex h-[60px] items-center gap-3 border-b bg-card border-border px-4 lg:px-5 print:hidden shrink-0">
       {/* Mobile menu */}
       <Sheet>
         <SheetTrigger asChild>
@@ -68,22 +45,17 @@ export default function NavBar() {
         </SheetContent>
       </Sheet>
 
-      {/* Search */}
-      <form className="flex-1" onSubmit={handleSearch}>
-        <div className="relative max-w-xs">
-          <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            type="search"
-            placeholder={`${tr.common.search}…`}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="ps-8 pe-14 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:bg-background"
-          />
-          <kbd className="pointer-events-none absolute end-2 top-1.5 hidden h-6 select-none items-center rounded border bg-background px-1.5 font-mono text-[10px] text-muted-foreground md:flex">
-            ⌘K
-          </kbd>
-        </div>
-      </form>
+      {/* Global search button — opens the Cmd+K SearchPalette */}
+      <button
+        onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}
+        className="flex flex-1 max-w-xs items-center gap-2 rounded-md bg-muted/50 px-3 h-9 text-sm text-muted-foreground hover:bg-muted transition-colors"
+      >
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-start">{tr.common.search}…</span>
+        <kbd className="hidden md:flex h-5 select-none items-center rounded border bg-background px-1.5 font-mono text-[10px]">
+          ⌘K
+        </kbd>
+      </button>
 
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
         {/* User avatar */}

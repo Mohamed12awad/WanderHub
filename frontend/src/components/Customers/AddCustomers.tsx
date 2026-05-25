@@ -65,7 +65,7 @@ const AddCustomer = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: users } = useQuery("users", getUsers);
+  const { data: users } = useQuery("users", () => getUsers());
   const navigate = useNavigate();
 
   const handleChange = (

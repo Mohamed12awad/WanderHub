@@ -78,32 +78,32 @@ const ViewCustomer: React.FC = () => {
 
             <section>
               <h2 className="text-lg font-semibold mb-3">Address Information</h2>
-              <InfoItem label="Street" value={customerData.address.street} />
-              <InfoItem label="City" value={customerData.address.city} />
-              <InfoItem label="State" value={customerData.address.state} />
-              <InfoItem label="ZIP Code" value={customerData.address.zip} />
-              <InfoItem label="Country" value={customerData.address.country} />
+              <InfoItem label="Street" value={customerData.address?.street} />
+              <InfoItem label="City" value={customerData.address?.city} />
+              <InfoItem label="State" value={customerData.address?.state} />
+              <InfoItem label="ZIP Code" value={customerData.address?.zip} />
+              <InfoItem label="Country" value={customerData.address?.country} />
             </section>
 
             <section>
               <h2 className="text-lg font-semibold mb-3">Identification Information</h2>
-              <InfoItem label="Passport Number" value={customerData.identification.passportNumber} />
-              <InfoItem label="National ID" value={customerData.identification.nationalId} />
+              <InfoItem label="Passport Number" value={customerData.identification?.passportNumber} />
+              <InfoItem label="National ID" value={customerData.identification?.nationalId} />
               <InfoItem label="Date of Birth" value={customerData.dateOfBirth} />
               <InfoItem label="Gender" value={customerData.gender} />
             </section>
 
             <section>
               <h2 className="text-lg font-semibold mb-3">Emergency Contact</h2>
-              <InfoItem label="Name" value={customerData.emergencyContact.name} />
-              <InfoItem label="Phone" value={customerData.emergencyContact.phone} />
-              <InfoItem label="Relationship" value={customerData.emergencyContact.relationship} />
+              <InfoItem label="Name" value={customerData.emergencyContact?.name} />
+              <InfoItem label="Phone" value={customerData.emergencyContact?.phone} />
+              <InfoItem label="Relationship" value={customerData.emergencyContact?.relationship} />
             </section>
 
             <section>
               <h2 className="text-lg font-semibold mb-3">Loyalty Program</h2>
-              <InfoItem label="Member ID" value={customerData.loyaltyProgram.memberId} />
-              <InfoItem label="Points" value={customerData.loyaltyProgram.points} />
+              <InfoItem label="Member ID" value={customerData.loyaltyProgram?.memberId} />
+              <InfoItem label="Points" value={customerData.loyaltyProgram?.points} />
             </section>
           </div>
 
@@ -139,8 +139,8 @@ const ViewCustomer: React.FC = () => {
 
 const InfoItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
   <div className="mb-3 grid grid-cols-2">
-    <Label className="block text-sm font-medium text-gray-700">{label}</Label>
-    <p className="mt-1 text-base text-gray-900">{value}</p>
+    <Label className="block text-sm font-medium text-muted-foreground">{label}</Label>
+    <p className="mt-1 text-base text-foreground">{value}</p>
   </div>
 );
 

@@ -269,6 +269,8 @@ export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired"
 export type InvoiceStatus = "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "cancelled";
 export type PaymentMethod = "cash" | "bank_transfer" | "card" | "cheque" | "other";
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface Quote {
   _id: string;
   quoteNumber: string;
@@ -287,6 +289,10 @@ export interface Quote {
   terms?: string;
   convertedToInvoice?: { _id: string; invoiceNumber: string };
   createdAt: string;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: { _id: string; name: string };
+  approvedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface Invoice {
@@ -309,6 +315,10 @@ export interface Invoice {
   notes?: string;
   terms?: string;
   createdAt: string;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: { _id: string; name: string };
+  approvedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface InvoicePayment {

@@ -16,6 +16,8 @@ interface ILineItem {
   total: number;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface IInvoice extends Document {
   invoiceNumber: string;
   title: string;
@@ -35,6 +37,10 @@ export interface IInvoice extends Document {
   notes?: string;
   terms?: string;
   createdBy: mongoose.Types.ObjectId;
+  approvalStatus: ApprovalStatus;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  rejectionReason?: string;
 }
 
 const lineItemSchema = new Schema<ILineItem>(
@@ -72,6 +78,10 @@ const invoiceSchema = new Schema<IInvoice>(
     notes: { type: String },
     terms: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    approvalStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
+    rejectionReason: { type: String },
   },
   { timestamps: true }
 );

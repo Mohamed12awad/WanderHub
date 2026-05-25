@@ -42,6 +42,7 @@ import QuoteForm from "@/components/Finance/QuoteForm";
 import QuoteDetail from "@/components/Finance/QuoteDetail";
 import InvoiceForm from "@/components/Finance/InvoiceForm";
 import InvoiceDetail from "@/components/Finance/InvoiceDetail";
+import Payments from "@/pages/Payments";
 
 const routes = [
   { path: "/dashboard", element: <Dashboard /> },
@@ -79,12 +80,13 @@ const routes = [
   { path: "/finance/invoices/new", element: <InvoiceForm /> },
   { path: "/finance/invoices/:id", element: <InvoiceDetail /> },
   { path: "/finance/invoices/:id/edit", element: <InvoiceForm /> },
+  { path: "/finance/payments", element: <Payments /> },
 ];
 
 const DefaultLayout: React.FC = () => {
   return (
     <ModulesProvider>
-      <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] md:grid-rows-[60px_1fr] bg-[#f5f6fa] dark:bg-background">
+      <div className="grid min-h-screen md:h-screen w-full md:grid-cols-[220px_1fr] md:grid-rows-[60px_1fr] bg-[#f5f6fa] dark:bg-background">
         <Sidebar />
         <NavBar />
         <main className="overflow-auto">

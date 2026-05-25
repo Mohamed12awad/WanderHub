@@ -98,6 +98,36 @@ export const updateQuote = async (req: Request, res: Response) => {
   }
 };
 
+export const approveQuote = async (req: Request, res: Response) => {
+  try {
+    const quote = await Quote.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: "approved", approvedBy: req.user!.id, approvedAt: new Date(), rejectionReason: undefined },
+      { new: true }
+    ).populate("customer", "name phone").populate("deal", "title").populate("createdBy", "name");
+    if (!quote) return res.status(404).json({ message: "Quote not found" });
+    res.json(quote);
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+};
+
+export const rejectQuote = async (req: Request, res: Response) => {
+  const { reason } = req.body as { reason: string };
+  if (!reason?.trim()) return res.status(400).json({ message: "Rejection reason is required" });
+  try {
+    const quote = await Quote.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: "rejected", approvedBy: req.user!.id, approvedAt: new Date(), rejectionReason: reason.trim() },
+      { new: true }
+    ).populate("customer", "name phone").populate("deal", "title").populate("createdBy", "name");
+    if (!quote) return res.status(404).json({ message: "Quote not found" });
+    res.json(quote);
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+};
+
 export const deleteQuote = async (req: Request, res: Response) => {
   try {
     const quote = await Quote.findByIdAndDelete(req.params.id);

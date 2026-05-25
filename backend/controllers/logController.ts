@@ -3,7 +3,7 @@ import Log from "../models/logModel";
 
 export const getLogs = async (req: Request, res: Response) => {
   try {
-    const { user, action, startDate, endDate, recordId } = req.query as Record<string, string>;
+    const { user, action, startDate, endDate, recordId, page, limit: limitRaw } = req.query as Record<string, string>;
     const query: Record<string, unknown> = {};
 
     if (user) query.userId = user;
@@ -16,8 +16,18 @@ export const getLogs = async (req: Request, res: Response) => {
       query.timestamp = timestampQuery;
     }
 
-    const logs = await Log.find(query).populate("userId", "name email");
-    res.status(200).json(logs);
+    if (!page) {
+      const logs = await Log.find(query).populate("userId", "name email").sort({ timestamp: -1 }).limit(500);
+      return res.status(200).json(logs);
+    }
+
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 50);
+    const [data, total] = await Promise.all([
+      Log.find(query).populate("userId", "name email").sort({ timestamp: -1 }).skip((p - 1) * limit).limit(limit),
+      Log.countDocuments(query),
+    ]);
+    res.status(200).json({ data, total, page: p, pages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

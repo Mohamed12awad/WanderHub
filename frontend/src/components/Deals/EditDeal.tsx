@@ -34,8 +34,8 @@ const EditDeal = () => {
   const [formData, setFormData] = useState<DealFormData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: customers } = useQuery("customers", getCustomers);
-  const { data: products } = useQuery("products", getProducts);
+  const { data: customers } = useQuery("customers", () => getCustomers());
+  const { data: products } = useQuery("products", () => getProducts());
   const navigate = useNavigate();
 
   useEffect(() => {

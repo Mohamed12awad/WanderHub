@@ -41,8 +41,8 @@ const QuoteForm: React.FC = () => {
   ]);
   const [saving, setSaving] = useState(false);
 
-  const { data: customersData } = useQuery("customers", getCustomers);
-  const { data: dealsData } = useQuery("deals", getDeals);
+  const { data: customersData } = useQuery("customers", () => getCustomers());
+  const { data: dealsData } = useQuery("deals", () => getDeals());
   const { data: quoteData } = useQuery(
     ["quotes", id],
     () => getQuoteById(id!),

@@ -2,11 +2,12 @@ import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { cn } from "@/lib/utils";
-import { User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck, LogsIcon } from "lucide-react";
+import { User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck, LogsIcon, ClipboardCheck } from "lucide-react";
 import ProfileSettings from "./settings/ProfileSettings";
 import AppearanceSettings from "./settings/AppearanceSettings";
 import ModulesSettings from "./settings/ModulesSettings";
 import FieldsSettings from "./settings/FieldsSettings";
+import ApprovalsSettings from "./settings/ApprovalsSettings";
 import { Tasks } from "@/pages/Tasks";
 import { Logs } from "@/components/Logs/Logs";
 import { Roles } from "@/components/Roles/Roles";
@@ -38,8 +39,8 @@ export default function Settings() {
   const adminItems: NavItem[] = [
     { to: "users", icon: Users, label: tr.nav.users },
     { to: "roles", icon: ShieldCheck, label: tr.nav.roles },
+    { to: "approvals", icon: ClipboardCheck, label: "Approvals" },
     { to: "logs", icon: LogsIcon, label: tr.nav.logs },
-
   ];
 
   return (
@@ -89,6 +90,7 @@ export default function Settings() {
           <Route path="tasks" element={<Tasks />} />
           <Route path="logs" element={<Logs />} />
           <Route path="roles" element={<Roles />} />
+          <Route path="approvals" element={<ApprovalsSettings />} />
 
 
         </Routes>

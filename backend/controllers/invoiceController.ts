@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Invoice from "../models/invoiceModel";
 import InvoicePayment from "../models/invoicePaymentModel";
+import Deal from "../models/dealModel";
 import { nextNumber } from "../services/numberSequenceService";
 import { InvoiceStatus } from "../models/invoiceModel";
 
@@ -30,15 +31,31 @@ function deriveStatus(total: number, totalPaid: number, dueDate?: Date): Invoice
 
 export const getInvoices = async (req: Request, res: Response) => {
   try {
-    const { status, customer, deal } = req.query;
+    const { status, customer, deal, page, limit: limitRaw, q } = req.query as Record<string, string>;
     const filter: Record<string, unknown> = {};
     if (status) filter.status = status;
     if (customer) filter.customer = customer;
     if (deal) filter.deal = deal;
-    const invoices = await Invoice.find(filter)
-      .populate("customer", "name")
-      .sort({ createdAt: -1 });
-    res.json(invoices);
+    if (q) filter.$or = [{ invoiceNumber: new RegExp(q, "i") }, { title: new RegExp(q, "i") }];
+
+    if (!page) {
+      const invoices = await Invoice.find(filter)
+        .populate("customer", "name")
+        .sort({ createdAt: -1 });
+      return res.json(invoices);
+    }
+
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 25);
+    const [data, total] = await Promise.all([
+      Invoice.find(filter)
+        .populate("customer", "name")
+        .sort({ createdAt: -1 })
+        .skip((p - 1) * limit)
+        .limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
+    return res.json({ data, total, page: p, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ message: (err as Error).message });
   }
@@ -136,7 +153,65 @@ export const recordPayment = async (req: Request, res: Response) => {
     invoice.status = deriveStatus(invoice.total, invoice.totalPaid, invoice.dueDate);
     await invoice.save();
 
+    if (invoice.deal && invoice.totalPaid >= invoice.total) {
+      await Deal.findByIdAndUpdate(invoice.deal, { status: "won" });
+    }
+
     res.status(201).json({ payment, invoice });
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+};
+
+export const approveInvoice = async (req: Request, res: Response) => {
+  try {
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: "approved", approvedBy: req.user!.id, approvedAt: new Date(), rejectionReason: undefined },
+      { new: true }
+    ).populate("customer", "name phone").populate("deal", "title").populate("quote", "quoteNumber").populate("createdBy", "name");
+    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+    res.json(invoice);
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+};
+
+export const rejectInvoice = async (req: Request, res: Response) => {
+  const { reason } = req.body as { reason: string };
+  if (!reason?.trim()) return res.status(400).json({ message: "Rejection reason is required" });
+  try {
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { approvalStatus: "rejected", approvedBy: req.user!.id, approvedAt: new Date(), rejectionReason: reason.trim() },
+      { new: true }
+    ).populate("customer", "name phone").populate("deal", "title").populate("quote", "quoteNumber").populate("createdBy", "name");
+    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+    res.json(invoice);
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+};
+
+export const getPayments = async (req: Request, res: Response) => {
+  try {
+    const { page, limit: limitRaw } = req.query as Record<string, string>;
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 25);
+    const [data, total] = await Promise.all([
+      InvoicePayment.find()
+        .populate({
+          path: "invoice",
+          select: "invoiceNumber title customer",
+          populate: { path: "customer", select: "name" },
+        })
+        .populate("createdBy", "name")
+        .sort({ date: -1 })
+        .skip((p - 1) * limit)
+        .limit(limit),
+      InvoicePayment.countDocuments(),
+    ]);
+    res.json({ data, total, page: p, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ message: (err as Error).message });
   }

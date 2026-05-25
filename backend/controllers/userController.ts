@@ -34,10 +34,21 @@ export const createUser = async (req: Request, res: Response) => {
   }
 };
 
-export const getUsers = async (_req: Request, res: Response) => {
+export const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await User.find().populate("role");
-    res.json(users);
+    const { page, limit: limitRaw, q } = req.query as Record<string, string>;
+    if (!page) {
+      const users = await User.find().populate("role");
+      return res.json(users);
+    }
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 25);
+    const filter = q ? { $or: [{ name: new RegExp(q, "i") }, { email: new RegExp(q, "i") }] } : {};
+    const [data, total] = await Promise.all([
+      User.find(filter).populate("role").skip((p - 1) * limit).limit(limit),
+      User.countDocuments(filter),
+    ]);
+    res.json({ data, total, page: p, pages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ message: (error as Error).message });
   }

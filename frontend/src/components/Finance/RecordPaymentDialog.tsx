@@ -19,9 +19,11 @@ interface Props {
   invoiceId: string;
   currency: string;
   onSuccess: () => void;
+  disabled?: boolean;
+  disabledTitle?: string;
 }
 
-const RecordPaymentDialog: React.FC<Props> = ({ invoiceId, currency, onSuccess }) => {
+const RecordPaymentDialog: React.FC<Props> = ({ invoiceId, currency, onSuccess, disabled, disabledTitle }) => {
   const { toast } = useToast();
   const { tr } = useLanguage();
   const f = tr.finance;
@@ -73,7 +75,7 @@ const RecordPaymentDialog: React.FC<Props> = ({ invoiceId, currency, onSuccess }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="h-8 px-4">
+        <Button size="sm" className="h-8 px-4" disabled={disabled} title={disabledTitle}>
           <DollarSign className="h-3.5 w-3.5 me-1" />
           {f.recordPayment}
         </Button>

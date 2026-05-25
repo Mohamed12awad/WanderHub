@@ -4,7 +4,7 @@ import NavItem from "./NavItem";
 import {
   Users2, Handshake, WalletCards, LayoutDashboard,
   Package, Banknote, KanbanSquare,
-  CalendarDays, CheckSquare, FileText, Receipt,
+  CalendarDays, CheckSquare, FileText, Receipt, CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -66,6 +66,7 @@ function NavLinks() {
         <>
           <NavItem href="/finance/quotes" icon={FileText} label={tr.nav.quotes} active={isActive("/finance/quotes")} />
           <NavItem href="/finance/invoices" icon={Receipt} label={tr.nav.invoices} active={isActive("/finance/invoices")} />
+          <NavItem href="/finance/payments" icon={CreditCard} label={tr.nav.payments} active={isActive("/finance/payments")} />
         </>
       )}
 

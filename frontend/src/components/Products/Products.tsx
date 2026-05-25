@@ -20,7 +20,7 @@ export function Products() {
   return (
     <GenericTable<Product>
       queryKey="products"
-      fetchData={getProducts}
+      fetchData={({ page, limit, q }) => getProducts({ page, limit, q })}
       deleteData={deleteProduct}
       headers={p.headers}
       renderRow={(item, handleDelete) => (

@@ -24,10 +24,23 @@ export const createCustomer = async (req: Request, res: Response) => {
   }
 };
 
-export const getCustomers = async (_req: Request, res: Response) => {
+export const getCustomers = async (req: Request, res: Response) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
-    res.json(customers);
+    const { page, limit: limitRaw, q, status } = req.query as Record<string, string>;
+    if (!page) {
+      const customers = await Customer.find().sort({ createdAt: -1 });
+      return res.json(customers);
+    }
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 25);
+    const filter: Record<string, unknown> = {};
+    if (q) filter.$or = [{ name: new RegExp(q, "i") }, { email: new RegExp(q, "i") }, { phone: new RegExp(q, "i") }];
+    if (status) filter.status = status;
+    const [data, total] = await Promise.all([
+      Customer.find(filter).sort({ createdAt: -1 }).skip((p - 1) * limit).limit(limit),
+      Customer.countDocuments(filter),
+    ]);
+    res.json({ data, total, page: p, pages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ message: (error as Error).message });
   }

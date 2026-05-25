@@ -61,7 +61,7 @@ export function AddTaskPanel({ open, onClose, task }: Props) {
     setTagInput("");
   }, [task, open]);
 
-  const { data: usersData } = useQuery("users", getUsers);
+  const { data: usersData } = useQuery("users", () => getUsers());
   const users: { _id: string; name: string }[] = Array.isArray(usersData?.data)
     ? usersData.data
     : [];

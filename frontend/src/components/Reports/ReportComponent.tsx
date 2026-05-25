@@ -73,7 +73,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
     );
 
   const renderBooking = (booking: Booking) => (
-    <div key={booking._id} className="p-4 mb-4 border rounded-lg bg-white">
+    <div key={booking._id} className="p-4 mb-4 border rounded-lg bg-card">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <h5 className="text-lg font-medium">
@@ -138,7 +138,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
         payments.length === 0 &&
         purchases.length === 0 &&
         expenses.length === 0 && (
-          <p className="text-center text-gray-500">
+          <p className="text-center text-muted-foreground">
             No data available for the selected period.
           </p>
         )}

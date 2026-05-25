@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,16 +6,19 @@ import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { CircleArrowLeft, Edit, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
-import { getInvoiceById, deleteInvoice, deleteInvoicePayment } from "@/utils/api";
-import { FinanceStatusBadge } from "./FinanceStatusBadge";
+import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice } from "@/utils/api";
+import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
+import { RejectDialog } from "@/components/common/RejectDialog";
+import { PermissionGate } from "@/components/common/PermissionGate";
 import RecordPaymentDialog from "./RecordPaymentDialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LoadingSpinner from "@/components/common/spinner";
 import { Invoice, InvoicePayment } from "@/types/types";
 import { useAuth } from "@/contexts/authContext";
+import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 
 const InfoRow: React.FC<{ label: string; value?: string | number | React.ReactNode }> = ({ label, value }) => (
   <div className="grid grid-cols-2 mb-2">
@@ -34,6 +37,9 @@ const InvoiceDetail: React.FC = () => {
   const f = tr.finance;
 
   const canDelete = ["admin", "super admin"].includes(user!.role);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const { isApprovalEnabled } = useApprovalConfig();
 
   const { data, isLoading } = useQuery(["invoices", id], () => getInvoiceById(id!));
   const invoice: Invoice | undefined = data?.data?.invoice;
@@ -43,6 +49,32 @@ const InvoiceDetail: React.FC = () => {
   if (!invoice) return <div className="p-4">Invoice not found.</div>;
 
   const outstanding = invoice.total - invoice.totalPaid;
+  const approvalEnabled = isApprovalEnabled("invoices");
+  const canEdit = !approvalEnabled || invoice.approvalStatus === "approved" || invoice.approvalStatus === "rejected";
+  const canRecordPayment = !approvalEnabled || invoice.approvalStatus === "approved";
+
+  const handleApprove = async () => {
+    setActionLoading(true);
+    try {
+      await approveInvoice(id!);
+      queryClient.invalidateQueries(["invoices", id]);
+      toast({ title: "Invoice approved." });
+    } catch {
+      toast({ title: "Approval failed", variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
+
+  const handleReject = async (reason: string) => {
+    setActionLoading(true);
+    try {
+      await rejectInvoice(id!, reason);
+      queryClient.invalidateQueries(["invoices", id]);
+      setRejectOpen(false);
+      toast({ title: "Invoice rejected." });
+    } catch {
+      toast({ title: "Rejection failed", variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Delete this invoice and all its payments?")) return;
@@ -67,6 +99,12 @@ const InvoiceDetail: React.FC = () => {
 
   return (
     <main className="p-4 space-y-5">
+      <RejectDialog
+        open={rejectOpen}
+        onConfirm={handleReject}
+        onCancel={() => setRejectOpen(false)}
+        loading={actionLoading}
+      />
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
           <CardTitle className="flex items-center gap-3">
@@ -74,14 +112,28 @@ const InvoiceDetail: React.FC = () => {
             {invoice.invoiceNumber} — {invoice.title}
           </CardTitle>
           <div className="flex gap-2 flex-wrap">
-            <Link to={`/finance/invoices/${id}/edit`}>
-              <Button size="sm" variant="outline" className="h-8 px-4">
+            <PermissionGate require="finance:approve">
+              {invoice.approvalStatus !== "approved" && (
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={handleApprove} disabled={actionLoading}>
+                  <CheckCircle className="h-3.5 w-3.5" />Approve
+                </Button>
+              )}
+              {invoice.approvalStatus !== "rejected" && (
+                <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRejectOpen(true)} disabled={actionLoading}>
+                  <XCircle className="h-3.5 w-3.5" />Reject
+                </Button>
+              )}
+            </PermissionGate>
+            <Link to={canEdit ? `/finance/invoices/${id}/edit` : "#"}>
+              <Button size="sm" variant="outline" className="h-8 px-4" disabled={!canEdit} title={!canEdit ? "Pending approval — cannot edit." : undefined}>
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
             <RecordPaymentDialog
               invoiceId={id!}
               currency={invoice.currency}
+              disabled={!canRecordPayment}
+              disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
               onSuccess={() => queryClient.invalidateQueries(["invoices", id])}
             />
             {canDelete && (
@@ -114,6 +166,7 @@ const InvoiceDetail: React.FC = () => {
                 } />
               )}
               <InfoRow label={f.status} value={<FinanceStatusBadge status={invoice.status} type="invoice" />} />
+              <InfoRow label="Approval" value={<ApprovalBadge status={invoice.approvalStatus} rejectionReason={invoice.rejectionReason} />} />
               <InfoRow label={f.currency} value={invoice.currency} />
               <InfoRow label={f.issueDate} value={new Date(invoice.issueDate).toLocaleDateString()} />
               <InfoRow label={f.dueDate} value={invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—"} />

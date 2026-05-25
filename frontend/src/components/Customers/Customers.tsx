@@ -13,6 +13,20 @@ type Customer = {
   createdAt: string;
 };
 
+const CUSTOMER_FILTERS = [
+  {
+    label: "Status",
+    field: "status",
+    type: "select" as const,
+    options: [
+      { value: "active", label: "Active" },
+      { value: "inactive", label: "Inactive" },
+      { value: "lead", label: "Lead" },
+      { value: "prospect", label: "Prospect" },
+    ],
+  },
+];
+
 export function Customers() {
   const { tr } = useLanguage();
   const c = tr.contacts;
@@ -20,7 +34,7 @@ export function Customers() {
   return (
     <GenericTable<Customer>
       queryKey="customers"
-      fetchData={getCustomers}
+      fetchData={({ page, limit, q, filters }) => getCustomers({ page, limit, q, ...filters })}
       deleteData={deleteCustomer}
       headers={c.headers}
       renderRow={(item, handleDelete) => (
@@ -41,6 +55,7 @@ export function Customers() {
       addLabel={c.add}
       emptyMessage={c.empty}
       noSearchMessage={c.noSearch}
+      filterConfigs={CUSTOMER_FILTERS}
       exportConfig={{
         filename: "contacts",
         getRow: (c) => ({

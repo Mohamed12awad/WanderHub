@@ -20,7 +20,7 @@ export default function Sidebar() {
     : "?";
 
   return (
-    <aside className="hidden md:flex flex-col overflow-hidden border-e bg-white dark:bg-[hsl(var(--sidebar-bg))] dark:border-border row-start-1 row-end-3 print:hidden">
+    <aside className="hidden md:flex flex-col overflow-hidden border-e bg-[hsl(var(--sidebar-bg))] border-border row-start-1 row-end-3 print:hidden">
       {/* Logo */}
       <div className="flex h-[60px] items-center px-5 border-b dark:border-border shrink-0">
         <Link to="/" className="flex items-center gap-2.5 font-bold text-foreground">

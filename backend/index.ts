@@ -22,6 +22,8 @@ import taskRoutes from "./routes/tasks";
 import timelineRoutes from "./routes/timeline";
 import noteRoutes from "./routes/notes";
 import financeRoutes from "./routes/finance";
+import searchRoutes from "./routes/search";
+import settingsRoutes from "./routes/settings";
 import { requireSignin } from "./middleware/auth";
 import { apiLimiter } from "./middleware/rateLimiter";
 
@@ -71,6 +73,8 @@ app.use("/api/tasks", requireSignin, taskRoutes);
 app.use("/api/timeline", requireSignin, timelineRoutes);
 app.use("/api/notes", requireSignin, noteRoutes);
 app.use("/api/finance", requireSignin, financeRoutes);
+app.use("/api/search", requireSignin, searchRoutes);
+app.use("/api/settings", requireSignin, settingsRoutes);
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

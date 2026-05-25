@@ -80,7 +80,7 @@ export function Dashboard() {
   const d = tr.dashboard;
 
   const { data: summeryData, isLoading: summeryLoading } = useQuery("summery", () => getSummery("month"));
-  const { data: dealsData, isLoading: dealsLoading } = useQuery("deals", getDeals);
+  const { data: dealsData, isLoading: dealsLoading } = useQuery("deals", () => getDeals());
 
   const cur = summeryData?.data?.currentPeriod ?? {};
   const prev = summeryData?.data?.previousPeriod ?? {};

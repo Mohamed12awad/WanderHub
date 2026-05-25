@@ -12,8 +12,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
 
 import React from "react";
-import { Link } from "react-router-dom";
-// import { deleteCustomer } from "@/utils/api";
+import { Link, useNavigate } from "react-router-dom";
 
 interface CustomerRowProps {
   id: string;
@@ -35,9 +34,10 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   handleDelete,
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <TableRow>
+    <TableRow className="cursor-pointer" onClick={() => navigate(`/customers/${id}`)}>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="hidden md:table-cell capitalize">
         <Badge
@@ -52,7 +52,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
         {totalSales}
       </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost">

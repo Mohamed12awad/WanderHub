@@ -15,6 +15,36 @@ export interface Deal {
   createdAt: string;
 }
 
+const DEAL_FILTERS = [
+  {
+    label: "Status",
+    field: "status",
+    type: "select" as const,
+    options: [
+      { value: "lead", label: "Lead" },
+      { value: "qualified", label: "Qualified" },
+      { value: "proposal", label: "Proposal" },
+      { value: "negotiation", label: "Negotiation" },
+      { value: "won", label: "Won" },
+      { value: "lost", label: "Lost" },
+      { value: "cancelled", label: "Cancelled" },
+    ],
+  },
+  {
+    label: "Source",
+    field: "source",
+    type: "select" as const,
+    options: [
+      { value: "website", label: "Website" },
+      { value: "referral", label: "Referral" },
+      { value: "cold_call", label: "Cold Call" },
+      { value: "social_media", label: "Social Media" },
+      { value: "other", label: "Other" },
+    ],
+  },
+  { label: "Close Date", field: "closeDate", type: "date-range" as const },
+];
+
 export function Deals() {
   const { tr } = useLanguage();
   const d = tr.deals;
@@ -22,7 +52,7 @@ export function Deals() {
   return (
     <GenericTable<Deal>
       queryKey="deals"
-      fetchData={getDeals}
+      fetchData={({ page, limit, q, filters }) => getDeals({ page, limit, q, ...filters })}
       deleteData={deleteDeal}
       headers={d.headers}
       renderRow={(item, handleDelete) => (
@@ -43,6 +73,7 @@ export function Deals() {
       addLabel={d.add}
       emptyMessage={d.empty}
       noSearchMessage={d.noSearch}
+      filterConfigs={DEAL_FILTERS}
       exportConfig={{
         filename: "deals",
         getRow: (deal) => ({

@@ -22,6 +22,34 @@ export interface ExpenseReportData {
   createdAt: string;
 }
 
+const EXPENSE_FILTERS = [
+  {
+    label: "Category",
+    field: "category",
+    type: "select" as const,
+    options: [
+      { value: "marketing", label: "Marketing & Advertising" },
+      { value: "transportation", label: "Transportation" },
+      { value: "utilities", label: "Utilities" },
+      { value: "meals", label: "Meals" },
+      { value: "lodging", label: "Lodging" },
+      { value: "travel", label: "Travel" },
+      { value: "supplies", label: "Supplies" },
+      { value: "others", label: "Others" },
+    ],
+  },
+  {
+    label: "Status",
+    field: "approved",
+    type: "select" as const,
+    options: [
+      { value: "true", label: "Approved" },
+      { value: "false", label: "Pending" },
+    ],
+  },
+  { label: "Date", field: "date", type: "date-range" as const },
+];
+
 export function Expenses() {
   const { tr } = useLanguage();
   const e = tr.expenses;
@@ -29,7 +57,7 @@ export function Expenses() {
   return (
     <GenericTable<ExpenseReportData>
       queryKey="expenses"
-      fetchData={getExpenses}
+      fetchData={({ page, limit, q, filters }) => getExpenses({ page, limit, q, ...filters })}
       deleteData={deleteExpense}
       headers={e.headers}
       renderRow={(item, handleDelete) => (
@@ -50,6 +78,7 @@ export function Expenses() {
       addLabel={e.add}
       emptyMessage={e.empty}
       noSearchMessage={e.noSearch}
+      filterConfigs={EXPENSE_FILTERS}
       exportConfig={{
         filename: "expenses",
         getRow: (ex) => ({

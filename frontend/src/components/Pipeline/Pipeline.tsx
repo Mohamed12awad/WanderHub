@@ -36,7 +36,7 @@ export function Pipeline() {
   const { tr } = useLanguage();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery("deals", getDeals);
+  const { data, isLoading, error } = useQuery("deals", () => getDeals());
 
   const moveMutation = useMutation(
     ({ id, status }: { id: string; status: string }) =>

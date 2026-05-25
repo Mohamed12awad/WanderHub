@@ -48,8 +48,13 @@ api.interceptors.response.use(
   }
 );
 
+// Global search
+export const globalSearch = (q: string) =>
+  api.get("/search", { params: { q } });
+
 // Deals API Requests
-export const getDeals = () => api.get("/deals");
+export const getDeals = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
+  api.get("/deals", { params });
 export const getDealById = (id: string) =>
   api.get(`/deals/${id}?includePayments=true`);
 export const createDeal = (data: DealData) => api.post("/deals", data);
@@ -84,7 +89,8 @@ export const deletePayment = (PaymentId: string): Promise<void> =>
 export const getRoles = () => api.get("/roles");
 
 // User API Requests
-export const getUsers = () => api.get("/users");
+export const getUsers = (params?: { page?: number; limit?: number; q?: string }) =>
+  api.get("/users", { params });
 export const getUserById = (id: string) => api.get(`/users/${id}`);
 export const createUser = (data: UserData) => api.post("/users", data);
 export const updateUser = (userId: string, data: UserData) =>
@@ -94,7 +100,8 @@ export const deleteUser = (userId: string): Promise<void> =>
 export const toggleUserState = (id: string) => api.put(`/users/active/${id}`);
 
 // User API Requests
-export const getCustomers = () => api.get("/customers");
+export const getCustomers = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
+  api.get("/customers", { params });
 export const getCustomerById = (id: string) => api.get(`/customers/${id}`);
 export const createCustomer = (data: Customer) => api.post("/customers", data);
 export const deleteCustomer = (customerId: string): Promise<void> =>
@@ -103,7 +110,8 @@ export const updateCustomer = (customerId: string, data: Customer) =>
   api.put(`/customers/${customerId}`, data);
 
 // Products API Requests
-export const getProducts = () => api.get("/products");
+export const getProducts = (params?: { page?: number; limit?: number; q?: string }) =>
+  api.get("/products", { params });
 export const getProductById = (id: string) => api.get(`/products/${id}`);
 export const createProduct = (data: Product) => api.post("/products", data);
 export const updateProduct = (id: string, data: Product) =>
@@ -126,7 +134,8 @@ export const getBookingReport = (params: ReportParams) =>
   api.get("/reports/bookings", { params });
 
 // // Expenses API Requests
-export const getExpenses = () => api.get("/expenses");
+export const getExpenses = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
+  api.get("/expenses", { params });
 export const getExpenseById = (id: string) => api.get(`/expenses/${id}`);
 export const createExpense = (data: ExpenseReportData) =>
   api.post("/expenses", data);
@@ -136,6 +145,8 @@ export const deleteExpense = (id: string): Promise<void> =>
   api.delete(`/expenses/${id}`);
 export const approveExpense = (id: string, state: boolean) =>
   api.patch(`/expenses/${id}/approval`, { approved: state });
+export const approveExpenseReport = (id: string) => api.patch(`/expenses/${id}/approve`);
+export const rejectExpenseReport = (id: string, reason: string) => api.patch(`/expenses/${id}/reject`, { reason });
 // export const updateExpenseReportItem = (id: string, expenseId: string, data) =>
 //   api.put(`/expenses/${id}/expense/${expenseId}`, data);
 export const deleteExpenseReportItem = (
@@ -168,6 +179,8 @@ export const getLogs = (params?: {
   startDate?: string;
   endDate?: string;
   action?: string;
+  page?: number;
+  limit?: number;
 }) => api.get("/logs", { params });
 
 // Notes API Requests
@@ -211,6 +224,8 @@ export const createQuote = (data: QuoteFormData) => api.post("/finance/quotes", 
 export const updateQuote = (id: string, data: Partial<QuoteFormData>) =>
   api.put(`/finance/quotes/${id}`, data);
 export const deleteQuote = (id: string): Promise<void> => api.delete(`/finance/quotes/${id}`);
+export const approveQuote = (id: string) => api.patch(`/finance/quotes/${id}/approve`);
+export const rejectQuote = (id: string, reason: string) => api.patch(`/finance/quotes/${id}/reject`, { reason });
 export const convertQuoteToInvoice = (id: string) =>
   api.post(`/finance/quotes/${id}/convert`);
 
@@ -222,9 +237,34 @@ export const createInvoice = (data: InvoiceFormData) => api.post("/finance/invoi
 export const updateInvoice = (id: string, data: Partial<InvoiceFormData>) =>
   api.put(`/finance/invoices/${id}`, data);
 export const deleteInvoice = (id: string): Promise<void> => api.delete(`/finance/invoices/${id}`);
+export const approveInvoice = (id: string) => api.patch(`/finance/invoices/${id}/approve`);
+export const rejectInvoice = (id: string, reason: string) => api.patch(`/finance/invoices/${id}/reject`, { reason });
 export const recordInvoicePayment = (
   invoiceId: string,
   data: { amount: number; currency: string; date: string; method: string; reference?: string; notes?: string }
 ) => api.post(`/finance/invoices/${invoiceId}/payments`, data);
 export const deleteInvoicePayment = (invoiceId: string, paymentId: string): Promise<void> =>
   api.delete(`/finance/invoices/${invoiceId}/payments/${paymentId}`);
+
+// Reports — Analytics
+export const getRevenueReport = (params?: { startDate?: string; endDate?: string }) =>
+  api.get("/reports/revenue", { params });
+export const getPipelineReport = () => api.get("/reports/pipeline");
+export const getExpensesCategoryReport = (params?: { startDate?: string; endDate?: string }) =>
+  api.get("/reports/expenses-category", { params });
+export const getOutstandingReport = () => api.get("/reports/outstanding");
+export const getCustomerAcquisitionReport = (params?: { startDate?: string; endDate?: string }) =>
+  api.get("/reports/customer-acquisition", { params });
+
+// Finance — Payments
+export const getPayments = (params?: { page?: number; limit?: number }) =>
+  api.get("/finance/payments", { params });
+
+// Deals — create quote from deal
+export const createQuoteFromDeal = (dealId: string) =>
+  api.post(`/deals/${dealId}/create-quote`);
+
+// Settings API Requests
+export const getApprovalSettings = () => api.get("/settings/approvals");
+export const updateApprovalSettings = (approvals: { module: string; approverRoles: string[]; enabled: boolean }[]) =>
+  api.put("/settings/approvals", { approvals });

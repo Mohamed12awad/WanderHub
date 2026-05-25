@@ -11,7 +11,7 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { approveExpense } from "@/utils/api";
 import { useQueryClient } from "react-query";
 interface CustomerRowProps {
@@ -34,6 +34,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   handleDelete,
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const handleApprove = async (id: string) => {
     await approveExpense(id, true);
@@ -41,7 +42,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   };
 
   return (
-    <TableRow>
+    <TableRow className="cursor-pointer" onClick={() => navigate(`/expenses/${id}`)}>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
       <TableCell>
@@ -60,7 +61,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
         {totalSales}
       </TableCell>
       <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost">

@@ -9,11 +9,17 @@ export interface IExpenseItem {
   beneficiary: string;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface IExpenseReport extends Document {
   title: string;
   userId: mongoose.Types.ObjectId;
   approved: boolean;
   expenses: mongoose.Types.DocumentArray<IExpenseItem & Document>;
+  approvalStatus: ApprovalStatus;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  rejectionReason?: string;
 }
 
 const expenseSchema = new Schema<IExpenseItem>({
@@ -30,6 +36,10 @@ const expenseReportSchema = new Schema<IExpenseReport>(
     userId: { type: Schema.Types.ObjectId, ref: "User" },
     approved: { type: Boolean, default: false },
     expenses: [expenseSchema],
+    approvalStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
+    rejectionReason: { type: String },
   },
   { timestamps: true }
 );

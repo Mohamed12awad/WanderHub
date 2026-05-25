@@ -10,6 +10,8 @@ export interface ILineItem {
   total: number;
 }
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface IQuote extends Document {
   quoteNumber: string;
   title: string;
@@ -27,6 +29,10 @@ export interface IQuote extends Document {
   terms?: string;
   convertedToInvoice?: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
+  approvalStatus: ApprovalStatus;
+  approvedBy?: mongoose.Types.ObjectId;
+  approvedAt?: Date;
+  rejectionReason?: string;
 }
 
 const lineItemSchema = new Schema<ILineItem>(
@@ -62,6 +68,10 @@ const quoteSchema = new Schema<IQuote>(
     terms: { type: String },
     convertedToInvoice: { type: Schema.Types.ObjectId, ref: "Invoice" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    approvalStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
+    rejectionReason: { type: String },
   },
   { timestamps: true }
 );

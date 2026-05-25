@@ -16,6 +16,7 @@ export const en = {
     finance: "Finance",
     quotes: "Quotes",
     invoices: "Invoices",
+    payments: "Payments",
   },
   auth: {
     signIn: "Sign in",
@@ -357,6 +358,7 @@ export const ar: typeof en = {
     finance: "المالية",
     quotes: "عروض الأسعار",
     invoices: "الفواتير",
+    payments: "المدفوعات",
   },
   auth: {
     signIn: "تسجيل الدخول",

@@ -3,171 +3,127 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { getExpenseById, updateExpense } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CircleArrowLeft, Minus } from "lucide-react";
+import { CircleArrowLeft, Trash2, Plus } from "lucide-react";
 import { AxiosError } from "axios";
-import { ErrorResponse, ExpenseReportData } from "@/types/types";
+import { ErrorResponse } from "@/types/types";
 import LoadingSpinner from "../common/spinner";
-import { ScrollArea, ScrollBar } from "../ui/scroll-area";
+import { toast } from "@/components/ui/use-toast";
 
-const initialFormData: ExpenseReportData = {
-  title: "",
-  userId: "",
-  expenses: [
-    { description: "", amount: 0, date: "", category: "", beneficiary: "" },
-  ],
-  approved: false,
+const CATEGORIES = [
+  { value: "marketing", label: "Marketing & Advertising" },
+  { value: "transportation", label: "Transportation" },
+  { value: "utilities", label: "Utilities" },
+  { value: "meals", label: "Meals" },
+  { value: "lodging", label: "Lodging" },
+  { value: "travel", label: "Travel" },
+  { value: "supplies", label: "Supplies" },
+  { value: "others", label: "Others" },
+];
+
+type ExpenseLine = {
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  beneficiary: string;
 };
 
-interface FormErrors {
-  title?: string;
-  expenses?: string;
+function toDateString(v: unknown): string {
+  if (!v) return "";
+  const d = new Date(v as string);
+  return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
 }
 
 const EditExpenseReport: React.FC = () => {
   const { id: expenseId } = useParams<{ id: string }>();
-  const [formData, setFormData] = useState<ExpenseReportData>(initialFormData);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [title, setTitle] = useState("");
+  const [lines, setLines] = useState<ExpenseLine[]>([]);
+  const [titleError, setTitleError] = useState("");
+  const [linesError, setLinesError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchExpenseData = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await getExpenseById(expenseId!);
-        // console.log(response);
-        setFormData(response.data);
+        const { data } = await getExpenseById(expenseId!);
+        setTitle(data.title ?? "");
+        setLines(
+          (data.expenses ?? []).map((e: ExpenseLine) => ({
+            ...e,
+            date: toDateString(e.date),
+          }))
+        );
+      } catch {
+        toast({ title: "Failed to load expense report", variant: "destructive" });
+      } finally {
         setIsLoading(false);
-      } catch (error) {
-        setIsLoading(false);
-        console.error("Error fetching expense data:", error);
       }
     };
-    fetchExpenseData();
+    fetchData();
   }, [expenseId]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value || "",
-    }));
-    setErrors((prevErrors) => ({
-      ...prevErrors,
-      [name]: "",
-    }));
-  };
-
-  const handleExpenseChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-    index: number
-  ) => {
-    const { name, value } = e.target;
-    const newExpenses = [...formData.expenses];
-    newExpenses[index] = {
-      ...newExpenses[index],
-      [name]: name === "amount" ? Number(value) : value || "",
-    };
-
-    // Ensure the date is valid
-    if (name === "date" && isNaN(new Date(value).getTime())) {
-      // Handle invalid date value if needed
-      console.error("Invalid date value:", value);
-    }
-
-    setFormData((prevData) => ({
-      ...prevData,
-      expenses: newExpenses,
-    }));
-    setErrors((prevErrors) => ({
-      ...prevErrors,
-      expenses: "",
-    }));
-  };
-
-  const addExpenseField = () => {
-    setFormData((prevData) => ({
-      ...prevData,
-      expenses: [
-        ...prevData.expenses,
-        {
-          description: "",
-          amount: 0,
-          date: "",
-          category: "",
-          beneficiary: "",
-        },
-      ],
-    }));
-  };
-
-  const removeExpenseField = (index: number) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      expenses: prevData.expenses.filter((_, i) => i !== index),
-    }));
-  };
-
-  const validateForm = () => {
-    const newErrors: FormErrors = {};
-    if (!formData.title) newErrors.title = "Title is required";
-    if (
-      formData.expenses.some(
-        (expense) =>
-          !expense.description ||
-          !expense.amount ||
-          !expense.date ||
-          !expense.category ||
-          !expense.beneficiary
+  const update = (idx: number, field: keyof ExpenseLine, value: string | number) => {
+    setLines((prev) =>
+      prev.map((row, i) =>
+        i === idx ? { ...row, [field]: field === "amount" ? Number(value) : value } : row
       )
-    ) {
-      newErrors.expenses = "All expense fields are required";
+    );
+    setLinesError("");
+  };
+
+  const addRow = () =>
+    setLines((prev) => [
+      ...prev,
+      {
+        description: "",
+        amount: 0,
+        date: new Date().toISOString().split("T")[0],
+        category: "",
+        beneficiary: "",
+      },
+    ]);
+
+  const removeRow = (idx: number) => {
+    if (lines.length === 1) return;
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const total = lines.reduce((sum, row) => sum + (row.amount || 0), 0);
+
+  const validate = () => {
+    let ok = true;
+    if (!title.trim()) { setTitleError("Title is required"); ok = false; }
+    if (lines.length === 0) {
+      setLinesError("At least one expense line is required");
+      ok = false;
+    } else if (lines.some((r) => !r.description || !r.amount || !r.date || !r.category || !r.beneficiary)) {
+      setLinesError("All expense fields are required");
+      ok = false;
     }
-    return newErrors;
+    return ok;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formValidationErrors = validateForm();
-    if (Object.keys(formValidationErrors).length > 0) {
-      setErrors(formValidationErrors);
-      return;
-    }
-
-    const expenseReportData: ExpenseReportData = {
-      ...formData,
-      expenses: formData.expenses.map((expense) => ({
-        ...expense,
-        amount: Number(expense.amount),
-        date: expense.date ? new Date(expense.date) : new Date(),
-      })),
-    };
-
+    if (!validate()) return;
     try {
       setIsLoading(true);
-      await updateExpense(expenseId!, expenseReportData);
-      setIsLoading(false);
+      await updateExpense(expenseId!, { title: title.trim(), userId: "", expenses: lines, approved: false });
       navigate("/expenses");
     } catch (error) {
       setIsLoading(false);
-      console.error("Error updating expense report:", error);
-
-      const axiosError = error as AxiosError<ErrorResponse>;
-      const errMsg = axiosError.response?.data?.message;
-      console.error("Error updating expense report:", errMsg);
-      alert(errMsg);
+      const msg = (error as AxiosError<ErrorResponse>).response?.data?.message;
+      toast({ title: msg ?? "Failed to update expense report", variant: "destructive" });
     }
   };
 
@@ -176,154 +132,128 @@ const EditExpenseReport: React.FC = () => {
       <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader>
-          <CardTitle className="flex">
-            <Link to="/expenses">
-              <CircleArrowLeft className="me-3" />
-            </Link>
+          <CardTitle className="flex items-center gap-2">
+            <Link to="/expenses"><CircleArrowLeft /></Link>
             Edit Expense Report
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="my-4">
-            <div className="">
-              <h2 className="text-lg font-semibold mb-2">Report Information</h2>
-              <div className="flex flex-col">
-                <Label className="my-3" htmlFor="title">
-                  Title
-                </Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formData.title || ""}
-                  onChange={handleChange}
-                  required
-                />
-                {errors.title && (
-                  <span className="text-red-500">{errors.title}</span>
-                )}
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-6 my-4">
+            <div className="max-w-sm space-y-1">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => { setTitle(e.target.value); setTitleError(""); }}
+              />
+              {titleError && <p className="text-sm text-destructive">{titleError}</p>}
             </div>
-            <div className="">
-              <h2 className="text-lg font-semibold mb-2">Expenses</h2>
-              <ScrollArea className="w-full rounded-md border p-4">
-                {formData.expenses.map((expense, index) => (
-                  <div
-                    key={index}
-                    className="mb-4 ms-5 grid grid-cols-3 lg:grid-cols-5 gap-4"
-                  >
-                    <Button
-                      variant="outline"
-                      className="rounded-full absolute left-1 mt-11 p-0 h-7 w-7"
-                      size="icon"
-                      onClick={() => removeExpenseField(index)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <div className="flex flex-col col-span-3 md:col-span-1">
-                      <Label className="my-3" htmlFor={`description-${index}`}>
-                        Description
-                      </Label>
-                      <Input
-                        id={`description-${index}`}
-                        name="description"
-                        value={expense.description || ""}
-                        onChange={(e) => handleExpenseChange(e, index)}
-                        required
-                      />
-                    </div>
-                    <div className="flex flex-col col-span-3 md:col-span-1">
-                      <Label className="my-3" htmlFor={`amount-${index}`}>
-                        Amount
-                      </Label>
-                      <Input
-                        id={`amount-${index}`}
-                        name="amount"
-                        type="number"
-                        value={expense.amount.toString()}
-                        onChange={(e) => handleExpenseChange(e, index)}
-                        required
-                      />
-                    </div>
-                    <div className="flex flex-col col-span-3 md:col-span-1">
-                      <Label className="my-3" htmlFor={`date-${index}`}>
-                        Date
-                      </Label>
-                      <Input
-                        id={`date-${index}`}
-                        name="date"
-                        type="date"
-                        value={
-                          expense.date
-                            ? new Date(expense.date).toISOString().split("T")[0]
-                            : ""
-                        }
-                        onChange={(e) => handleExpenseChange(e, index)}
-                        required
-                      />
-                    </div>
-                    <div className="flex flex-col col-span-3 md:col-span-1">
-                      <Label className="my-3" htmlFor={`category-${index}`}>
-                        Category
-                      </Label>
-                      <Select
-                        name="category"
-                        value={expense.category || ""}
-                        onValueChange={(value) =>
-                          handleExpenseChange(
-                            {
-                              target: { name: "category", value },
-                            } as React.ChangeEvent<HTMLSelectElement>,
-                            index
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="meals">Meals</SelectItem>
-                          <SelectItem value="lodging">Lodging</SelectItem>
-                          <SelectItem value="travel">Travel</SelectItem>
-                          <SelectItem value="transportation">
-                            Transportation
-                          </SelectItem>
-                          <SelectItem value="supplies">Supplies</SelectItem>
-                          <SelectItem value="others">Others</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex flex-col col-span-3 md:col-span-1">
-                      <Label className="my-3" htmlFor={`beneficiary-${index}`}>
-                        Beneficiary
-                      </Label>
-                      <Input
-                        id={`beneficiary-${index}`}
-                        name="beneficiary"
-                        value={expense.beneficiary || ""}
-                        onChange={(e) => handleExpenseChange(e, index)}
-                        required
-                      />
-                    </div>
-                  </div>
-                ))}
-                {errors.expenses && (
-                  <span className="text-red-500">{errors.expenses}</span>
-                )}
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-              <div className="text-end mt-3">
-                <Button
-                  type="button"
-                  onClick={addExpenseField}
-                  variant="outline"
-                >
-                  Add Expense
+
+            <div className="space-y-3">
+              <h2 className="text-base font-semibold">Expense Lines</h2>
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[160px]">Description</TableHead>
+                      <TableHead className="w-28">Amount</TableHead>
+                      <TableHead className="w-36">Date</TableHead>
+                      <TableHead className="min-w-[160px]">Category</TableHead>
+                      <TableHead className="min-w-[140px]">Beneficiary</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lines.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                          No expense lines yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {lines.map((row, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Input
+                            value={row.description}
+                            onChange={(e) => update(idx, "description", e.target.value)}
+                            placeholder="Description"
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={row.amount || ""}
+                            onChange={(e) => update(idx, "amount", e.target.value)}
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={row.date}
+                            onChange={(e) => update(idx, "date", e.target.value)}
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.category}
+                            onValueChange={(v) => update(idx, "category", v)}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CATEGORIES.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={row.beneficiary}
+                            onChange={(e) => update(idx, "beneficiary", e.target.value)}
+                            placeholder="Beneficiary"
+                            className="h-8"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => removeRow(idx)}
+                            disabled={lines.length === 1}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between">
+                <Button type="button" variant="outline" size="sm" onClick={addRow}>
+                  <Plus className="h-3.5 w-3.5 me-1" />
+                  Add Row
                 </Button>
+                <p className="text-sm font-semibold text-foreground">
+                  Total: {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
               </div>
+              {linesError && <p className="text-sm text-destructive">{linesError}</p>}
             </div>
-            <div className="text-center mt-4">
-              <Button type="submit">Update Expense Report</Button>
-            </div>
+
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Saving…" : "Update Expense Report"}
+            </Button>
           </form>
         </CardContent>
       </Card>

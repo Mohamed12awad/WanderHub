@@ -41,8 +41,8 @@ const AddDeal = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: customers } = useQuery("customers", getCustomers);
-  const { data: products } = useQuery("products", getProducts);
+  const { data: customers } = useQuery("customers", () => getCustomers());
+  const { data: products } = useQuery("products", () => getProducts());
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

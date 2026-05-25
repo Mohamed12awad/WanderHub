@@ -1,31 +1,28 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getDealById, deletePayment } from "@/utils/api";
+import { getDealById } from "@/utils/api";
 import { Link, useParams } from "react-router-dom";
-import { CircleArrowLeft, Edit, Printer } from "lucide-react";
-import PaymentRow from "./PaymentsRow";
-import { useQuery, useMutation, useQueryClient } from "react-query";
-import { PaymentDialog } from "../common/PaymentDialog";
+import { CircleArrowLeft, Edit, Printer, FileText } from "lucide-react";
+import { useQuery } from "react-query";
+import { DealPaymentDialog } from "./DealPaymentDialog";
 import { Button } from "../ui/button";
 import LoadingSpinner from "../common/spinner";
-import Invoice from "../common/Invoice";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
 import FinanceTab from "@/components/Finance/FinanceTab";
 
 const STATUS_COLORS: Record<string, string> = {
-  lead: "bg-blue-100 text-blue-700",
-  qualified: "bg-purple-100 text-purple-700",
-  proposal: "bg-yellow-100 text-yellow-700",
-  negotiation: "bg-orange-100 text-orange-700",
-  won: "bg-green-100 text-green-700",
-  lost: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-100 text-gray-500",
+  lead: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  qualified: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  proposal: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  negotiation: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  won: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  lost: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  cancelled: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 interface DealData {
@@ -46,19 +43,8 @@ interface DealData {
   createdAt: string;
 }
 
-interface PaymentData {
-  _id: string;
-  amount: number;
-  currency: string;
-  date: string;
-  method: string;
-  createdAt: Date;
-  createdBy: { name: string };
-  notes: string;
-}
 
 const ViewDeal = () => {
-  const queryClient = useQueryClient();
   const { id: dealId } = useParams<{ id: string }>();
 
   const { data: dealData, isLoading, error } = useQuery(
@@ -67,16 +53,10 @@ const ViewDeal = () => {
   );
 
   const [formData, setFormData] = useState<DealData | null>(null);
-  const [payments, setPayments] = useState<PaymentData[]>([]);
-
-  const mutation = useMutation(deletePayment, {
-    onSuccess: () => queryClient.invalidateQueries(["deals", dealId]),
-  });
 
   useEffect(() => {
     if (!dealData?.data) return;
     const d = dealData.data.deal;
-    setPayments(dealData.data.payments ?? []);
     setFormData({
       ...d,
       customerID: d.customer?._id,
@@ -104,13 +84,24 @@ const ViewDeal = () => {
             <Link to="/deals"><CircleArrowLeft /></Link>
             View Deal
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Link to={`/finance/quotes/new?deal=${dealId}&customer=${formData.customerID}`}>
+              <Button size="sm" variant="outline" className="h-8 px-4">
+                <FileText className="h-3.5 w-3.5 me-1" />New Quote
+              </Button>
+            </Link>
             <Link to={`/deals/${dealId}/edit`}>
               <Button size="sm" className="h-8 px-4">
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
-            <PaymentDialog id={formData._id} />
+            <DealPaymentDialog
+              dealId={dealId!}
+              customerId={formData.customerID}
+              dealTitle={formData.title}
+              dealPrice={formData.price}
+              currency={formData.currency}
+            />
             <Button variant="ghost" size="sm" className="h-8 px-4" onClick={() => print()}>
               <Printer className="h-3.5 w-3.5 me-1" />Invoice
             </Button>
@@ -146,39 +137,6 @@ const ViewDeal = () => {
 
       <Card className="mt-5 print:hidden">
         <CardContent className="py-5">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="hidden md:table-cell">No.</TableHead>
-                <TableHead>Amount Received</TableHead>
-                <TableHead className="hidden md:table-cell">Currency</TableHead>
-                <TableHead className="hidden md:table-cell">Method</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="hidden md:table-cell">Created By</TableHead>
-                <TableHead><span className="sr-only">Actions</span></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.map((item, index) => (
-                <PaymentRow
-                  key={item._id}
-                  name={(index + 1).toString()}
-                  state={new Date(item.date).toISOString().split("T")[0]}
-                  totalSales={item.amount.toString()}
-                  date={item.currency}
-                  method={item.method}
-                  price={item.createdBy?.name}
-                  id={item._id}
-                  handleDelete={(id) => mutation.mutate(id)}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card className="mt-5 print:hidden">
-        <CardContent className="py-5">
           <Tabs defaultValue="timeline">
             <TabsList className="mb-4">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -202,7 +160,6 @@ const ViewDeal = () => {
         </CardContent>
       </Card>
 
-      <Invoice payments={payments} booking={formData} />
     </main>
   );
 };

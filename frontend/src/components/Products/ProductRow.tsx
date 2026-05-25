@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface ProductRowProps {
   id: string;
@@ -26,9 +26,10 @@ const ProductRow: React.FC<ProductRowProps> = ({
   id, name, type, capacity, location, date, handleDelete,
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <TableRow>
+    <TableRow className="cursor-pointer" onClick={() => navigate(`/products/${id}`)}>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="hidden md:table-cell">
         <Badge variant="outline">{type}</Badge>
@@ -36,7 +37,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
       <TableCell className="hidden md:table-cell">{capacity}</TableCell>
       <TableCell className="hidden md:table-cell capitalize">{location}</TableCell>
       <TableCell className="hidden md:table-cell">{date}</TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost">

@@ -44,7 +44,7 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
     <Link to={`/bookings/${booking._id}`}>
       <div
         key={booking._id}
-        className="p-6 mb-4 print:py-2 print:mb-2 border rounded-lg shadow-sm bg-white"
+        className="p-6 mb-4 print:py-2 print:mb-2 border rounded-lg shadow-sm bg-card"
       >
         <div className="grid print:grid-cols-2 grid-cols-1 md:grid-cols-2 gap-4 print:text-sm">
           <div>
@@ -119,7 +119,7 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
           {bookings.map((booking) => renderBooking(booking))}
         </div>
       ) : (
-        <p className="text-center text-gray-500">No booking data available.</p>
+        <p className="text-center text-muted-foreground">No booking data available.</p>
       )}
     </div>
   );
