@@ -1,0 +1,156 @@
+import React, { useState } from "react";
+import { useMutation, useQueryClient } from "react-query";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PlusCircle } from "lucide-react";
+import { createActivity } from "@/utils/api";
+import { ActivityFormData, ActivityType } from "@/types/types";
+
+interface ActivityDialogProps {
+  linkedTo: string;
+  linkedModel: "Customer" | "Deal";
+}
+
+const ACTIVITY_ICONS: Record<ActivityType, string> = {
+  call: "📞",
+  meeting: "🤝",
+  task: "✅",
+  note: "📝",
+  email: "📧",
+};
+
+export const ActivityDialog: React.FC<ActivityDialogProps> = ({
+  linkedTo,
+  linkedModel,
+}) => {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<ActivityType>("call");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+
+  const { mutate, isLoading } = useMutation(createActivity, {
+    onSuccess: () => {
+      queryClient.invalidateQueries(["activities", linkedTo]);
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+      setType("call");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data: ActivityFormData = {
+      type,
+      title,
+      description,
+      date,
+      status: "pending",
+      linkedTo,
+      linkedModel,
+    };
+    mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 gap-1">
+          <PlusCircle className="h-3.5 w-3.5" />
+          Log Activity
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Log Activity</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Type</Label>
+              <div className="col-span-3">
+                <Select
+                  value={type}
+                  onValueChange={(v) => setType(v as ActivityType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["call", "meeting", "task", "note", "email"] as ActivityType[]).map(
+                      (t) => (
+                        <SelectItem key={t} value={t} className="capitalize">
+                          {ACTIVITY_ICONS[t]} {t}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
+              <Input
+                id="title"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g. Follow-up call with client"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">
+                Date
+              </Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="desc" className="text-right pt-2">
+                Notes
+              </Label>
+              <textarea
+                id="desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="col-span-3 border rounded-md p-2 text-sm min-h-[72px] resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Optional notes..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};

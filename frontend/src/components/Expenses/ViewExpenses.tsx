@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import { useQuery, useQueryClient } from "react-query";
 import { Button } from "@/components/ui/button";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
+import { NotesPanel } from "@/components/common/NotesPanel";
 
 interface ExpenseData {
   _id: string;
@@ -176,6 +178,18 @@ const ViewExpense = () => {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+      <Card className="mt-5 print:hidden">
+        <CardContent className="py-5">
+          <Tabs defaultValue="notes">
+            <TabsList className="mb-4">
+              <TabsTrigger value="notes">Notes</TabsTrigger>
+            </TabsList>
+            <TabsContent value="notes">
+              {expenseId && <NotesPanel linkedTo={expenseId} linkedModel="Expense" />}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </main>

@@ -1,189 +1,153 @@
 import React from "react";
 import { format } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
-  TableHeader,
-} from "../ui/table";
+import { Table, TableBody, TableRow, TableCell, TableHeader } from "../ui/table";
 
-interface Booking {
-  ownerName: string;
-  ownerPhone: string;
+interface DealSummary {
+  title?: string;
   customer: string;
-  customerPhone: string;
-  customerMobile: string;
-  room: string;
+  customerPhone?: string;
+  product?: string;
   price: number;
   totalPaid: number;
-  startDate: Date;
-  endDate: Date;
-  numberOfPeople: number;
+  currency?: string;
+  status?: string;
+  source?: string;
+  expectedCloseDate?: Date | null;
+  quantity?: number;
+  notes?: string;
   createdAt: string;
-  extraBusSeats: number;
-  bookingLocation: string;
-  notes: string;
 }
 
 interface Payment {
   amount: number;
   date: string;
+  method?: string;
+  currency?: string;
 }
 
 interface InvoiceProps {
-  booking: Booking;
+  booking: DealSummary;
   payments: Payment[];
 }
 
 const Invoice: React.FC<InvoiceProps> = ({ booking, payments }) => {
-  const bookingConditions = [
-    "يقر العميل بأنه قد قام بمراجعة البيانات وان جميع البيانات المذكورة صحيحة.",
-    "يقر العميل بأن عدد الأفراد المذكور في طلب الحجز هو العدد الفعلي وفي حالة دخول اكثر من هذا العدد يتم محاسبتهم نقدا قبل التسكين.",
-    "يقر العميل بإلتزامه بالمواعيد المحددة للتسكين والمغادرة، والتعليمات الخاصة من الفندق وذلك دون ادنى مسئولية من الشركة.",
-    "يرجى العلم بأن في حالة حجز غرفة ثلاثية يتم استلام غرفة مزدوجة وبعد ميعاد التسكين يتم اضافة سرير.",
-    "يقر العميل بأن هذا الحجز غير قابل للإلغاء او رد قيمة المبلغ المدفوع وذلك قبل ميعاد السفر بأسبوعين.",
-    "في حالة إلغاء الحجز يتم خصم قيمة ليلة من اجمالي اقامة الفندق وذلك بحد اقصى اسبوعين عن ميعاد السفر.",
-    "في حالة حجز العميل بالأنتقالات تلتزم الشركة بتوصيل العميل الي مكان الحجز دون ادنى مسئولية علي الشركة.",
-    "الشركة غير مسئولة عن اي اعطال او تأخيرات خارجه عن ارادتها او اي مفقودات او تلفيات وهي مسئولية العميل.",
-    "في حالة عدم امكانية الشركة اتمام الحجز لأي سبب خارجه عن ارادتها تكون ملزمه برد المبلغ المدفوع او تغيير الحجز.",
-    "يرجى العلم بأن اذا زادت اسعار السولار سيتم زيادة السعر.",
-    "الشركة غير مسئولة عن المتعلقات الشخصية للعميل.",
-    "يقر العميل بأنه قد قرأ جميع الشروط السابقة والموافقة قبل التوقيع على طلب الحجز.",
-  ];
+  const formatDate = (date: string | Date) =>
+    format(new Date(date), "dd/MM/yyyy");
 
-  const formatDate = (date: string) => format(new Date(date), "dd/MM/yyyy");
-  // console.log(booking);
+  const outstanding = booking.price - booking.totalPaid;
+
   return (
-    <div
-      dir="rtl"
-      className="container mx-auto p-4 rtl-grid text-right hidden print:block text-base"
-    >
-      <div className="text-center mb-4 flex justify-around flex-row-reverse">
-        <img src="/sahab.png" alt="Logo" className="w-20 h-20 -mt-10" />
-        <p className="">تاريخ الحجز: {formatDate(booking.createdAt)}</p>
-        <h1 className="clear-both text-center">فاتورة</h1>
-      </div>
-      <div className="details mb-4">
-        <h2 className="text-lg font-bold">تفاصيل الحجز</h2>
-        <Table className="w-full border-collapse mb-4">
-          <TableBody>
-            <TableRow>
-              <TableCell className="border px-4 py-1">عميل</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.customer}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">رقم الهاتف</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.customerPhone} - {booking.customerMobile}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">مكان الحجز</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.bookingLocation}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">رقم الغرفة</TableCell>
-              <TableCell className="border px-4 py-1">{booking.room}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">السعر الإجمالي</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.price}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">
-                المدفوع الإجمالي
-              </TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.totalPaid}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">الفترة</TableCell>
-              <TableCell className="border px-4 py-1">
-                من{" "}
-                {booking.startDate.toLocaleDateString("ar-eg", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}{" "}
-                إلى{" "}
-                {booking.endDate.toLocaleDateString("ar-eg", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">عدد الأفراد</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.numberOfPeople}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">
-                عدد الكراسى الأضافية
-              </TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.extraBusSeats}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">مسئول الحجز</TableCell>
-              <TableCell className="border px-4 py-1">
-                {`${booking.ownerName} - ${booking.ownerPhone}`}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="border px-4 py-1">ملاحظات</TableCell>
-              <TableCell className="border px-4 py-1">
-                {booking.notes}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
-      <div className="section mb-4">
-        <h2 className="text-lg font-bold">المدفوعات</h2>
-        <Table className="w-full border-collapse mb-4">
-          <TableHeader>
-            <TableRow>
-              <TableCell className="border px-4 py-1">المبلغ</TableCell>
-              <TableCell className="border px-4 py-1">التاريخ</TableCell>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {payments.map((payment, index) => (
-              <TableRow key={index}>
-                <TableCell className="border px-4 py-1">
-                  {payment.amount}
-                </TableCell>
-                <TableCell className="border px-4 py-1">
-                  {formatDate(payment.date)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="section mb-4">
-        <h2 className="text-lg font-bold">شــــــــروط الحجـــز</h2>
-        <div className="conditions">
-          {bookingConditions.map((condition, index) => (
-            <p key={index} className="text-sm">
-              {index + 1}. {condition}
-            </p>
-          ))}
+    <div className="container mx-auto p-8 hidden print:block text-sm">
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-2xl font-bold mb-1">Invoice</h1>
+          <p className="text-gray-500">Date: {formatDate(booking.createdAt)}</p>
         </div>
+        <img src="/logo.png" alt="Logo" className="h-12" />
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold border-b pb-1 mb-3">Deal Details</h2>
+        <Table className="w-full border-collapse">
+          <TableBody>
+            {booking.title && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium w-1/3">Deal</TableCell>
+                <TableCell className="border px-4 py-1">{booking.title}</TableCell>
+              </TableRow>
+            )}
+            <TableRow>
+              <TableCell className="border px-4 py-1 font-medium">Customer</TableCell>
+              <TableCell className="border px-4 py-1">{booking.customer}</TableCell>
+            </TableRow>
+            {booking.customerPhone && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Phone</TableCell>
+                <TableCell className="border px-4 py-1">{booking.customerPhone}</TableCell>
+              </TableRow>
+            )}
+            {booking.product && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Product / Service</TableCell>
+                <TableCell className="border px-4 py-1">{booking.product}</TableCell>
+              </TableRow>
+            )}
+            {booking.quantity !== undefined && booking.quantity > 0 && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Quantity</TableCell>
+                <TableCell className="border px-4 py-1">{booking.quantity}</TableCell>
+              </TableRow>
+            )}
+            {booking.status && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Status</TableCell>
+                <TableCell className="border px-4 py-1 capitalize">{booking.status}</TableCell>
+              </TableRow>
+            )}
+            {booking.source && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Source</TableCell>
+                <TableCell className="border px-4 py-1">{booking.source}</TableCell>
+              </TableRow>
+            )}
+            <TableRow>
+              <TableCell className="border px-4 py-1 font-medium">Total Price</TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.price.toLocaleString()} {booking.currency ?? ""}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1 font-medium">Total Paid</TableCell>
+              <TableCell className="border px-4 py-1">
+                {booking.totalPaid.toLocaleString()} {booking.currency ?? ""}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="border px-4 py-1 font-medium">Outstanding</TableCell>
+              <TableCell className="border px-4 py-1 font-semibold text-red-600">
+                {outstanding.toLocaleString()} {booking.currency ?? ""}
+              </TableCell>
+            </TableRow>
+            {booking.notes && (
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">Notes</TableCell>
+                <TableCell className="border px-4 py-1">{booking.notes}</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {payments.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold border-b pb-1 mb-3">Payment History</h2>
+          <Table className="w-full border-collapse">
+            <TableHeader>
+              <TableRow>
+                <TableCell className="border px-4 py-1 font-medium">#</TableCell>
+                <TableCell className="border px-4 py-1 font-medium">Amount</TableCell>
+                <TableCell className="border px-4 py-1 font-medium">Method</TableCell>
+                <TableCell className="border px-4 py-1 font-medium">Date</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((payment, index) => (
+                <TableRow key={index}>
+                  <TableCell className="border px-4 py-1">{index + 1}</TableCell>
+                  <TableCell className="border px-4 py-1">
+                    {payment.amount.toLocaleString()} {payment.currency ?? ""}
+                  </TableCell>
+                  <TableCell className="border px-4 py-1 capitalize">{payment.method ?? "—"}</TableCell>
+                  <TableCell className="border px-4 py-1">{formatDate(payment.date)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <div className="mt-8 text-xs text-gray-400 text-center border-t pt-4">
+        Generated by WonderHub CRM
       </div>
     </div>
   );

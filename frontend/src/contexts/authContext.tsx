@@ -13,6 +13,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  permissions: string[];
 }
 
 interface AuthContextProps {
@@ -20,6 +21,7 @@ interface AuthContextProps {
   isLoggedIn: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateCurrentUser: (updates: Partial<User>) => void;
   loading: boolean;
   error: string | null;
 }
@@ -52,7 +54,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         axios.defaults.headers.common[
           "Authorization"
         ] = `Bearer ${response.data.token}`;
-        navigate("/customers");
+        navigate("/dashboard");
       }
     } catch (error) {
       setError("Login failed. Please check your credentials and try again.");
@@ -60,6 +62,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateCurrentUser = (updates: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const logout = () => {
@@ -85,7 +96,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoggedIn, login, logout, loading, error }}
+      value={{ user, isLoggedIn, login, logout, updateCurrentUser, loading, error }}
     >
       {children}
     </AuthContext.Provider>

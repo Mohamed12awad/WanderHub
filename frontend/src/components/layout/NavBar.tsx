@@ -1,4 +1,4 @@
-// import { useState } from "react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "../ui/input";
@@ -10,97 +10,109 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FaUserCircle, FaBars, FaSearch } from "react-icons/fa";
+import { Menu, Search, LogOut } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/authContext";
+import { useLanguage } from "../../contexts/LanguageContext";
+import NavLinks from "./NavLinks";
 
-import { Link } from "react-router-dom";
-import { useAuth } from "../../contexts/authContext.tsx";
-import NavLinks from "./NavLinks.tsx";
-import { ModeToggle } from "../common/toggleTheme.tsx";
+const SEARCH_ROUTES: Record<string, string> = {
+  deals: "/deals",
+  customers: "/customers",
+  contacts: "/customers",
+  products: "/products",
+  expenses: "/expenses",
+  pipeline: "/pipeline",
+};
 
 export default function NavBar() {
-  const { logout } = useAuth();
-  // const [searchContext, setSearchContext] = useState("customers");
+  const { logout, user } = useAuth();
+  const { lang, tr } = useLanguage();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
 
-  // const handleSearchContextChange = (context: string) => {
-  //   setSearchContext(context);
-  // };
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    const match = Object.keys(SEARCH_ROUTES).find((k) => q.includes(k));
+    navigate(match ? SEARCH_ROUTES[match] : "/customers");
+    setQuery("");
+  };
+
+  const initials = user?.name
+    ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : "?";
 
   return (
-    <div className="flex flex-col print:hidden dark:bg-slate-800">
-      <header className="flex h-14 items-center gap-4 border-b dark:border-slate-800 bg-muted/40 px-4 lg:h-[60px] lg:px-6">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="shrink-0 md:hidden"
-            >
-              <FaBars className="h-5 w-5" />
-              <span className="sr-only">Toggle navigation menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="flex flex-col">
-            <nav className="grid gap-2 text-lg font-medium">
-              <Link
-                to="/"
-                className="flex items-center gap-2 text-lg font-semibold"
-              >
-                <img src="/logo.png" className="h-6 w-6" />
-                <span>WonderHub</span>
-              </Link>
-              <NavLinks />
-            </nav>
-          </SheetContent>
-        </Sheet>
-        <div className="w-full flex-1 flex items-center">
-          {/* <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="">
-                {searchContext.charAt(0).toUpperCase() + searchContext.slice(1)}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem
-                onClick={() => handleSearchContextChange("customers")}
-              >
-                Customers
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSearchContextChange("bookings")}
-              >
-                Bookings
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu> */}
-          <form className="w-full" method="get">
-            <div className="relative">
-              <FaSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder={`Search ${"customers"}...`}
-                className="w-full appearance-none bg-background pl-8 shadow-none md:w-2/3 lg:w-1/3"
-              />
-            </div>
-          </form>
+    <header className="flex h-[60px] items-center gap-3 border-b bg-white dark:bg-[hsl(var(--card))] dark:border-border px-4 lg:px-5 print:hidden shrink-0">
+      {/* Mobile menu */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="md:hidden shrink-0">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side={lang === "ar" ? "right" : "left"} className="flex flex-col w-72 p-0">
+          <div className="flex h-[60px] items-center gap-2.5 px-5 border-b shrink-0">
+            <Link to="/" className="flex items-center gap-2.5 font-bold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <img src="/logo.png" className="h-5 w-5" alt="WonderHub" />
+              </div>
+              <span>WonderHub</span>
+            </Link>
+          </div>
+          <nav className="flex-1 overflow-y-auto px-3 py-4">
+            <NavLinks />
+          </nav>
+        </SheetContent>
+      </Sheet>
+
+      {/* Search */}
+      <form className="flex-1" onSubmit={handleSearch}>
+        <div className="relative max-w-xs">
+          <Search className="absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            placeholder={`${tr.common.search}…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="ps-8 pe-14 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:bg-background"
+          />
+          <kbd className="pointer-events-none absolute end-2 top-1.5 hidden h-6 select-none items-center rounded border bg-background px-1.5 font-mono text-[10px] text-muted-foreground md:flex">
+            ⌘K
+          </kbd>
         </div>
-        <ModeToggle />
+      </form>
+
+      <div className="flex items-center gap-1.5 ms-auto shrink-0">
+        {/* User avatar */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="icon" className="rounded-full">
-              <FaUserCircle className="h-5 w-5" />
-              <span className="sr-only">Toggle user menu</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full h-8 w-8 bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90"
+            >
+              {initials}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="font-normal">
+              <p className="font-semibold text-sm">{user?.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Support</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={logout}
+              className="text-destructive focus:text-destructive gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              {lang === "en" ? "Sign out" : "تسجيل الخروج"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </header>
-    </div>
+      </div>
+    </header>
   );
 }

@@ -39,7 +39,7 @@ export const PaymentDialog: React.FC<PaymentProps> = ({ id }) => {
 
   const { mutate, isLoading } = useMutation(createPayment, {
     onSuccess: () => {
-      queryClient.invalidateQueries("bookings"); // Invalidate and refetch the 'customers' query
+      queryClient.invalidateQueries("deals");
     },
     onError: (error) => {
       console.error("Error creating payment:", error);

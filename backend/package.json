@@ -2,9 +2,14 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "node index.js",
+    "dev": "tsx watch index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "seed:roles": "tsx utils/seedRoles.ts",
+    "seed:users": "tsx utils/seedUsers.ts",
+    "seed:data": "tsx utils/seedData.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,17 +18,30 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-jwt": "^8.4.1",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.1",
-    "nodemon": "^3.1.3",
-    "pdfkit": "^0.15.0",
-    "pug": "^3.0.3",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "express-jwt": "^8.5.1",
+    "express-rate-limit": "^8.5.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.0",
+    "nodemon": "^3.1.14",
+    "pdfkit": "^0.18.0",
+    "pug": "^3.0.4",
     "puppeteer": "^18.1.0",
-    "validator": "^13.12.0"
+    "validator": "^13.15.35",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.9.1",
+    "@types/pug": "^2.0.10",
+    "@types/validator": "^13.15.10",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
   }
 }

@@ -1,99 +1,84 @@
-// Sidebar.js
+import React from "react";
 import { useLocation } from "react-router-dom";
-// import { Button } from "../ui/button";
-// import { Link } from "react-router-dom";
 import NavItem from "./NavItem";
 import {
-  Users2,
-  Plane,
-  Users,
-  WalletCards,
-  LayoutDashboard,
-  DoorOpen,
-  Banknote,
+  Users2, Handshake, WalletCards, LayoutDashboard,
+  Package, Banknote, KanbanSquare,
+  CalendarDays, CheckSquare, FileText, Receipt,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useModules } from "@/contexts/ModulesContext";
+
+const NavSection: React.FC<{ label: string }> = ({ label }) => (
+  <div className="pt-3 pb-1 px-3">
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+      {label}
+    </p>
+  </div>
+);
 
 function NavLinks() {
   const { user } = useAuth();
+  const { tr, lang } = useLanguage();
+  const { modules } = useModules();
   const location = useLocation();
+
+  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isAdminOrAbove = ["admin", "manager", "super admin"].includes(user!.role);
+
+  const hasCRM = modules.customers || modules.deals || modules.pipeline;
+  const hasWork = modules.calendar || modules.tasks;
+  const hasFinance = modules.expenses || modules.finance;
+  const hasCatalog = (isAdminOrAbove && modules.products) || modules.reports;
+
   return (
-    <>
-      <NavItem
-        href="/customers"
-        icon={Users2}
-        label="Customers"
-        active={location.pathname.includes("/customers")}
-      />
-      <NavItem
-        href="/bookings"
-        icon={Plane}
-        label="Bookings"
-        active={location.pathname.includes("/bookings")}
-      />
-      {["admin", "manager", "super admin"].includes(user!.role) && (
-        <NavItem
-          href="/rooms"
-          icon={DoorOpen}
-          label="Rooms"
-          active={location.pathname.includes("/rooms")}
-        />
+    <div className="space-y-0.5">
+      <NavItem href="/dashboard" icon={LayoutDashboard} label={tr.nav.dashboard} active={isActive("/dashboard")} />
+
+      {/* CRM */}
+      {hasCRM && <NavSection label={lang === "ar" ? "إدارة العملاء" : "CRM"} />}
+      {modules.customers && (
+        <NavItem href="/customers" icon={Users2} label={tr.nav.contacts} active={isActive("/customers")} />
       )}
-      <NavItem
-        href="/expenses"
-        icon={Banknote}
-        label="Expenses"
-        active={location.pathname.includes("/expenses")}
-      />
-      {["admin", "super admin"].includes(user!.role) && (
-        <NavItem
-          href="/users"
-          icon={Users}
-          label="Users"
-          active={location.pathname.includes("/users")}
-        />
+      {modules.deals && (
+        <NavItem href="/deals" icon={Handshake} label={tr.nav.deals} active={isActive("/deals")} />
       )}
-      <NavItem
-        href="/reports"
-        icon={WalletCards}
-        label="Reports"
-        active={location.pathname.includes("/reports")}
-      />
-      {["admin", "super admin"].includes(user!.role) && (
-        <NavItem
-          href="/dashboard"
-          icon={LayoutDashboard}
-          label="Dashboard"
-          active={location.pathname.includes("/dashboard")}
-        />
+      {modules.pipeline && (
+        <NavItem href="/pipeline" icon={KanbanSquare} label={tr.nav.pipeline} active={isActive("/pipeline")} />
       )}
-      {/* 
-            <NavItem
-              href="/"
-              icon={Home}
-              label="Dashboard"
-              active={location.pathname === "/"}
-            />
-            <NavItem
-              href="/test"
-              icon={ShoppingCart}
-              label="Orders"
-              badge="6"
-              active={location.pathname.includes("/test")}
-            />
-            <NavItem
-              href="/products"
-              icon={Package}
-              label="Products"
-              active={location.pathname.includes("/products")}
-            />
-            <NavItem
-              href="/analytics"
-              icon={LineChart}
-              label="Analytics"
-              active={location.pathname === "/analytics"}
-            /> */}
-    </>
+
+      {/* Work */}
+      {hasWork && <NavSection label={lang === "ar" ? "العمل" : "Work"} />}
+      {modules.calendar && (
+        <NavItem href="/calendar" icon={CalendarDays} label={tr.nav.calendar} active={isActive("/calendar")} />
+      )}
+      {modules.tasks && (
+        <NavItem href="/tasks" icon={CheckSquare} label={tr.nav.tasks} active={isActive("/tasks")} />
+      )}
+
+      {/* Finance */}
+      {hasFinance && <NavSection label={lang === "ar" ? "المالية" : "Finance"} />}
+      {modules.expenses && (
+        <NavItem href="/expenses" icon={Banknote} label={tr.nav.expenses} active={isActive("/expenses")} />
+      )}
+      {modules.finance && (
+        <>
+          <NavItem href="/finance/quotes" icon={FileText} label={tr.nav.quotes} active={isActive("/finance/quotes")} />
+          <NavItem href="/finance/invoices" icon={Receipt} label={tr.nav.invoices} active={isActive("/finance/invoices")} />
+        </>
+      )}
+
+      {/* Catalog & Reports */}
+      {hasCatalog && <NavSection label={lang === "ar" ? "الكتالوج" : "Catalog"} />}
+      {isAdminOrAbove && modules.products && (
+        <NavItem href="/products" icon={Package} label={tr.nav.products} active={isActive("/products")} />
+      )}
+      {modules.reports && (
+        <NavItem href="/reports" icon={WalletCards} label={tr.nav.reports} active={isActive("/reports")} />
+      )}
+
+    </div>
   );
 }
 

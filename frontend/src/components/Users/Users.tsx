@@ -2,15 +2,19 @@ import { GenericTable } from "@/components/common/GenericTable";
 import UserRow from "./UserRow";
 import { deleteUser, getUsers } from "@/utils/api";
 import { User } from "@/types/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function Users() {
+  const { tr } = useLanguage();
+  const u = tr.users;
+
   return (
     <GenericTable<User>
       queryKey="users"
       fetchData={getUsers}
       deleteData={deleteUser}
-      headers={["Name", "Status", "Email", "Role", "Created at"]}
-      renderRow={(item) => (
+      headers={u.headers}
+      renderRow={(item, handleDelete) => (
         <UserRow
           key={item._id}
           name={item.name}
@@ -19,12 +23,15 @@ export function Users() {
           totalSales={item.role.name}
           date={new Date(item.createdAt).toLocaleString()}
           id={item._id}
-          handleDelete={(id) => deleteUser(id)}
+          handleDelete={handleDelete}
         />
       )}
-      title="Users"
-      description="Manage your Users and view their performance."
+      title={u.title}
+      description={u.description}
       addLink="/users/add"
+      addLabel={u.add}
+      emptyMessage={u.empty}
+      noSearchMessage={u.noSearch}
     />
   );
 }
