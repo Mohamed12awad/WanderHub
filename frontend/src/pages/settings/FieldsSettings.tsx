@@ -132,7 +132,7 @@ export default function FieldsSettings() {
 
   const [activeModule, setActiveModule] = useState<FieldModule>("customers");
   const [fieldGroups, setFieldGroups] = useState<Record<FieldModule, FieldDef[]>>(
-    Object.fromEntries(FIELD_MODULES.map((m) => [m, []])) as Record<FieldModule, FieldDef[]>
+    Object.fromEntries(FIELD_MODULES.map((m) => [m, []])) as unknown as Record<FieldModule, FieldDef[]>
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -151,7 +151,7 @@ export default function FieldsSettings() {
     getWorkspaceSettings()
       .then((res) => {
         const groups: { module: string; fields: FieldDef[] }[] = res.data?.fieldGroups ?? [];
-        const parsed = Object.fromEntries(FIELD_MODULES.map((m) => [m, []])) as Record<FieldModule, FieldDef[]>;
+        const parsed = Object.fromEntries(FIELD_MODULES.map((m) => [m, []])) as unknown as Record<FieldModule, FieldDef[]>;
         groups.forEach((g) => {
           if (FIELD_MODULES.includes(g.module as FieldModule)) {
             parsed[g.module as FieldModule] = g.fields;

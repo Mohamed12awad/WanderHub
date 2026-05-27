@@ -78,7 +78,7 @@ export function Logs() {
                 {logs.map((log) => (
                   <TableRow key={log._id}>
                     <TableCell className="text-sm font-medium">
-                      {log.userId?.name ?? (
+                      {log.user?.name ?? (
                         <span className="text-muted-foreground italic">{l.deletedUser}</span>
                       )}
                     </TableCell>

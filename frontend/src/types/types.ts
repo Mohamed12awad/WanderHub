@@ -111,7 +111,8 @@ export interface ActivityFormData {
 
 export interface LogEntry {
   _id: string;
-  userId: { _id: string; name: string; email: string } | null;
+  userId: string;
+  user: { _id: string; name: string; email: string } | null;
   action: string;
   method: string;
   endpoint: string;
