@@ -58,12 +58,7 @@ export default function ProfileSettings() {
       return;
     }
     const roleId = userData?.data?.role?._id ?? userData?.data?.role ?? "";
-    const payload: any = {
-      name,
-      phone,
-      email: user!.email,
-      role: roleId,
-    };
+    const payload: any = { name, phone, email: user!.email, role: roleId };
     if (newPassword) payload.password = newPassword;
     mutation.mutate(payload);
   };
@@ -73,94 +68,107 @@ export default function ProfileSettings() {
     : "?";
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">{s.profile}</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your personal information.</p>
-      </div>
+    <div className="p-6 max-w-2xl mx-auto space-y-5">
 
-      {/* Avatar */}
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold shrink-0">
-          {initials}
-        </div>
-        <div>
-          <p className="font-semibold text-base">{name}</p>
-          <Badge variant="outline" className="capitalize text-xs mt-0.5">{user?.role}</Badge>
-        </div>
-      </div>
+      {/* ── Profile hero card ── */}
+      <Card className="overflow-hidden">
+        <div className="h-20 bg-gradient-to-r from-primary/25 via-primary/15 to-primary/5" />
+        <CardContent className="pt-0 pb-5 px-6">
+          <div className="flex items-end gap-4 -mt-9">
+            <div className="h-16 w-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold ring-4 ring-background shrink-0 select-none">
+              {isLoading ? "…" : initials}
+            </div>
+            <div className="pb-1 min-w-0">
+              <p className="font-semibold text-base leading-tight truncate">{name || "—"}</p>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{user?.email}</p>
+              <Badge variant="outline" className="capitalize text-xs mt-1.5">{user?.role}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="space-y-3">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* ── Account information ── */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Account Information</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-1.5">
-                <Label htmlFor="name">{s.fullName}</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="phone">{s.phone}</Label>
-                <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").substring(0, 15))}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="email">{s.email}</Label>
-                <Input id="email" value={user?.email ?? ""} disabled className="opacity-60" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>{s.role}</Label>
-                <Badge variant="outline" className="w-fit capitalize">{user?.role}</Badge>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="name">{s.fullName}</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="phone">{s.phone}</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").substring(0, 15))}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="email">{s.email}</Label>
+                  <Input id="email" value={user?.email ?? ""} disabled className="opacity-60 cursor-not-allowed" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>{s.role}</Label>
+                  <div className="flex items-center h-10">
+                    <Badge variant="outline" className="capitalize">{user?.role}</Badge>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* ── Change password ── */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold">Change Password</CardTitle>
               <CardDescription className="text-xs">Leave blank to keep your current password.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-1.5">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Button type="submit" disabled={mutation.isLoading}>
-            {mutation.isLoading ? tr.common.loading : s.saveChanges}
-          </Button>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={mutation.isLoading} className="px-8">
+              {mutation.isLoading ? tr.common.loading : s.saveChanges}
+            </Button>
+          </div>
         </form>
       )}
     </div>

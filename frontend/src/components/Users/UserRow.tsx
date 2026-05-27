@@ -5,88 +5,79 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
-
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toggleUserState } from "@/utils/api";
 import { useQueryClient } from "react-query";
 
-interface CustomerRowProps {
+interface UserRowProps {
   id: string;
   name: string;
-  state: string;
-  price: string;
-  totalSales: string;
+  email: string;
+  role: string;
+  active: boolean;
   date: string;
   handleDelete: (id: string) => void;
 }
 
-const CustomerRow: React.FC<CustomerRowProps> = ({
-  id,
-  name,
-  state,
-  price,
-  totalSales,
-  date,
-  handleDelete,
-}) => {
+const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, handleDelete }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const handleToggleState = async (id: string) => {
+  const handleToggleState = async () => {
     await toggleUserState(id);
-    queryClient.invalidateQueries("Users"); // Invalidate and refetch the 'Users' query
+    queryClient.invalidateQueries("users");
   };
 
   return (
-    <TableRow>
+    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/users/${id}/edit`)}>
       <TableCell className="font-medium">{name}</TableCell>
+      <TableCell className="hidden md:table-cell text-foreground/70">{email}</TableCell>
+      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{role}</TableCell>
       <TableCell>
         <Badge
           variant="outline"
-          // className={state == "Deal Closed" && "bg-emeradld-300"}
+          className={active
+            ? "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
+            : "bg-slate-400 text-white border-slate-400 dark:bg-slate-600 dark:border-slate-600"
+          }
         >
-          {state}
+          {active ? "Active" : "Inactive"}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{price}</TableCell>
-      <TableCell className="hidden md:table-cell capitalize">
-        {totalSales}
-      </TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{date}</TableCell>
-      <TableCell>
+      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-haspopup="true" size="icon" variant="ghost">
+            <Button aria-haspopup="true" size="icon" variant="ghost" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
               <span className="sr-only">Toggle menu</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <Link to={`/users/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
-
-            <DropdownMenuItem
-              disabled={user?.id == id ? true : false}
-              onClick={() => handleToggleState(id)}
-            >
-              Toggle Active
+            <DropdownMenuItem disabled={user?.id === id} onClick={handleToggleState}>
+              {active ? "Deactivate" : "Activate"}
             </DropdownMenuItem>
-
             {["admin", "super admin"].includes(user!.role) && (
-              <DropdownMenuItem
-                disabled={user?.id == id ? true : false}
-                onClick={() => handleDelete(id)}
-              >
-                Delete
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  disabled={user?.id === id}
+                  onClick={() => handleDelete(id)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -95,4 +86,4 @@ const CustomerRow: React.FC<CustomerRowProps> = ({
   );
 };
 
-export default CustomerRow;
+export default UserRow;

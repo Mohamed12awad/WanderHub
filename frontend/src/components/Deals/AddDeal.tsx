@@ -1,16 +1,18 @@
-import React, { ChangeEvent, useState } from "react";
+import React, { ChangeEvent, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { Label } from "@/components/ui/label";
 import { createDeal, getCustomers, getProducts } from "@/utils/api";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
-import { ErrorResponse, Customer, Product } from "@/types/types";
+import { ErrorResponse } from "@/types/types";
 import LoadingSpinner from "../common/spinner";
+import DynamicFields from "@/components/common/DynamicFields";
+import { useToast } from "@/components/ui/use-toast";
 
 const DEAL_STATUSES = ["lead", "qualified", "proposal", "negotiation", "won", "lost", "cancelled"];
 const DEAL_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
@@ -28,6 +30,7 @@ const initialFormData = {
   source: "",
   expectedCloseDate: "",
   notes: "",
+  customFields: {} as Record<string, string>,
 };
 
 interface FormErrors {
@@ -40,10 +43,24 @@ const AddDeal = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
-
-  const { data: customers } = useQuery("customers", () => getCustomers());
-  const { data: products } = useQuery("products", () => getProducts());
+  const { toast } = useToast();
   const navigate = useNavigate();
+
+  const fetchCustomers = useCallback(
+    (q: string) =>
+      getCustomers({ page: 1, limit: 20, q }).then((r) =>
+        (r.data as any).data.map((c: { _id: string; name: string }) => ({ value: c._id, label: c.name }))
+      ),
+    [],
+  );
+
+  const fetchProducts = useCallback(
+    (q: string) =>
+      getProducts({ page: 1, limit: 20, q }).then((r) =>
+        (r.data as any).data.map((p: { _id: string; name: string }) => ({ value: p._id, label: p.name }))
+      ),
+    [],
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -83,7 +100,7 @@ const AddDeal = () => {
       navigate("/deals");
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;
-      alert(axiosError.response?.data?.message ?? "Error creating deal");
+      toast({ title: axiosError.response?.data?.message ?? "Error creating deal", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -100,9 +117,9 @@ const AddDeal = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h2 className="text-lg font-semibold mb-2">Deal Information</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Deal Information</h2>
 
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="title">Title <span className="text-red-700">*</span></Label>
@@ -112,27 +129,25 @@ const AddDeal = () => {
 
               <div className="flex flex-col">
                 <Label className="my-3">Customer <span className="text-red-700">*</span></Label>
-                <Select onValueChange={(v) => handleSelect("customer", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Customer" /></SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[12rem]">
-                    {customers?.data.map((c: Customer) => (
-                      <SelectItem key={c._id} value={c._id!}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={formData.customer}
+                  onChange={(v) => handleSelect("customer", v)}
+                  fetchFn={fetchCustomers}
+                  placeholder="Select Customer"
+                  searchPlaceholder="Search customers..."
+                />
                 {errors.customer && <span className="text-red-500 text-sm">{errors.customer}</span>}
               </div>
 
               <div className="flex flex-col">
                 <Label className="my-3">Product / Service</Label>
-                <Select onValueChange={(v) => handleSelect("product", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Product (optional)" /></SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[12rem]">
-                    {products?.data.map((p: Product) => (
-                      <SelectItem key={p._id} value={p._id!}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={formData.product}
+                  onChange={(v) => handleSelect("product", v)}
+                  fetchFn={fetchProducts}
+                  placeholder="Select Product (optional)"
+                  searchPlaceholder="Search products..."
+                />
               </div>
 
               <div className="flex flex-col">
@@ -153,7 +168,7 @@ const AddDeal = () => {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold mb-2">Other Information</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Other Information</h2>
 
               <div className="flex flex-col">
                 <Label className="my-3">Status</Label>
@@ -207,6 +222,12 @@ const AddDeal = () => {
                 />
               </div>
             </div>
+
+            <DynamicFields
+              module="deals"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+            />
 
             <div className="col-span-2">
               <Button type="submit" disabled={isLoading}>

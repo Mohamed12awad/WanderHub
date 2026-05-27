@@ -50,7 +50,7 @@ export const PaymentDialog: React.FC<PaymentProps> = ({ id }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData: PaymentData = {
-      booking: id,
+      deal: id,
       amount,
       method,
       currency,

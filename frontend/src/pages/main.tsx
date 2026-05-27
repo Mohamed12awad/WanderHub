@@ -1,10 +1,11 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { ModulesProvider } from "@/contexts/ModulesContext";
 
 import NavBar from "@/components/layout/NavBar";
 import Sidebar from "@/components/layout/Sidebar";
 import { Dashboard } from "./Dashboard";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 import { Customers } from "@/components/Customers/Customers";
 import AddCustomer from "@/components/Customers/AddCustomers";
@@ -37,7 +38,7 @@ import { Roles } from "@/components/Roles/Roles";
 import { ActivityCalendar } from "@/components/Activities/ActivityCalendar";
 import { Tasks } from "@/pages/Tasks";
 import Settings from "@/pages/Settings";
-import FinancePage from "@/pages/Finance";
+import { QuotesPage, InvoicesPage } from "@/pages/Finance";
 import QuoteForm from "@/components/Finance/QuoteForm";
 import QuoteDetail from "@/components/Finance/QuoteDetail";
 import InvoiceForm from "@/components/Finance/InvoiceForm";
@@ -72,8 +73,8 @@ const routes = [
   { path: "/logs", element: <Logs /> },
   { path: "/roles", element: <Roles /> },
   { path: "/settings/*", element: <Settings /> },
-  { path: "/finance/quotes", element: <FinancePage /> },
-  { path: "/finance/invoices", element: <FinancePage /> },
+  { path: "/finance/quotes", element: <QuotesPage /> },
+  { path: "/finance/invoices", element: <InvoicesPage /> },
   { path: "/finance/quotes/new", element: <QuoteForm /> },
   { path: "/finance/quotes/:id", element: <QuoteDetail /> },
   { path: "/finance/quotes/:id/edit", element: <QuoteForm /> },
@@ -83,20 +84,37 @@ const routes = [
   { path: "/finance/payments", element: <Payments /> },
 ];
 
+const AppRoutes = () => (
+  <Routes>
+    {routes.map((route, index) => (
+      <Route key={index} path={route.path} element={route.element} />
+    ))}
+  </Routes>
+);
+
 const DefaultLayout: React.FC = () => {
+  const location = useLocation();
+  const isSettings = location.pathname.startsWith("/settings");
+
   return (
     <ModulesProvider>
-      <div className="grid min-h-screen md:h-screen w-full md:grid-cols-[220px_1fr] md:grid-rows-[60px_1fr] bg-[#f5f6fa] dark:bg-background">
-        <Sidebar />
-        <NavBar />
-        <main className="overflow-auto">
-          <Routes>
-            {routes.map((route, index) => (
-              <Route key={index} path={route.path} element={route.element} />
-            ))}
-          </Routes>
-        </main>
-      </div>
+      {isSettings ? (
+        <div className="h-screen w-full overflow-hidden bg-background">
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
+        </div>
+      ) : (
+        <div className="grid min-h-screen md:h-screen w-full md:grid-cols-[240px_1fr] md:grid-rows-[60px_1fr] bg-background">
+          <Sidebar />
+          <NavBar />
+          <main className="overflow-auto">
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </main>
+        </div>
+      )}
     </ModulesProvider>
   );
 };

@@ -1,0 +1,92 @@
+import { Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../prisma/prisma.service';
+import { toClient } from '../common/serialize';
+
+@Injectable()
+export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(query: Record<string, string>) {
+    const { page, limit: limitRaw, q, active, phone, createdAt_from, createdAt_to } = query;
+    if (!page) {
+      const users = await this.prisma.user.findMany({ include: { role: true }, orderBy: { createdAt: 'desc' } });
+      return toClient(users);
+    }
+    const p = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(limitRaw) || 25);
+    const where: any = {};
+    if (q) where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { email: { contains: q, mode: 'insensitive' } },
+    ];
+    if (active !== undefined && active !== '') where.active = active === 'true';
+    if (phone) where.phone = { contains: phone, mode: 'insensitive' };
+    if (createdAt_from || createdAt_to) {
+      where.createdAt = {};
+      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
+      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
+    }
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({ where, include: { role: true }, skip: (p - 1) * limit, take: limit }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+  }
+
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, include: { role: { select: { id: true, name: true } } } });
+    return user ? toClient(user) : null;
+  }
+
+  async create(body: Record<string, any>) {
+    const { password, role, ...rest } = body;
+    const hashed = await bcrypt.hash(password, await bcrypt.genSalt());
+    const user = await this.prisma.user.create({
+      data: { ...rest, password: hashed, ...(role ? { roleId: role } : {}) } as any,
+      include: { role: true },
+    });
+    return toClient(user);
+  }
+
+  async update(id: string, body: Record<string, any>, requestingUserRole: string) {
+    const existing = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
+    if (!existing) return null;
+
+    const { password, role, _id, id: _id2, createdAt, updatedAt, ...rest } = body;
+    const data: Record<string, any> = { ...rest };
+
+    if (role) {
+      const newRole = await this.prisma.role.findUnique({ where: { id: role } });
+      if (newRole?.name === 'super admin' && requestingUserRole !== 'super admin') {
+        return { forbidden: true };
+      }
+      if (existing.role.name === 'super admin' && requestingUserRole !== 'super admin') {
+        return { forbidden: true };
+      }
+      data.roleId = role;
+    }
+
+    if (password) {
+      data.password = await bcrypt.hash(password, await bcrypt.genSalt());
+    }
+
+    const user = await this.prisma.user.update({ where: { id }, data, include: { role: true } });
+    return toClient(user);
+  }
+
+  async toggleActive(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) return null;
+    const updated = await this.prisma.user.update({ where: { id }, data: { active: !user.active }, include: { role: true } });
+    return toClient(updated);
+  }
+
+  async remove(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
+    if (!user) return null;
+    if (user.role.name === 'super admin') return { forbidden: true };
+    await this.prisma.user.delete({ where: { id } });
+    return true;
+  }
+}

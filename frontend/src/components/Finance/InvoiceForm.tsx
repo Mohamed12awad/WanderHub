@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
 import { useQuery } from "react-query";
-import { getCustomers, getDeals, getInvoiceById, createInvoice, updateInvoice } from "@/utils/api";
+import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice } from "@/utils/api";
 import LineItemsTable, { LineItemRow } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -27,9 +28,12 @@ const InvoiceForm: React.FC = () => {
   const { tr } = useLanguage();
   const f = tr.finance;
 
+  const dealParam = searchParams.get("deal");
   const [title, setTitle] = useState("");
   const [customer, setCustomer] = useState(searchParams.get("customer") ?? "");
-  const [deal, setDeal] = useState(searchParams.get("deal") ?? "none");
+  const [customerLabel, setCustomerLabel] = useState("");
+  const [deal, setDeal] = useState(dealParam ?? "none");
+  const [dealLabel, setDealLabel] = useState("");
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [currency, setCurrency] = useState("USD");
   const [taxRate, setTaxRate] = useState(0);
@@ -42,8 +46,40 @@ const InvoiceForm: React.FC = () => {
   ]);
   const [saving, setSaving] = useState(false);
 
-  const { data: customersData } = useQuery("customers", () => getCustomers());
-  const { data: dealsData } = useQuery("deals", () => getDeals());
+  const fetchCustomers = useCallback(
+    (q: string) =>
+      getCustomers({ page: 1, limit: 20, q }).then((r) =>
+        (r.data as any).data.map((c: { _id: string; name: string }) => ({ value: c._id, label: c.name }))
+      ),
+    [],
+  );
+
+  const fetchDeals = useCallback(
+    (q: string) =>
+      getDeals({ page: 1, limit: 20, q }).then((r) =>
+        [
+          { value: "none", label: "None" },
+          ...(r.data as any).data.map((d: { _id: string; title: string }) => ({ value: d._id, label: d.title })),
+        ]
+      ),
+    [],
+  );
+
+  // Pre-fill from deal when creating new invoice from a deal's page
+  useEffect(() => {
+    if (isEdit || !dealParam) return;
+    getDealById(dealParam).then(({ data }) => {
+      const d = data.deal;
+      if (!title) setTitle(d.title ?? "");
+      if (!customer && d.customer?._id) {
+        setCustomer(d.customer._id);
+        setCustomerLabel(d.customer.name ?? "");
+      }
+      if (d.title) setDealLabel(d.title);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealParam, isEdit]);
+
   const { data: invoiceData } = useQuery(
     ["invoices", id],
     () => getInvoiceById(id!),
@@ -55,7 +91,9 @@ const InvoiceForm: React.FC = () => {
     const inv = invoiceData.data.invoice;
     setTitle(inv.title);
     setCustomer(inv.customer._id);
+    setCustomerLabel(inv.customer.name ?? "");
     setDeal(inv.deal?._id ?? "none");
+    setDealLabel(inv.deal?.title ?? "None");
     setStatus(inv.status);
     setCurrency(inv.currency);
     setTaxRate(inv.taxRate);
@@ -108,9 +146,6 @@ const InvoiceForm: React.FC = () => {
     }
   };
 
-  const customers = customersData?.data ?? [];
-  const deals = dealsData?.data ?? [];
-
   return (
     <main className="p-4">
       <form onSubmit={handleSubmit}>
@@ -132,26 +167,25 @@ const InvoiceForm: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>{f.customer} *</Label>
-                <Select value={customer} onValueChange={setCustomer}>
-                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c: { _id: string; name: string }) => (
-                      <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={customer}
+                  onChange={setCustomer}
+                  fetchFn={fetchCustomers}
+                  selectedLabel={customerLabel}
+                  placeholder="Select customer"
+                  searchPlaceholder="Search customers..."
+                />
               </div>
               <div className="space-y-2">
                 <Label>Deal (optional)</Label>
-                <Select value={deal} onValueChange={setDeal}>
-                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {deals.map((d: { _id: string; title: string }) => (
-                      <SelectItem key={d._id} value={d._id}>{d.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={deal}
+                  onChange={setDeal}
+                  fetchFn={fetchDeals}
+                  selectedLabel={dealLabel}
+                  placeholder="None"
+                  searchPlaceholder="Search deals..."
+                />
               </div>
               <div className="space-y-2">
                 <Label>{f.status}</Label>
@@ -242,6 +276,11 @@ const InvoiceForm: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        <div className="flex justify-end mt-4 py-3">
+          <Button type="submit" size="sm" className="h-8 px-5" disabled={saving}>
+            {saving ? tr.common.loading : tr.common.save}
+          </Button>
+        </div>
       </form>
     </main>
   );

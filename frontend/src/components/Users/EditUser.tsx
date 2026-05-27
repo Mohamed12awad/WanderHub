@@ -79,7 +79,7 @@ const EditUser: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { data: updatedUser } = await updateUserMutation.mutateAsync({
+      await updateUserMutation.mutateAsync({
         email,
         name,
         role,
@@ -87,9 +87,6 @@ const EditUser: React.FC = () => {
         phone,
       });
 
-      console.log(
-        `User updated: ${updatedUser.name} (${updatedUser.email}) with role: ${updatedUser.role}`
-      );
       navigate("/users");
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;

@@ -47,6 +47,7 @@ export interface Customer {
   emergencyContact: EmergencyContact;
   loyaltyProgram: LoyaltyProgram;
   paymentInformation: PaymentInformation;
+  customFields?: Record<string, string>;
 }
 
 export interface User {
@@ -66,16 +67,6 @@ export interface ErrorResponse {
   message?: string;
 }
 
-export interface Room {
-  _id?: string;
-  roomNumber: string;
-  type: string;
-  capacity: number;
-  location: string;
-  notes: string;
-  createdAt?: string;
-}
-
 export interface DealData {
   title?: string;
   customer: string;
@@ -88,6 +79,7 @@ export interface DealData {
   quantity: number;
   source: string;
   notes: string;
+  customFields?: Record<string, string>;
 }
 
 export type ActivityType = "call" | "meeting" | "task" | "note" | "email";
@@ -141,7 +133,7 @@ export interface UserData {
 }
 
 export interface PaymentData {
-  booking: string;
+  deal?: string;
   amount: number;
   date: Date | string;
   method: string;
@@ -181,9 +173,10 @@ export interface Product {
   location: string;
   notes: string;
   createdAt?: string;
+  customFields?: Record<string, string>;
 }
 
-export type NoteLinkedModel = "Customer" | "Deal" | "Product" | "Expense";
+export type NoteLinkedModel = "Customer" | "Deal" | "Product" | "Expense" | "Quote" | "Invoice";
 
 export interface Note {
   _id: string;
@@ -321,6 +314,18 @@ export interface Invoice {
   rejectionReason?: string;
 }
 
+export type AccountType = "bank" | "cash" | "safe";
+
+export interface Account {
+  _id: string;
+  name: string;
+  type: AccountType;
+  currency: string;
+  balance: number;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface InvoicePayment {
   _id: string;
   invoice: string;
@@ -330,6 +335,8 @@ export interface InvoicePayment {
   method: PaymentMethod;
   reference?: string;
   notes?: string;
+  accountId?: string;
+  account?: { _id: string; name: string };
   createdBy: { _id: string; name: string };
   createdAt: string;
 }

@@ -1,12 +1,20 @@
-import React, { useState, useEffect, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { getProductById, updateProduct } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
+import DynamicFields from "@/components/common/DynamicFields";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
+
+const DEFAULT_TYPES = ["service", "physical", "digital", "subscription"];
 
 interface ProductData {
   name: string;
@@ -14,18 +22,38 @@ interface ProductData {
   capacity: number;
   location: string;
   notes: string;
+  customFields: Record<string, string>;
 }
 
 const EditProduct = () => {
   const { id } = useParams<{ id: string }>();
   const [formData, setFormData] = useState<ProductData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const originalRef = useRef<string | null>(null);
   const navigate = useNavigate();
+  const { getFieldsForModule } = useWorkspaceSettings();
+  const typeOptions = getFieldsForModule("products")
+    .find((f) => f.isSystem && f.name === "type")
+    ?.options?.split(",").map((o) => o.trim()).filter(Boolean)
+    ?? DEFAULT_TYPES;
 
   useEffect(() => {
     if (!id) return;
-    getProductById(id).then(({ data }) => setFormData(data)).catch(console.error);
+    getProductById(id).then(({ data }) => {
+      const loaded = { ...data, customFields: data.customFields ?? {} };
+      setFormData(loaded);
+      originalRef.current = JSON.stringify(loaded);
+    }).catch(console.error);
   }, [id]);
+
+  const isDirty = originalRef.current !== null && JSON.stringify(formData) !== originalRef.current;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -52,9 +80,14 @@ const EditProduct = () => {
       <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader>
-          <CardTitle className="flex">
-            <Link to="/products"><CircleArrowLeft className="me-3" /></Link>
+          <CardTitle className="flex items-center gap-3">
+            <Link to={`/products/${id}`}><CircleArrowLeft className="me-3" /></Link>
             Edit Product / Service
+            {isDirty && (
+              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                Unsaved changes
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -65,7 +98,16 @@ const EditProduct = () => {
             </div>
             <div className="flex flex-col col-span-2 md:col-span-1">
               <Label className="my-3" htmlFor="type">Type</Label>
-              <Input id="type" name="type" value={formData.type} onChange={handleChange} />
+              <Select value={formData.type} onValueChange={(v) => setFormData((prev) => ({ ...prev!, type: v }))}>
+                <SelectTrigger id="type">
+                  <SelectValue placeholder="Select type…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt} className="capitalize">{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col col-span-2 md:col-span-1">
               <Label className="my-3" htmlFor="capacity">Quantity / Capacity</Label>
@@ -85,6 +127,12 @@ const EditProduct = () => {
                 className="border border-input rounded-lg p-2 min-h-[80px]"
               />
             </div>
+            <DynamicFields
+              module="products"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev!, customFields: { ...prev!.customFields, [k]: v } }))}
+            />
+
             <div className="col-span-2">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Updating..." : "Update Product"}

@@ -49,7 +49,7 @@ const AddUser: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { data: newUser } = await createUserMutation.mutateAsync({
+      await createUserMutation.mutateAsync({
         email,
         password,
         name,
@@ -57,9 +57,6 @@ const AddUser: React.FC = () => {
         phone,
       });
 
-      console.log(
-        `User created: ${newUser.name} (${newUser.email}) with role: ${newUser.role}`
-      );
       navigate("/users");
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;

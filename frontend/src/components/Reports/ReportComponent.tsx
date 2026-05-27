@@ -5,14 +5,10 @@ interface Customer {
   phone: string;
 }
 
-interface Room {
-  roomNumber: string;
-}
-
 interface Booking {
   _id: string;
   customer: Customer;
-  room: Room;
+  room?: { roomNumber?: string };
   price: number;
   totalPaid: number;
   status: string;
@@ -80,7 +76,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
             Customer: {booking.customer.name}
           </h5>
           <p>Phone: {booking.customer.phone}</p>
-          <p>Room: {booking.room.roomNumber}</p>
+          {booking.room?.roomNumber && <p>Room: {booking.room.roomNumber}</p>}
           <p>Total Price: {booking.price}</p>
           <p>Total Paid: {booking.totalPaid}</p>
           <p>Status: {booking.status}</p>

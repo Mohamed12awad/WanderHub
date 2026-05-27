@@ -1,11 +1,11 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Eye } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useQuery } from "react-query";
 import { getQuotes, getInvoices } from "@/utils/api";
 import { FinanceStatusBadge } from "./FinanceStatusBadge";
@@ -22,6 +22,7 @@ interface Props {
 const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId }) => {
   const { tr } = useLanguage();
   const f = tr.finance;
+  const navigate = useNavigate();
 
   const filterParam = linkedModel === "Deal" ? { deal: linkedId } : { customer: linkedId };
   const prefilledCustomer = linkedModel === "Customer" ? linkedId : customerId;
@@ -97,12 +98,15 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId }) => {
                 <TableHead>{f.status}</TableHead>
                 <TableHead className="text-right">{f.total}</TableHead>
                 <TableHead className="hidden md:table-cell">{f.validUntil}</TableHead>
-                <TableHead><span className="sr-only">View</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {quotes.map((q) => (
-                <TableRow key={q._id}>
+                <TableRow
+                  key={q._id}
+                  className="cursor-pointer hover:bg-muted/40"
+                  onClick={() => navigate(`/finance/quotes/${q._id}`)}
+                >
                   <TableCell className="font-mono text-sm">{q.quoteNumber}</TableCell>
                   <TableCell>{q.title}</TableCell>
                   <TableCell><FinanceStatusBadge status={q.status} type="quote" /></TableCell>
@@ -111,13 +115,6 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId }) => {
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                     {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Link to={`/finance/quotes/${q._id}`}>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
@@ -141,14 +138,17 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId }) => {
                 <TableHead className="text-right">{f.total}</TableHead>
                 <TableHead className="text-right hidden md:table-cell">{f.outstanding}</TableHead>
                 <TableHead className="hidden md:table-cell">{f.dueDate}</TableHead>
-                <TableHead><span className="sr-only">View</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {invoices.map((inv) => {
                 const outstanding = inv.total - inv.totalPaid;
                 return (
-                  <TableRow key={inv._id}>
+                  <TableRow
+                    key={inv._id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => navigate(`/finance/invoices/${inv._id}`)}
+                  >
                     <TableCell className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
                     <TableCell>{inv.title}</TableCell>
                     <TableCell><FinanceStatusBadge status={inv.status} type="invoice" /></TableCell>
@@ -160,13 +160,6 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId }) => {
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                       {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Link to={`/finance/invoices/${inv._id}`}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
                     </TableCell>
                   </TableRow>
                 );

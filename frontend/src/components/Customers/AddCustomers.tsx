@@ -16,6 +16,8 @@ import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
 import { Customer, ErrorResponse } from "@/types/types";
+import DynamicFields from "@/components/common/DynamicFields";
+import { useToast } from "@/components/ui/use-toast";
 
 interface User {
   _id: string;
@@ -59,11 +61,13 @@ const initialFormData = {
   status: "Draft",
   owner: "",
   notes: "",
+  customFields: {} as Record<string, string>,
 };
 
 const AddCustomer = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const { data: users } = useQuery("users", () => getUsers());
   const navigate = useNavigate();
@@ -105,9 +109,8 @@ const AddCustomer = () => {
       setIsLoading(false);
       console.error("Error adding customer:", error);
       const axiosError = error as AxiosError<ErrorResponse>;
-      const errMsg = axiosError.response?.data?.message;
-      console.error("Error creating user:", errMsg);
-      alert(errMsg);
+      const errMsg = axiosError.response?.data?.message ?? "Error creating customer";
+      toast({ title: errMsg, variant: "destructive" });
     }
   };
 
@@ -125,11 +128,11 @@ const AddCustomer = () => {
         <CardContent>
           <form
             onSubmit={handleSubmit}
-            className="md:grid md:grid-cols-2 gap-4"
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
           >
             {/* Personal Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Personal Information
               </h2>
               <div className="flex flex-col">
@@ -182,7 +185,7 @@ const AddCustomer = () => {
 
             {/* Work Related */}
             <div>
-              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 mt-5 md:mt-0">
                 Work Related
               </h2>
               <div className="flex flex-col">
@@ -262,7 +265,7 @@ const AddCustomer = () => {
             </div>
             {/* Address Information */}
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 mt-5 md:mt-0">
                 Address Information
               </h2>
               <div className="flex flex-col">
@@ -324,7 +327,7 @@ const AddCustomer = () => {
 
             {/* Identification Information */}
             <div>
-              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 mt-5 md:mt-0">
                 Identification Information
               </h2>
               <div className="flex flex-col">
@@ -353,7 +356,7 @@ const AddCustomer = () => {
 
             {/* Contact Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Contact Information
               </h2>
               <div className="flex flex-col">
@@ -393,7 +396,7 @@ const AddCustomer = () => {
 
             {/* Payment Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Payment Information
               </h2>
               <div className="flex flex-col">
@@ -436,7 +439,7 @@ const AddCustomer = () => {
 
             {/* Loyalty Program Information */}
             <div>
-              <h2 className="text-lg font-semibold md:mb-2 my-5 md:my-0">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 mt-5 md:mt-0">
                 Loyalty Program Information
               </h2>
               <div className="flex flex-col">
@@ -462,6 +465,13 @@ const AddCustomer = () => {
                 />
               </div>
             </div>
+
+            {/* Custom Fields */}
+            <DynamicFields
+              module="customers"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+            />
 
             {/* Submit Button */}
             <div className="col-span-2">

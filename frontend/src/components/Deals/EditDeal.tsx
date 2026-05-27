@@ -1,15 +1,16 @@
-import React, { ChangeEvent, useEffect, useState } from "react";
+import React, { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { getDealById, updateDeal, getCustomers, getProducts } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "react-query";
+import DynamicFields from "@/components/common/DynamicFields";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
-import { Customer, Product } from "@/types/types";
 
 const DEAL_STATUSES = ["lead", "qualified", "proposal", "negotiation", "won", "lost", "cancelled"];
 const DEAL_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
@@ -27,22 +28,39 @@ interface DealFormData {
   source: string;
   expectedCloseDate: string;
   notes: string;
+  customFields: Record<string, string>;
 }
 
 const EditDeal = () => {
   const { id: dealId } = useParams<{ id: string }>();
   const [formData, setFormData] = useState<DealFormData | null>(null);
+  const [customerLabel, setCustomerLabel] = useState("");
+  const [productLabel, setProductLabel] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const { data: customers } = useQuery("customers", () => getCustomers());
-  const { data: products } = useQuery("products", () => getProducts());
+  const originalRef = useRef<string | null>(null);
   const navigate = useNavigate();
+
+  const fetchCustomers = useCallback(
+    (q: string) =>
+      getCustomers({ page: 1, limit: 20, q }).then((r) =>
+        (r.data as any).data.map((c: { _id: string; name: string }) => ({ value: c._id, label: c.name }))
+      ),
+    [],
+  );
+
+  const fetchProducts = useCallback(
+    (q: string) =>
+      getProducts({ page: 1, limit: 20, q }).then((r) =>
+        (r.data as any).data.map((p: { _id: string; name: string }) => ({ value: p._id, label: p.name }))
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (!dealId) return;
     getDealById(dealId).then(({ data }) => {
       const d = data.deal;
-      setFormData({
+      const loaded: DealFormData = {
         title: d.title ?? "",
         customer: d.customer?._id ?? "",
         product: d.product?._id ?? "",
@@ -56,9 +74,23 @@ const EditDeal = () => {
           ? new Date(d.expectedCloseDate).toISOString().split("T")[0]
           : "",
         notes: d.notes ?? "",
-      });
+        customFields: d.customFields ?? {},
+      };
+      setFormData(loaded);
+      setCustomerLabel(d.customer?.name ?? "");
+      setProductLabel(d.product?.name ?? "");
+      originalRef.current = JSON.stringify(loaded);
     }).catch(console.error);
   }, [dealId]);
+
+  const isDirty = formData !== null && originalRef.current !== null && JSON.stringify(formData) !== originalRef.current;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -97,15 +129,20 @@ const EditDeal = () => {
       <LoadingSpinner loading={isLoading} />
       <Card>
         <CardHeader>
-          <CardTitle className="flex">
-            <Link to="/deals"><CircleArrowLeft className="me-3" /></Link>
+          <CardTitle className="flex items-center gap-3">
+            <Link to={`/deals/${dealId}`}><CircleArrowLeft className="me-3" /></Link>
             Edit Deal
+            {isDirty && (
+              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                Unsaved changes
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h2 className="text-lg font-semibold mb-2">Deal Information</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Deal Information</h2>
 
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="title">Title</Label>
@@ -114,26 +151,26 @@ const EditDeal = () => {
 
               <div className="flex flex-col">
                 <Label className="my-3">Customer</Label>
-                <Select value={formData.customer} onValueChange={(v) => handleSelect("customer", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Customer" /></SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[12rem]">
-                    {customers?.data.map((c: Customer) => (
-                      <SelectItem key={c._id} value={c._id!}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={formData.customer}
+                  onChange={(v) => handleSelect("customer", v)}
+                  fetchFn={fetchCustomers}
+                  selectedLabel={customerLabel}
+                  placeholder="Select Customer"
+                  searchPlaceholder="Search customers..."
+                />
               </div>
 
               <div className="flex flex-col">
                 <Label className="my-3">Product / Service</Label>
-                <Select value={formData.product} onValueChange={(v) => handleSelect("product", v)}>
-                  <SelectTrigger><SelectValue placeholder="Select Product (optional)" /></SelectTrigger>
-                  <SelectContent className="overflow-y-auto max-h-[12rem]">
-                    {products?.data.map((p: Product) => (
-                      <SelectItem key={p._id} value={p._id!}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <AsyncSearchableSelect
+                  value={formData.product}
+                  onChange={(v) => handleSelect("product", v)}
+                  fetchFn={fetchProducts}
+                  selectedLabel={productLabel}
+                  placeholder="Select Product (optional)"
+                  searchPlaceholder="Search products..."
+                />
               </div>
 
               <div className="flex flex-col">
@@ -153,7 +190,7 @@ const EditDeal = () => {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold mb-2">Other Information</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Other Information</h2>
 
               <div className="flex flex-col">
                 <Label className="my-3">Status</Label>
@@ -204,8 +241,14 @@ const EditDeal = () => {
               </div>
             </div>
 
-            <div className="col-span-2">
-              <Button type="submit" disabled={isLoading}>
+            <DynamicFields
+              module="deals"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev!, customFields: { ...prev!.customFields, [k]: v } }))}
+            />
+
+            <div className="col-span-2 flex justify-end border-t pt-4 mt-2">
+              <Button type="submit" disabled={isLoading} className="px-8">
                 {isLoading ? "Updating..." : "Update Deal"}
               </Button>
             </div>

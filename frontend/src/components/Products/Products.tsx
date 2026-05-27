@@ -13,6 +13,10 @@ export interface Product {
   createdAt: string;
 }
 
+const PRODUCT_FILTERS = [
+  { label: "Created Date", field: "createdAt", type: "date-range" as const },
+];
+
 export function Products() {
   const { tr } = useLanguage();
   const p = tr.products;
@@ -20,9 +24,19 @@ export function Products() {
   return (
     <GenericTable<Product>
       queryKey="products"
-      fetchData={({ page, limit, q }) => getProducts({ page, limit, q })}
+      fetchData={({ page, limit, q, filters, sort, dir }) => getProducts({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
       deleteData={deleteProduct}
       headers={p.headers}
+      sortableHeaders={["Name", "Capacity", "Created"]}
+      quickStatusFilter={{
+        field: "type",
+        options: [
+          { value: "service",      label: "Service" },
+          { value: "physical",     label: "Physical" },
+          { value: "digital",      label: "Digital" },
+          { value: "subscription", label: "Subscription" },
+        ],
+      }}
       renderRow={(item, handleDelete) => (
         <ProductRow
           key={item._id}
@@ -31,7 +45,7 @@ export function Products() {
           type={item.type}
           capacity={item.capacity}
           location={item.location}
-          date={new Date(item.createdAt).toLocaleString()}
+          date={new Date(item.createdAt).toLocaleDateString()}
           handleDelete={handleDelete}
         />
       )}
@@ -41,6 +55,8 @@ export function Products() {
       addLabel={p.add}
       emptyMessage={p.empty}
       noSearchMessage={p.noSearch}
+      filterConfigs={PRODUCT_FILTERS}
+      module="products"
     />
   );
 }

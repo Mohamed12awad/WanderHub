@@ -1,0 +1,509 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum DealStatus {
+  lead
+  qualified
+  proposal
+  negotiation
+  won
+  lost
+  cancelled
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  partially_paid
+  paid
+  overdue
+  cancelled
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ActivityType {
+  call
+  meeting
+  task
+  note
+  email
+}
+
+enum ActivityStatus {
+  pending
+  completed
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  review
+  done
+  cancelled
+}
+
+// ─── Auth & Config ────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String
+  password  String
+  active    Boolean  @default(true)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedCustomers      Customer[]       @relation("CustomerOwner")
+  createdQuotes       Quote[]          @relation("QuoteCreatedBy")
+  approvedQuotes      Quote[]          @relation("QuoteApprovedBy")
+  createdInvoices     Invoice[]        @relation("InvoiceCreatedBy")
+  approvedInvoices    Invoice[]        @relation("InvoiceApprovedBy")
+  invoicePayments     InvoicePayment[]
+  partialPayments     PartialPayment[]
+  expenseReports      ExpenseReport[]  @relation("ExpenseUser")
+  approvedExpenses    ExpenseReport[]  @relation("ExpenseApprovedBy")
+  assignedActivities  Activity[]       @relation("ActivityAssignedTo")
+  createdActivities   Activity[]       @relation("ActivityCreatedBy")
+  notes               Note[]
+  assignedTasks       Task[]           @relation("TaskAssignedTo")
+  createdTasks        Task[]           @relation("TaskCreatedBy")
+  triggeredTimelines  TimelineEvent[]
+  logs                Log[]
+}
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+model Customer {
+  id                     String    @id @default(cuid())
+  name                   String
+  phone                  String    @unique
+  mobile                 String?
+  email                  String?   @unique
+  // Embedded objects stored as JSON
+  address                Json?
+  identification         Json?
+  dateOfBirth            DateTime?
+  gender                 String?
+  preferredContactMethod String?
+  paymentInformation     Json?
+  loyaltyProgram         Json?
+  emergencyContact       Json?
+  location               String?
+  ownerId                String?
+  owner                  User?     @relation("CustomerOwner", fields: [ownerId], references: [id])
+  status                 String?
+  notes                  String?
+  customFields           Json?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  deals         Deal[]
+  quotes        Quote[]
+  invoices      Invoice[]
+  activities    Activity[]
+  customerNotes Note[]
+  timelines     TimelineEvent[]
+}
+
+model Deal {
+  id                String     @id @default(cuid())
+  customerId        String
+  customer          Customer   @relation(fields: [customerId], references: [id])
+  productId         String?
+  product           Product?   @relation(fields: [productId], references: [id])
+  title             String
+  price             Float
+  currency          String     @default("USD")
+  totalPaid         Float      @default(0)
+  status            DealStatus @default(lead)
+  source            String?
+  quantity          Int        @default(1)
+  expectedCloseDate DateTime?
+  startDate         DateTime?
+  endDate           DateTime?
+  notes             String?
+  customFields      Json?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  quotes          Quote[]
+  invoices        Invoice[]
+  partialPayments PartialPayment[]
+  activities      Activity[]
+  dealNotes       Note[]
+  timelines       TimelineEvent[]
+  tasks           Task[]
+}
+
+// ─── Catalog ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  type         String?
+  capacity     Float?
+  location     String?
+  description  String?
+  notes        String?
+  customFields Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  deals        Deal[]
+  productNotes Note[]
+}
+
+// ─── Finance — Quotes ────────────────────────────────────────────────────────
+
+model Quote {
+  id                   String         @id @default(cuid())
+  quoteNumber          String         @unique
+  title                String
+  customerId           String
+  customer             Customer       @relation(fields: [customerId], references: [id])
+  dealId               String?
+  deal                 Deal?          @relation(fields: [dealId], references: [id])
+  status               QuoteStatus    @default(draft)
+  subtotal             Float          @default(0)
+  taxRate              Float          @default(0)
+  tax                  Float          @default(0)
+  total                Float          @default(0)
+  currency             String         @default("USD")
+  validUntil           DateTime?
+  notes                String?
+  terms                String?
+  convertedToInvoiceId String?        @unique
+  convertedToInvoice   Invoice?       @relation("QuoteToInvoice", fields: [convertedToInvoiceId], references: [id])
+  createdById          String
+  createdBy            User           @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+  approvalStatus       ApprovalStatus @default(pending)
+  approvedById         String?
+  approvedBy           User?          @relation("QuoteApprovedBy", fields: [approvedById], references: [id])
+  approvedAt           DateTime?
+  rejectionReason      String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  items QuoteLineItem[]
+}
+
+model QuoteLineItem {
+  id          String @id @default(cuid())
+  quoteId     String
+  quote       Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  discount    Float  @default(0)
+  total       Float
+  order       Int    @default(0)
+}
+
+// ─── Finance — Invoices ──────────────────────────────────────────────────────
+
+model Invoice {
+  id              String         @id @default(cuid())
+  invoiceNumber   String         @unique
+  title           String
+  customerId      String
+  customer        Customer       @relation(fields: [customerId], references: [id])
+  dealId          String?
+  deal            Deal?          @relation(fields: [dealId], references: [id])
+  fromQuote       Quote?         @relation("QuoteToInvoice")
+  status          InvoiceStatus  @default(draft)
+  subtotal        Float          @default(0)
+  taxRate         Float          @default(0)
+  tax             Float          @default(0)
+  total           Float          @default(0)
+  totalPaid       Float          @default(0)
+  currency        String         @default("USD")
+  issueDate       DateTime       @default(now())
+  dueDate         DateTime?
+  notes           String?
+  terms           String?
+  createdById     String
+  createdBy       User           @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  approvalStatus  ApprovalStatus @default(pending)
+  approvedById    String?
+  approvedBy      User?          @relation("InvoiceApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  items    InvoiceLineItem[]
+  payments InvoicePayment[]
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  discount    Float   @default(0)
+  total       Float
+  order       Int     @default(0)
+}
+
+model InvoicePayment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  amount      Float
+  currency    String   @default("USD")
+  date        DateTime
+  method      String   @default("cash")
+  reference   String?
+  notes       String?
+  accountId   String?
+  account     Account? @relation(fields: [accountId], references: [id])
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Legacy deal-level payment (pre-invoice system)
+model PartialPayment {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id])
+  amount      Float
+  currency    String   @default("EGP")
+  date        DateTime
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  method      String   @default("cash")
+  notes       String?
+  accountId   String?
+  account     Account? @relation(fields: [accountId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Accounts ─────────────────────────────────────────────────────────────────
+
+enum AccountType {
+  bank
+  cash
+  safe
+}
+
+model Account {
+  id              String           @id @default(cuid())
+  name            String
+  type            AccountType      @default(cash)
+  currency        String           @default("USD")
+  balance         Float            @default(0)
+  notes           String?
+  invoicePayments InvoicePayment[]
+  partialPayments PartialPayment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// ─── Expenses ────────────────────────────────────────────────────────────────
+
+model ExpenseReport {
+  id              String         @id @default(cuid())
+  title           String
+  userId          String
+  user            User           @relation("ExpenseUser", fields: [userId], references: [id])
+  approved        Boolean        @default(false)
+  approvalStatus  ApprovalStatus @default(pending)
+  approvedById    String?
+  approvedBy      User?          @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  expenses     ExpenseItem[]
+  expenseNotes Note[]
+}
+
+model ExpenseItem {
+  id              String        @id @default(cuid())
+  expenseReportId String
+  expenseReport   ExpenseReport @relation(fields: [expenseReportId], references: [id], onDelete: Cascade)
+  description     String
+  amount          Float
+  date            DateTime
+  category        String
+  beneficiary     String
+}
+
+// ─── Activities & Notes ──────────────────────────────────────────────────────
+
+model Activity {
+  id           String         @id @default(cuid())
+  type         ActivityType
+  title        String
+  description  String?
+  date         DateTime
+  status       ActivityStatus @default(pending)
+  // Polymorphic link — keep both generic fields and typed FKs
+  linkedToId   String
+  linkedModel  String
+  customerId   String?
+  customer     Customer?      @relation(fields: [customerId], references: [id])
+  dealId       String?
+  deal         Deal?          @relation(fields: [dealId], references: [id])
+  assignedToId String?
+  assignedTo   User?          @relation("ActivityAssignedTo", fields: [assignedToId], references: [id])
+  createdById  String
+  createdBy    User           @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model Note {
+  id              String         @id @default(cuid())
+  content         String
+  linkedToId      String
+  linkedModel     String
+  customerId      String?
+  customer        Customer?      @relation(fields: [customerId], references: [id])
+  dealId          String?
+  deal            Deal?          @relation(fields: [dealId], references: [id])
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
+  expenseReportId String?
+  expenseReport   ExpenseReport? @relation(fields: [expenseReportId], references: [id])
+  createdById     String
+  createdBy       User           @relation(fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// ─── Tasks ───────────────────────────────────────────────────────────────────
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  priority     TaskPriority @default(medium)
+  status       TaskStatus   @default(todo)
+  dueDate      DateTime?
+  assignedToId String?
+  assignedTo   User?        @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  linkedToId   String?
+  linkedModel  String?
+  dealId       String?
+  deal         Deal?        @relation(fields: [dealId], references: [id])
+  completedAt  DateTime?
+  tags         String[]
+  createdById  String
+  createdBy    User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+// ─── Timeline ────────────────────────────────────────────────────────────────
+
+model TimelineEvent {
+  id            String    @id @default(cuid())
+  eventType     String
+  title         String
+  payload       Json?
+  linkedToId    String
+  linkedModel   String
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  dealId        String?
+  deal          Deal?     @relation(fields: [dealId], references: [id])
+  triggeredById String?
+  triggeredBy   User?     @relation(fields: [triggeredById], references: [id])
+  isSystem      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+}
+
+// ─── System ──────────────────────────────────────────────────────────────────
+
+model Log {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  method    String
+  endpoint  String
+  recordId  String?
+  timestamp DateTime @default(now())
+}
+
+model Purchase {
+  id           String   @id @default(cuid())
+  itemName     String
+  quantity     Float
+  price        Float
+  date         DateTime
+  supplier     String
+  shippingCost Float    @default(0)
+  tax          Float    @default(0)
+  insurance    Float    @default(0)
+  otherCosts   Float    @default(0)
+  landedCost   Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model NumberSequence {
+  id         String @id @default(cuid())
+  key        String @unique
+  prefix     String @default("")
+  lastNumber Int    @default(0)
+  padLength  Int    @default(4)
+  separator  String @default("-")
+}
+
+model WorkspaceConfig {
+  id             String   @id @default(cuid())
+  approvals      Json     @default("[]")
+  fieldGroups    Json     @default("[]")
+  moduleSettings Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

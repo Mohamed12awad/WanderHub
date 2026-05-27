@@ -3,10 +3,14 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
 import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote } from "@/utils/api";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
@@ -16,11 +20,13 @@ import LoadingSpinner from "@/components/common/spinner";
 import { Quote } from "@/types/types";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import { PermissionGate } from "@/components/common/PermissionGate";
+import { NotesPanel } from "@/components/common/NotesPanel";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
+import { useAuth } from "@/contexts/authContext";
 
 const InfoRow: React.FC<{ label: string; value?: string | number | React.ReactNode }> = ({ label, value }) => (
   <div className="grid grid-cols-2 mb-2">
-    <Label className="my-1 text-muted-foreground">{label}</Label>
+    <Label className="my-1 font-medium">{label}</Label>
     <p className="my-1">{value ?? "—"}</p>
   </div>
 );
@@ -31,11 +37,13 @@ const QuoteDetail: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { tr } = useLanguage();
+  const { user } = useAuth();
   const f = tr.finance;
   const [converting, setConverting] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const canDelete = ["admin", "super admin"].includes(user!.role);
   const { isApprovalEnabled } = useApprovalConfig();
   const { data, isLoading } = useQuery(["quotes", id], () => getQuoteById(id!));
   const quote: Quote | undefined = data?.data;
@@ -44,7 +52,8 @@ const QuoteDetail: React.FC = () => {
   if (!quote) return <div className="p-4">Quote not found.</div>;
 
   const approvalEnabled = isApprovalEnabled("quotes");
-  const canEdit = !approvalEnabled || quote.approvalStatus === "approved" || quote.approvalStatus === "rejected";
+  const isPending = quote.approvalStatus === "pending";
+  const canEdit = !approvalEnabled || !isPending;
   const canConvert = !approvalEnabled || quote.approvalStatus === "approved";
 
   const handleConvert = async () => {
@@ -95,32 +104,39 @@ const QuoteDetail: React.FC = () => {
   };
 
   return (
-    <main className="p-4">
+    <main className="p-4 max-w-7xl mx-auto space-y-5">
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}
         onCancel={() => setRejectOpen(false)}
         loading={actionLoading}
       />
+
+      {/* Approval pending banner */}
+      {approvalEnabled && isPending && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300 print:hidden">
+          <Clock className="h-4 w-4 shrink-0" />
+          <p className="text-sm">This quote is awaiting approval. Editing and conversion are locked until approved.</p>
+          <PermissionGate require="finance:approve">
+            <div className="ms-auto flex gap-2">
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-green-600 border-green-300 hover:bg-green-50" onClick={handleApprove} disabled={actionLoading}>
+                <CheckCircle className="h-3.5 w-3.5" />Approve
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRejectOpen(true)} disabled={actionLoading}>
+                <XCircle className="h-3.5 w-3.5" />Reject
+              </Button>
+            </div>
+          </PermissionGate>
+        </div>
+      )}
+
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
+        <CardHeader className="flex flex-row items-start justify-between print:hidden">
           <CardTitle className="flex items-center gap-3">
             <Link to="/finance/quotes"><CircleArrowLeft /></Link>
             {quote.quoteNumber} — {quote.title}
           </CardTitle>
-          <div className="flex gap-2 flex-wrap">
-            <PermissionGate require="finance:approve">
-              {quote.approvalStatus !== "approved" && (
-                <Button size="sm" variant="outline" className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={handleApprove} disabled={actionLoading}>
-                  <CheckCircle className="h-3.5 w-3.5" />Approve
-                </Button>
-              )}
-              {quote.approvalStatus !== "rejected" && (
-                <Button size="sm" variant="outline" className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRejectOpen(true)} disabled={actionLoading}>
-                  <XCircle className="h-3.5 w-3.5" />Reject
-                </Button>
-              )}
-            </PermissionGate>
+          <div className="flex gap-2 items-center">
             <Link to={canEdit ? `/finance/quotes/${id}/edit` : "#"}>
               <Button size="sm" variant="outline" className="h-8 px-4" disabled={!canEdit} title={!canEdit ? "Pending approval — cannot edit." : undefined}>
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
@@ -138,15 +154,66 @@ const QuoteDetail: React.FC = () => {
                 </Button>
               </Link>
             )}
-            <Button size="sm" variant="destructive" className="h-8 px-4" onClick={handleDelete}>
-              {tr.common.delete}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">More actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.print()}>
+                  <Printer className="h-3.5 w-3.5 me-2" />Print
+                </DropdownMenuItem>
+                <PermissionGate require="finance:approve">
+                  {!isPending && quote.approvalStatus === "approved" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
+                        <XCircle className="h-3.5 w-3.5 me-2" />Reject
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {!isPending && quote.approvalStatus === "rejected" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleApprove} disabled={actionLoading} className="text-green-600 focus:text-green-600">
+                        <CheckCircle className="h-3.5 w-3.5 me-2" />Approve
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </PermissionGate>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
+
+        {/* Print-only header */}
+        <div className="hidden print:block px-6 pt-6 pb-2 border-b">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold">Quote</h1>
+              <p className="text-sm text-gray-500 mt-1">{quote.quoteNumber}</p>
+            </div>
+            <div className="text-right text-sm">
+              <p className="font-semibold">{quote.customer.name}</p>
+              {quote.validUntil && <p className="text-gray-500">Valid until: {new Date(quote.validUntil).toLocaleDateString()}</p>}
+            </div>
+          </div>
+        </div>
+
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <section>
-              <h2 className="font-semibold mb-3">Quote Information</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Quote Information</h2>
               <InfoRow label={f.quoteNumber} value={quote.quoteNumber} />
               <InfoRow label={f.customer} value={
                 <Link to={`/customers/${quote.customer._id}`} className="text-blue-500">
@@ -162,45 +229,87 @@ const QuoteDetail: React.FC = () => {
               <InfoRow label="Approval" value={<ApprovalBadge status={quote.approvalStatus} rejectionReason={quote.rejectionReason} />} />
               <InfoRow label={f.currency} value={quote.currency} />
               <InfoRow label={f.validUntil} value={quote.validUntil ? new Date(quote.validUntil).toLocaleDateString() : "—"} />
-              <InfoRow label={f.notes} value={quote.notes} />
-              <InfoRow label={f.terms} value={quote.terms} />
             </section>
             <section>
-              <h2 className="font-semibold mb-3">Totals</h2>
-              <InfoRow label={f.subtotal} value={`${quote.subtotal.toLocaleString()} ${quote.currency}`} />
-              <InfoRow label={f.taxRate} value={`${quote.taxRate}%`} />
-              <InfoRow label={f.tax} value={`${quote.tax.toLocaleString()} ${quote.currency}`} />
-              <InfoRow label={f.total} value={
-                <span className="font-semibold text-lg">
-                  {quote.total.toLocaleString()} {quote.currency}
-                </span>
-              } />
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Notes & Terms</h2>
+              {quote.notes ? (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">{f.notes}</p>
+                  <p className="text-sm whitespace-pre-wrap">{quote.notes}</p>
+                </div>
+              ) : null}
+              {quote.terms ? (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">{f.terms}</p>
+                  <p className="text-sm whitespace-pre-wrap">{quote.terms}</p>
+                </div>
+              ) : null}
+              {!quote.notes && !quote.terms && (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
             </section>
           </div>
 
-          <h2 className="font-semibold mb-3">{f.items}</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{f.description}</TableHead>
-                <TableHead className="w-20">{f.quantity}</TableHead>
-                <TableHead className="w-28">{f.unitPrice}</TableHead>
-                <TableHead className="w-24">{f.discount}</TableHead>
-                <TableHead className="w-28 text-right">{f.itemTotal}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {quote.items.map((item, idx) => (
-                <TableRow key={idx}>
-                  <TableCell>{item.description}</TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>{item.unitPrice.toLocaleString()}</TableCell>
-                  <TableCell>{item.discount}%</TableCell>
-                  <TableCell className="text-right">{item.total.toLocaleString()} {quote.currency}</TableCell>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{f.items}</h2>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{f.description}</TableHead>
+                  <TableHead className="w-20 text-right">{f.quantity}</TableHead>
+                  <TableHead className="w-28 text-right">{f.unitPrice}</TableHead>
+                  <TableHead className="w-24 text-right">{f.discount}</TableHead>
+                  <TableHead className="w-28 text-right">{f.itemTotal}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {quote.items.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
+                    <TableCell className="text-right tabular-nums">{item.unitPrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{item.discount}%</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {quote.currency}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex justify-end mt-4">
+            <div className="w-72 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{f.subtotal}</span>
+                <span className="font-medium tabular-nums">{quote.subtotal.toLocaleString()} {quote.currency}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{f.taxRate}</span>
+                <span className="tabular-nums">{quote.taxRate}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{f.tax}</span>
+                <span className="tabular-nums">{quote.tax.toLocaleString()} {quote.currency}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 font-semibold">
+                <span>{f.total}</span>
+                <span className="text-base tabular-nums">{quote.total.toLocaleString()} {quote.currency}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notes */}
+      <Card className="print:hidden">
+        <CardContent className="py-5">
+          <Tabs defaultValue="notes">
+            <TabsList className="mb-4">
+              <TabsTrigger value="notes">Notes</TabsTrigger>
+            </TabsList>
+            <TabsContent value="notes">
+              <NotesPanel linkedTo={id!} linkedModel="Quote" />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </main>

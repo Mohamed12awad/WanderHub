@@ -42,7 +42,22 @@ const DEAL_FILTERS = [
       { value: "other", label: "Other" },
     ],
   },
-  { label: "Close Date", field: "closeDate", type: "date-range" as const },
+  {
+    label: "Currency",
+    field: "currency",
+    type: "select" as const,
+    options: [
+      { value: "USD", label: "USD" },
+      { value: "EUR", label: "EUR" },
+      { value: "GBP", label: "GBP" },
+      { value: "EGP", label: "EGP" },
+      { value: "AED", label: "AED" },
+      { value: "SAR", label: "SAR" },
+    ],
+  },
+  { label: "Deal Value", field: "price", type: "number-range" as const },
+  { label: "Expected Close Date", field: "closeDate", type: "date-range" as const },
+  { label: "Created Date", field: "createdAt", type: "date-range" as const },
 ];
 
 export function Deals() {
@@ -52,9 +67,10 @@ export function Deals() {
   return (
     <GenericTable<Deal>
       queryKey="deals"
-      fetchData={({ page, limit, q, filters }) => getDeals({ page, limit, q, ...filters })}
+      fetchData={({ page, limit, q, filters, sort, dir }) => getDeals({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
       deleteData={deleteDeal}
       headers={d.headers}
+      sortableHeaders={["Title", "Value", "Created"]}
       renderRow={(item, handleDelete) => (
         <DealRow
           key={item._id}
@@ -74,6 +90,19 @@ export function Deals() {
       emptyMessage={d.empty}
       noSearchMessage={d.noSearch}
       filterConfigs={DEAL_FILTERS}
+      module="deals"
+      quickStatusFilter={{
+        field: "status",
+        options: [
+          { value: "lead", label: "Lead" },
+          { value: "qualified", label: "Qualified" },
+          { value: "proposal", label: "Proposal" },
+          { value: "negotiation", label: "Negotiation" },
+          { value: "won", label: "Won" },
+          { value: "lost", label: "Lost" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+      }}
       exportConfig={{
         filename: "deals",
         getRow: (deal) => ({

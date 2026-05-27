@@ -1,0 +1,124 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { TimelineService } from '../timeline/timeline.service';
+import { toClient } from '../common/serialize';
+
+@Injectable()
+export class TasksService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly timeline: TimelineService,
+  ) {}
+
+  async findAll(query: Record<string, string>) {
+    const { status, priority, assignedTo, linkedTo, overdue, mine, page = '1' } = query;
+    const where: any = {};
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
+    if (assignedTo) where.assignedToId = assignedTo;
+    if (linkedTo) where.linkedToId = linkedTo;
+    if (mine === 'true') where.assignedToId = query._userId;
+    if (overdue === 'true') {
+      where.dueDate = { lt: new Date() };
+      where.status = { notIn: ['done', 'cancelled'] };
+    }
+    const limit = 50;
+    const skip = (parseInt(page, 10) - 1) * limit;
+    const [tasks, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+    return { data: toClient(tasks), total, page: parseInt(page, 10), pages: Math.ceil(total / limit) };
+  }
+
+  async summary() {
+    const counts = await this.prisma.task.groupBy({
+      by: ['status'],
+      _count: { id: true },
+    });
+    const summary: Record<string, number> = { todo: 0, in_progress: 0, review: 0, done: 0, cancelled: 0 };
+    counts.forEach(({ status, _count }) => { summary[status] = _count.id; });
+    return summary;
+  }
+
+  async findOne(id: string) {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
+    });
+    return task ? toClient(task) : null;
+  }
+
+  async create(body: Record<string, any>, userId: string) {
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+    const data: any = { ...rest, createdById: userId };
+    if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if (rest.linkedModel === 'Deal' && rest.linkedToId) data.dealId = rest.linkedToId;
+
+    const task = await this.prisma.task.create({
+      data,
+      include: { assignedTo: { select: { id: true, name: true, email: true } } },
+    });
+
+    if (task.linkedToId && task.linkedModel) {
+      await this.timeline.log(
+        'task.created',
+        `Task "${task.title}" created`,
+        task.linkedToId,
+        task.linkedModel as 'Customer' | 'Deal',
+        { title: task.title, priority: task.priority },
+        userId,
+      );
+    }
+
+    return toClient(task);
+  }
+
+  async update(id: string, body: Record<string, any>) {
+    const existing = await this.prisma.task.findUnique({ where: { id } });
+    if (!existing) return null;
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+    const data: any = { ...rest };
+    if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    const task = await this.prisma.task.update({
+      where: { id },
+      data,
+      include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
+    });
+    return toClient(task);
+  }
+
+  async remove(id: string) {
+    const existing = await this.prisma.task.findUnique({ where: { id } });
+    if (!existing) return null;
+    await this.prisma.task.delete({ where: { id } });
+    return true;
+  }
+
+  async complete(id: string, userId: string) {
+    const task = await this.prisma.task.findUnique({ where: { id } });
+    if (!task) return null;
+    const wasDone = task.status === 'done';
+    const updated = await this.prisma.task.update({
+      where: { id },
+      data: { status: wasDone ? 'todo' : 'done', completedAt: wasDone ? null : new Date() },
+    });
+    if (!wasDone && task.linkedToId && task.linkedModel) {
+      await this.timeline.log(
+        'task.completed',
+        `Task "${task.title}" completed`,
+        task.linkedToId,
+        task.linkedModel as 'Customer' | 'Deal',
+        { title: task.title },
+        userId,
+      );
+    }
+    return toClient(updated);
+  }
+}

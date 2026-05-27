@@ -13,23 +13,19 @@ interface Customer {
   };
 }
 
-interface Room {
-  roomNumber: string;
-}
-
 interface Booking {
   _id: string;
   customer: Customer;
-  room: Room;
+  room?: { roomNumber?: string };
   price: number;
   totalPaid: number;
   status: string;
-  startDate: string;
-  endDate: string;
-  numberOfPeople: number;
-  extraBusSeats: number;
-  bookingLocation: string;
-  notes: string;
+  startDate?: string;
+  endDate?: string;
+  numberOfPeople?: number;
+  extraBusSeats?: number;
+  bookingLocation?: string;
+  notes?: string;
 }
 
 interface BookingReportProps {
@@ -41,9 +37,8 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
     document.body.style.overflow = "auto";
   }, []);
   const renderBooking = (booking: Booking) => (
-    <Link to={`/bookings/${booking._id}`}>
+    <Link to={`/deals/${booking._id}`} key={booking._id}>
       <div
-        key={booking._id}
         className="p-6 mb-4 print:py-2 print:mb-2 border rounded-lg shadow-sm bg-card"
       >
         <div className="grid print:grid-cols-2 grid-cols-1 md:grid-cols-2 gap-4 print:text-sm">
@@ -53,24 +48,29 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
               <span className="font-normal">{booking.customer.name}</span>
             </h5>
             <p className="mb-1">
-              <strong>Phone:</strong> {booking.customer.phone} -{" "}
-              {booking.customer.mobile}
+              <strong>Phone:</strong> {booking.customer.phone}{booking.customer.mobile ? ` - ${booking.customer.mobile}` : ""}
             </p>
-            <p className="mb-1">
-              <strong>Room:</strong> {booking.room.roomNumber}
-            </p>
-            <p className="mb-1">
-              <strong>Start Date:</strong> {booking.startDate.split("T")[0]}
-            </p>
-            <p className="mb-1">
-              <strong>Number Of People:</strong> {booking.numberOfPeople}
-            </p>
-            {booking.extraBusSeats > 0 && (
+            {booking.room?.roomNumber && (
+              <p className="mb-1">
+                <strong>Room:</strong> {booking.room.roomNumber}
+              </p>
+            )}
+            {booking.startDate && (
+              <p className="mb-1">
+                <strong>Start Date:</strong> {booking.startDate.split("T")[0]}
+              </p>
+            )}
+            {booking.numberOfPeople !== undefined && (
+              <p className="mb-1">
+                <strong>Number Of People:</strong> {booking.numberOfPeople}
+              </p>
+            )}
+            {(booking.extraBusSeats ?? 0) > 0 && (
               <p className="mb-1">
                 <strong>Extra Bus Seats:</strong> {booking.extraBusSeats}
               </p>
             )}
-            {booking.customer.owner !== null && (
+            {booking.customer.owner != null && (
               <p className="mb-1">
                 <strong>Owner:</strong> {booking.customer.owner.name} -{" "}
                 {booking.customer.owner.phone}
@@ -88,21 +88,21 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
               <strong>Remaining:</strong>{" "}
               {(booking.price - booking.totalPaid).toLocaleString()} EGP
             </p>
-
-            <p className="mb-1">
-              <strong>End Date:</strong> {booking.endDate.split("T")[0]}
-            </p>
-            <p className="mb-1">
-              <strong>Booking Location:</strong> {booking.bookingLocation}
-            </p>
-            {booking.notes != "" && (
+            {booking.endDate && (
+              <p className="mb-1">
+                <strong>End Date:</strong> {booking.endDate.split("T")[0]}
+              </p>
+            )}
+            {booking.bookingLocation && (
+              <p className="mb-1">
+                <strong>Booking Location:</strong> {booking.bookingLocation}
+              </p>
+            )}
+            {booking.notes && (
               <p className="mb-1">
                 <strong>Notes:</strong> {booking.notes}
               </p>
             )}
-            {/* <p className="mb-1">
-            <strong>Status:</strong> {booking.status}
-          </p> */}
           </div>
         </div>
       </div>

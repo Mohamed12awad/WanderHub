@@ -5,7 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -13,13 +13,13 @@ import { useAuth } from "@/contexts/authContext";
 import { Link, useNavigate } from "react-router-dom";
 
 const STATUS_COLORS: Record<string, string> = {
-  lead: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  qualified: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  proposal: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  negotiation: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  won: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  lost: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  cancelled: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+  lead:        "bg-sky-500     text-white border-sky-500     dark:bg-sky-600     dark:border-sky-600",
+  qualified:   "bg-violet-500  text-white border-violet-500  dark:bg-violet-600  dark:border-violet-600",
+  proposal:    "bg-amber-500   text-white border-amber-500   dark:bg-amber-600   dark:border-amber-600",
+  negotiation: "bg-orange-500  text-white border-orange-500  dark:bg-orange-600  dark:border-orange-600",
+  won:         "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600",
+  lost:        "bg-rose-500    text-white border-rose-500    dark:bg-rose-600    dark:border-rose-600",
+  cancelled:   "bg-slate-400   text-white border-slate-400   dark:bg-slate-600   dark:border-slate-600",
 };
 
 interface DealRowProps {
@@ -37,26 +37,25 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, value, d
   const navigate = useNavigate();
 
   return (
-    <TableRow className="cursor-pointer" onClick={() => navigate(`/deals/${id}`)}>
+    <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/deals/${id}`)}>
       <TableCell className="font-medium">{title}</TableCell>
-      <TableCell>{customer}</TableCell>
+      <TableCell className="text-foreground/70">{customer}</TableCell>
       <TableCell>
-        <Badge className={STATUS_COLORS[status] ?? ""} variant="outline">
+        <Badge className={`${STATUS_COLORS[status] ?? ""} capitalize w-fit`} variant="outline">
           {status}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">{value}</TableCell>
-      <TableCell className="hidden md:table-cell">{date}</TableCell>
+      <TableCell className="hidden md:table-cell font-medium tabular-nums">{value}</TableCell>
+      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-haspopup="true" size="icon" variant="ghost">
+            <Button aria-haspopup="true" size="icon" variant="ghost" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
               <span className="sr-only">Toggle menu</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <Link to={`/deals/${id}`}>
               <DropdownMenuItem>View</DropdownMenuItem>
             </Link>
@@ -64,9 +63,12 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, value, d
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
             {["admin", "super admin"].includes(user!.role) && (
-              <DropdownMenuItem onClick={() => handleDelete(id)}>
-                Delete
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>

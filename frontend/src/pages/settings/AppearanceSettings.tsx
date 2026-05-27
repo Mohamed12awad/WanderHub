@@ -18,7 +18,7 @@ export default function AppearanceSettings() {
   const s = tr.settings;
 
   return (
-    <div className="p-6 max-w-2xl space-y-8">
+    <div className="p-6 max-w-2xl mx-auto space-y-8">
       <div>
         <h2 className="text-lg font-semibold">{s.appearance}</h2>
         <p className="text-sm text-muted-foreground mt-0.5">Customize the look and feel of your workspace.</p>

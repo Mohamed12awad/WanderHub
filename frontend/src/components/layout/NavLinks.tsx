@@ -11,8 +11,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useModules } from "@/contexts/ModulesContext";
 
 const NavSection: React.FC<{ label: string }> = ({ label }) => (
-  <div className="pt-3 pb-1 px-3">
-    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+  <div className="pt-4 pb-1 px-3">
+    <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">
       {label}
     </p>
   </div>

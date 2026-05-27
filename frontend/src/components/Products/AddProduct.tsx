@@ -3,10 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { createProduct } from "@/utils/api";
 import { Link, useNavigate } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
+import DynamicFields from "@/components/common/DynamicFields";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
+
+const DEFAULT_TYPES = ["service", "physical", "digital", "subscription"];
 
 const initialFormData = {
   name: "",
@@ -14,6 +21,7 @@ const initialFormData = {
   capacity: "",
   location: "",
   notes: "",
+  customFields: {} as Record<string, string>,
 };
 
 interface FormErrors {
@@ -26,6 +34,11 @@ const AddProduct = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { getFieldsForModule } = useWorkspaceSettings();
+  const typeOptions = getFieldsForModule("products")
+    .find((f) => f.isSystem && f.name === "type")
+    ?.options?.split(",").map((o) => o.trim()).filter(Boolean)
+    ?? DEFAULT_TYPES;
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -77,7 +90,16 @@ const AddProduct = () => {
             </div>
             <div className="flex flex-col col-span-2 md:col-span-1">
               <Label className="my-3" htmlFor="type">Type</Label>
-              <Input id="type" name="type" value={formData.type} onChange={handleChange} placeholder="e.g. Service, Physical, Subscription" />
+              <Select value={formData.type} onValueChange={(v) => { setFormData((prev) => ({ ...prev, type: v })); setErrors((prev) => ({ ...prev, type: "" })); }}>
+                <SelectTrigger id="type">
+                  <SelectValue placeholder="Select type…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt} className="capitalize">{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.type && <span className="text-red-500 text-sm">{errors.type}</span>}
             </div>
             <div className="flex flex-col col-span-2 md:col-span-1">
@@ -98,6 +120,12 @@ const AddProduct = () => {
                 className="border border-input rounded-lg p-2 min-h-[80px]"
               />
             </div>
+            <DynamicFields
+              module="products"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+            />
+
             <div className="col-span-2">
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? "Adding..." : "Add Product"}

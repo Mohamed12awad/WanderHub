@@ -20,28 +20,30 @@ export default function Sidebar() {
     : "?";
 
   return (
-    <aside className="hidden md:flex flex-col overflow-hidden border-e bg-[hsl(var(--sidebar-bg))] border-border row-start-1 row-end-3 print:hidden">
-      {/* Logo */}
-      <div className="flex h-[60px] items-center px-5 border-b dark:border-border shrink-0">
-        <Link to="/" className="flex items-center gap-2.5 font-bold text-foreground">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+    <aside className="hidden md:flex flex-col overflow-hidden bg-[hsl(var(--sidebar-bg))] border-e border-white/[0.06] row-start-1 row-end-3 print:hidden">
+      {/* Logo ─ same height as the header */}
+      <div className="flex h-[60px] items-center gap-3 px-5 shrink-0">
+        <Link to="/" className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/40">
             <img src="/logo.png" className="h-5 w-5" alt="WonderHub" />
           </div>
-          <span className="text-base">WonderHub</span>
+          <span className="text-sm font-semibold tracking-tight text-white truncate">
+            WonderHub
+          </span>
         </Link>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
+      {/* Navigation */}
+      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
         <NavLinks />
       </nav>
 
-      {/* Footer */}
-      <div className="border-t dark:border-border px-3 py-3 space-y-1 shrink-0">
+      {/* Footer — language + user */}
+      <div className="px-3 py-3 shrink-0 border-t border-white/[0.06] space-y-0.5">
         {/* Language picker */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            <button className="w-full flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium text-white/35 hover:bg-white/[0.07] hover:text-white/65 transition-colors">
               <Globe className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{LANGUAGES[lang].native}</span>
             </button>
@@ -61,25 +63,25 @@ export default function Sidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* User info */}
-        <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">
+        {/* User row */}
+        <div className="flex items-center gap-2.5 rounded-md px-3 py-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-foreground truncate">{user?.name}</p>
-            <p className="text-[10px] text-muted-foreground capitalize truncate">{user?.role}</p>
+            <p className="text-xs font-semibold text-white/75 truncate">{user?.name}</p>
+            <p className="text-[10px] text-white/35 capitalize truncate">{user?.role}</p>
           </div>
           <Link
             to="/settings"
-            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="shrink-0 text-white/30 hover:text-white/65 transition-colors"
             title="Settings"
           >
             <Settings className="h-3.5 w-3.5" />
           </Link>
           <button
             onClick={logout}
-            className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+            className="shrink-0 text-white/30 hover:text-red-400 transition-colors"
             title="Sign out"
           >
             <LogOut className="h-3.5 w-3.5" />

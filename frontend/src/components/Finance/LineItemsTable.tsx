@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Trash2, Plus } from "lucide-react";
+import { getProducts } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
 
 export interface LineItemRow {
   description: string;
@@ -28,6 +30,15 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
   const { tr } = useLanguage();
   const f = tr.finance;
 
+  const fetchProducts = useCallback(
+    (q: string) =>
+      getProducts({ page: 1, limit: 20, q }).then((r) => {
+        const list: any[] = (r.data as any).data ?? (Array.isArray(r.data) ? r.data : []);
+        return list.map((p) => ({ value: p._id, label: p.name, price: p.price }));
+      }),
+    [],
+  );
+
   const addRow = () =>
     onChange([...items, { description: "", quantity: 1, unitPrice: 0, discount: 0 }]);
 
@@ -35,10 +46,11 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
     onChange(items.filter((_, i) => i !== idx));
 
   const update = (idx: number, field: keyof LineItemRow, value: string | number) => {
-    const next = items.map((item, i) =>
-      i === idx ? { ...item, [field]: field === "description" ? value : Number(value) } : item
+    onChange(
+      items.map((item, i) =>
+        i === idx ? { ...item, [field]: field === "description" ? value : Number(value) } : item
+      )
     );
-    onChange(next);
   };
 
   return (
@@ -47,10 +59,11 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[180px]">{f.description}</TableHead>
-              <TableHead className="w-20">{f.quantity}</TableHead>
-              <TableHead className="w-28">{f.unitPrice}</TableHead>
-              <TableHead className="w-24">{f.discount}</TableHead>
+              <TableHead className="w-44">Product</TableHead>
+              <TableHead className="min-w-[160px]">{f.description}</TableHead>
+              <TableHead className="w-20 text-right">{f.quantity}</TableHead>
+              <TableHead className="w-28 text-right">{f.unitPrice}</TableHead>
+              <TableHead className="w-24 text-right">{f.discount}</TableHead>
               <TableHead className="w-28 text-right">{f.itemTotal}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -58,13 +71,33 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
           <TableBody>
             {items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
                   {f.noItems}
                 </TableCell>
               </TableRow>
             )}
             {items.map((item, idx) => (
               <TableRow key={idx}>
+                <TableCell>
+                  <AsyncSearchableSelect
+                    value=""
+                    onChange={() => {}}
+                    onSelectItem={(p) => {
+                      const product = p as any;
+                      onChange(
+                        items.map((row, i) =>
+                          i === idx
+                            ? { ...row, description: p.label, unitPrice: product.price ?? row.unitPrice }
+                            : row
+                        )
+                      );
+                    }}
+                    fetchFn={fetchProducts}
+                    placeholder="Pick…"
+                    searchPlaceholder="Search products…"
+                    className="h-8 text-xs"
+                  />
+                </TableCell>
                 <TableCell>
                   <Input
                     value={item.description}
@@ -79,7 +112,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     min={0}
                     value={item.quantity}
                     onChange={(e) => update(idx, "quantity", e.target.value)}
-                    className="h-8"
+                    className="h-8 text-right"
                   />
                 </TableCell>
                 <TableCell>
@@ -89,7 +122,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     step="0.01"
                     value={item.unitPrice}
                     onChange={(e) => update(idx, "unitPrice", e.target.value)}
-                    className="h-8"
+                    className="h-8 text-right"
                   />
                 </TableCell>
                 <TableCell>
@@ -99,7 +132,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     max={100}
                     value={item.discount}
                     onChange={(e) => update(idx, "discount", e.target.value)}
-                    className="h-8"
+                    className="h-8 text-right"
                   />
                 </TableCell>
                 <TableCell className="text-right font-medium">

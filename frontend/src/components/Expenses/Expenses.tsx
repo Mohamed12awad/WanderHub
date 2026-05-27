@@ -1,5 +1,5 @@
 import { GenericTable } from "@/components/common/GenericTable";
-import BookingRow from "./ExpenseRow";
+import ExpenseRow from "./ExpenseRow";
 import { deleteExpense, getExpenses } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -23,31 +23,7 @@ export interface ExpenseReportData {
 }
 
 const EXPENSE_FILTERS = [
-  {
-    label: "Category",
-    field: "category",
-    type: "select" as const,
-    options: [
-      { value: "marketing", label: "Marketing & Advertising" },
-      { value: "transportation", label: "Transportation" },
-      { value: "utilities", label: "Utilities" },
-      { value: "meals", label: "Meals" },
-      { value: "lodging", label: "Lodging" },
-      { value: "travel", label: "Travel" },
-      { value: "supplies", label: "Supplies" },
-      { value: "others", label: "Others" },
-    ],
-  },
-  {
-    label: "Status",
-    field: "approved",
-    type: "select" as const,
-    options: [
-      { value: "true", label: "Approved" },
-      { value: "false", label: "Pending" },
-    ],
-  },
-  { label: "Date", field: "date", type: "date-range" as const },
+  { label: "Created Date", field: "createdAt", type: "date-range" as const },
 ];
 
 export function Expenses() {
@@ -57,18 +33,26 @@ export function Expenses() {
   return (
     <GenericTable<ExpenseReportData>
       queryKey="expenses"
-      fetchData={({ page, limit, q, filters }) => getExpenses({ page, limit, q, ...filters })}
+      fetchData={({ page, limit, q, filters, sort, dir }) => getExpenses({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
       deleteData={deleteExpense}
       headers={e.headers}
+      sortableHeaders={["Report", "Total", "Created"]}
+      quickStatusFilter={{
+        field: "approved",
+        options: [
+          { value: "true",  label: "Approved" },
+          { value: "false", label: "Pending" },
+        ],
+      }}
       renderRow={(item, handleDelete) => (
-        <BookingRow
+        <ExpenseRow
           key={item._id}
-          name={item.title}
-          state={item.approved ? "Approved" : "Pending"}
-          price={item.expenses.reduce((t, i) => t + i.amount, 0)}
-          totalSales={item.userId?.name ?? "—"}
-          date={new Date(item.createdAt).toLocaleString()}
           id={item._id}
+          title={item.title}
+          total={item.expenses.reduce((t, i) => t + i.amount, 0)}
+          approved={item.approved}
+          owner={item.userId?.name ?? "—"}
+          date={new Date(item.createdAt).toLocaleDateString()}
           handleDelete={handleDelete}
         />
       )}
@@ -79,6 +63,7 @@ export function Expenses() {
       emptyMessage={e.empty}
       noSearchMessage={e.noSearch}
       filterConfigs={EXPENSE_FILTERS}
+      module="expenses"
       exportConfig={{
         filename: "expenses",
         getRow: (ex) => ({

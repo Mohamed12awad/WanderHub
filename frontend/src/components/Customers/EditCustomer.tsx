@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,10 +13,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { updateCustomer, getCustomerById, getUsers } from "@/utils/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import DynamicFields from "@/components/common/DynamicFields";
 import { CircleArrowLeft } from "lucide-react";
 import { Customer } from "@/types/types";
 import { useAuth } from "@/contexts/authContext";
-// import { useQuery } from "react-query";
 
 interface User {
   _id: string;
@@ -60,6 +61,7 @@ const initialFormData = {
   status: "Draft",
   owner: "",
   notes: "",
+  customFields: {} as Record<string, string>,
 };
 
 const EditCustomer = () => {
@@ -68,6 +70,7 @@ const EditCustomer = () => {
   const { id } = useParams<{ id: string }>();
   const [users, setUsers] = useState([]);
   const { user } = useAuth();
+  const originalRef = useRef<string | null>(null);
   //   const { data: users } = useQuery("users", getUsers);
   const navigate = useNavigate();
 
@@ -79,13 +82,24 @@ const EditCustomer = () => {
         const { data: users } = await getUsers();
         setUsers(users);
         const { data } = await getCustomerById(id);
-        setFormData({ ...data, owner: data.owner._id || "" });
+        const loaded = { ...initialFormData, ...data, owner: data.owner?._id || "", customFields: data.customFields ?? {} };
+        setFormData(loaded);
+        originalRef.current = JSON.stringify(loaded);
       } catch (error) {
         console.error("Error fetching customer data:", error);
       }
     };
     fetchCustomerData();
   }, [id]);
+
+  const isDirty = originalRef.current !== null && JSON.stringify(formData) !== originalRef.current;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -133,18 +147,23 @@ const EditCustomer = () => {
     <main className="p-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex">
-            <Link to="/customers">
-              <CircleArrowLeft className="me-3 " />
+          <CardTitle className="flex items-center gap-3">
+            <Link to={`/customers/${id}`}>
+              <CircleArrowLeft className="me-3" />
             </Link>
             Edit Customer
+            {isDirty && (
+              <Badge variant="outline" className="text-xs font-normal text-amber-600 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                Unsaved changes
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Personal Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Personal Information
               </h2>
               <div className="flex flex-col">
@@ -197,7 +216,7 @@ const EditCustomer = () => {
 
             {/* Work Related */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">Work Related</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Work Related</h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="location">
                   Location
@@ -282,7 +301,7 @@ const EditCustomer = () => {
 
             {/* Address Information */}
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Address Information
               </h2>
               <div className="flex flex-col">
@@ -344,7 +363,7 @@ const EditCustomer = () => {
 
             {/* Identification Information */}
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Identification Information
               </h2>
               <div className="flex flex-col">
@@ -404,7 +423,7 @@ const EditCustomer = () => {
 
             {/* Emergency Contact */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">Emergency Contact</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Emergency Contact</h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="emergencyContact.name">
                   Name
@@ -442,7 +461,7 @@ const EditCustomer = () => {
 
             {/* Loyalty Program */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">Loyalty Program</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Loyalty Program</h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="loyaltyProgram.memberId">
                   Member ID
@@ -469,7 +488,7 @@ const EditCustomer = () => {
 
             {/* Payment Information */}
             <div>
-              <h2 className="text-lg font-semibold mb-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                 Payment Information
               </h2>
               <div className="flex flex-col">
@@ -510,6 +529,12 @@ const EditCustomer = () => {
                 />
               </div>
             </div>
+
+            <DynamicFields
+              module="customers"
+              values={formData.customFields}
+              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+            />
 
             <Button type="submit" className="col-span-2" disabled={isLoading}>
               {isLoading ? "Updating..." : "Update Customer"}

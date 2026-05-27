@@ -89,7 +89,7 @@ export const deletePayment = (PaymentId: string): Promise<void> =>
 export const getRoles = () => api.get("/roles");
 
 // User API Requests
-export const getUsers = (params?: { page?: number; limit?: number; q?: string }) =>
+export const getUsers = (params?: Record<string, string | number | undefined>) =>
   api.get("/users", { params });
 export const getUserById = (id: string) => api.get(`/users/${id}`);
 export const createUser = (data: UserData) => api.post("/users", data);
@@ -110,7 +110,7 @@ export const updateCustomer = (customerId: string, data: Customer) =>
   api.put(`/customers/${customerId}`, data);
 
 // Products API Requests
-export const getProducts = (params?: { page?: number; limit?: number; q?: string }) =>
+export const getProducts = (params?: Record<string, string | number | undefined>) =>
   api.get("/products", { params });
 export const getProductById = (id: string) => api.get(`/products/${id}`);
 export const createProduct = (data: Product) => api.post("/products", data);
@@ -245,6 +245,21 @@ export const recordInvoicePayment = (
 ) => api.post(`/finance/invoices/${invoiceId}/payments`, data);
 export const deleteInvoicePayment = (invoiceId: string, paymentId: string): Promise<void> =>
   api.delete(`/finance/invoices/${invoiceId}/payments/${paymentId}`);
+export const editInvoicePayment = (
+  invoiceId: string,
+  paymentId: string,
+  data: { amount?: number; currency?: string; date?: string; method?: string; reference?: string; notes?: string; accountId?: string }
+) => api.patch(`/finance/invoices/${invoiceId}/payments/${paymentId}`, data);
+
+// Accounts API Requests
+export const getAccounts = () => api.get("/accounts");
+export const createAccount = (data: { name: string; type: string; currency: string; balance?: number; notes?: string }) =>
+  api.post("/accounts", data);
+export const updateAccount = (id: string, data: { name?: string; type?: string; currency?: string; balance?: number; notes?: string }) =>
+  api.patch(`/accounts/${id}`, data);
+export const deleteAccount = (id: string): Promise<void> => api.delete(`/accounts/${id}`);
+export const getAccountStatement = (id: string, params?: { page?: number; limit?: number }) =>
+  api.get(`/accounts/${id}/statement`, { params });
 
 // Reports — Analytics
 export const getRevenueReport = (params?: { startDate?: string; endDate?: string }) =>
@@ -268,3 +283,9 @@ export const createQuoteFromDeal = (dealId: string) =>
 export const getApprovalSettings = () => api.get("/settings/approvals");
 export const updateApprovalSettings = (approvals: { module: string; approverRoles: string[]; enabled: boolean }[]) =>
   api.put("/settings/approvals", { approvals });
+
+export const getWorkspaceSettings = () => api.get("/settings/workspace");
+export const updateWorkspaceSettings = (data: {
+  fieldGroups?: { module: string; fields: { id: string; name: string; label: string; type: string; required: boolean; options?: string }[] }[];
+  moduleSettings?: { module: string; enabled: boolean }[];
+}) => api.put("/settings/workspace", data);

@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport,
+  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense,
 } from "@/utils/api";
-import { Link, useParams } from "react-router-dom";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle } from "lucide-react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { CircleArrowLeft, Edit, CheckCircle, XCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
@@ -47,10 +51,12 @@ interface ExpenseData {
 const ViewExpense = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { id: expenseId } = useParams<{ id: string }>();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const { isApprovalEnabled } = useApprovalConfig();
+  const canDelete = ["admin", "super admin"].includes(user!.role);
 
   const { data: expenseData, isLoading, error } = useQuery(
     ["expenses", expenseId],
@@ -92,6 +98,16 @@ const ViewExpense = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Delete this expense report? This action cannot be undone.")) return;
+    try {
+      await deleteExpense(expenseId!);
+      navigate("/expenses");
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+  };
+
   if (isLoading) return <LoadingSpinner loading />;
   if (error || !formData) return <div className="p-4 text-sm text-destructive">Could not load expense report.</div>;
 
@@ -111,83 +127,75 @@ const ViewExpense = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between flex-wrap gap-3">
-          <CardTitle className="flex items-center gap-2">
-            <Link to="/expenses"><CircleArrowLeft /></Link>
-            View Expense Report
-          </CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <PermissionGate require="expenses:approve">
-              {approvalStatus !== "approved" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
-                  onClick={handleApprove}
-                  disabled={actionLoading}
-                >
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Approve
-                </Button>
-              )}
-              {approvalStatus !== "rejected" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10"
-                  onClick={() => setRejectOpen(true)}
-                  disabled={actionLoading}
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                  Reject
-                </Button>
-              )}
-            </PermissionGate>
+          <div className="min-w-0">
+            <AppBreadcrumb crumbs={[{ label: "Expenses", href: "/expenses" }, { label: formData.title }]} />
+            <CardTitle className="flex items-center gap-2 mt-1">
+              <Link to="/expenses"><CircleArrowLeft /></Link>
+              {formData.title}
+            </CardTitle>
+          </div>
+          <div className="flex gap-2 shrink-0">
             <Link to={canEdit ? `/expenses/${expenseId}/edit` : "#"}>
-              <Button size="sm" className="h-8 px-3" disabled={!canEdit} title={!canEdit ? "Record is pending approval and cannot be edited." : undefined}>
+              <Button size="sm" className="h-8 px-4" disabled={!canEdit} title={!canEdit ? "Record is pending approval and cannot be edited." : undefined}>
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">More actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <PermissionGate require="expenses:approve">
+                  {approvalStatus !== "approved" && (
+                    <DropdownMenuItem onClick={handleApprove} disabled={actionLoading} className="text-green-600 focus:text-green-600">
+                      <CheckCircle className="h-3.5 w-3.5 me-2" />Approve
+                    </DropdownMenuItem>
+                  )}
+                  {approvalStatus !== "rejected" && (
+                    <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
+                      <XCircle className="h-3.5 w-3.5 me-2" />Reject
+                    </DropdownMenuItem>
+                  )}
+                </PermissionGate>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5 me-2" />Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h2 className="text-base font-semibold mb-3">Report Information</h2>
-              <div className="grid grid-cols-2 mb-2">
-                <Label className="my-1 text-muted-foreground">Title</Label>
-                <p className="my-1">{formData.title}</p>
-              </div>
-              <div className="grid grid-cols-2 mb-2">
-                <Label className="my-1 text-muted-foreground">Approval</Label>
-                <div className="my-1">
-                  <ApprovalBadge status={approvalStatus} rejectionReason={formData.rejectionReason} />
-                </div>
-              </div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Report Information</h2>
+              <InfoRow label="Title" value={formData.title} />
+              <InfoRow label="Approval">
+                <ApprovalBadge status={approvalStatus} rejectionReason={formData.rejectionReason} />
+              </InfoRow>
               {formData.approvedBy && (
-                <div className="grid grid-cols-2 mb-2">
-                  <Label className="my-1 text-muted-foreground">
-                    {approvalStatus === "rejected" ? "Rejected by" : "Approved by"}
-                  </Label>
-                  <p className="my-1 text-sm">
+                <InfoRow label={approvalStatus === "rejected" ? "Rejected by" : "Approved by"}>
+                  <span className="text-sm">
                     {typeof formData.approvedBy === "object" ? formData.approvedBy.name : "—"}
                     {formData.approvedAt && (
-                      <span className="text-muted-foreground ms-1">
-                        · {new Date(formData.approvedAt).toLocaleDateString()}
-                      </span>
+                      <span className="text-muted-foreground ms-1">· {new Date(formData.approvedAt).toLocaleDateString()}</span>
                     )}
-                  </p>
-                </div>
+                  </span>
+                </InfoRow>
               )}
-              <div className="grid grid-cols-2 mb-2">
-                <Label className="my-1 text-muted-foreground">Total</Label>
-                <p className="my-1 font-semibold">
+              <InfoRow label="Total">
+                <span className="text-sm font-semibold">
                   {formData.expenses.reduce((t, i) => t + i.amount, 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 mb-2">
-                <Label className="my-1 text-muted-foreground">Created At</Label>
-                <p className="my-1">{new Date(formData.createdAt).toLocaleDateString()}</p>
-              </div>
+                </span>
+              </InfoRow>
+              <InfoRow label="Created At" value={new Date(formData.createdAt).toLocaleDateString()} />
             </div>
           </div>
         </CardContent>
@@ -195,7 +203,8 @@ const ViewExpense = () => {
 
       <Card>
         <CardContent className="py-5">
-          <div className="overflow-x-auto">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Expense Items</h2>
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -204,15 +213,15 @@ const ViewExpense = () => {
                   <TableHead className="hidden md:table-cell">Date</TableHead>
                   <TableHead className="hidden md:table-cell">Category</TableHead>
                   <TableHead>Beneficiary</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  {canDeleteItem && <TableHead><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {formData.expenses.map((expense) => (
                   <TableRow key={expense._id}>
                     <TableCell>{expense.description}</TableCell>
-                    <TableCell>{expense.amount.toLocaleString()}</TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell className="tabular-nums">{expense.amount.toLocaleString()}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
                       {new Date(expense.date).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="hidden md:table-cell capitalize">{expense.category}</TableCell>
@@ -220,11 +229,12 @@ const ViewExpense = () => {
                     {canDeleteItem && (
                       <TableCell>
                         <Button
-                          variant="destructive"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
                           onClick={() => handleDeleteItem(expenseId!, expense._id)}
                         >
-                          Delete
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
                     )}
@@ -251,5 +261,14 @@ const ViewExpense = () => {
     </main>
   );
 };
+
+const InfoRow: React.FC<{ label: string; value?: string | number | null; children?: React.ReactNode }> = ({ label, value, children }) => (
+  <div className="mb-2 grid grid-cols-[160px_1fr] items-start gap-2">
+    <Label className="text-sm font-medium text-foreground/60 pt-0.5">{label}</Label>
+    <div className="flex items-start">
+      {children ?? <p className="text-sm text-foreground">{value ?? "—"}</p>}
+    </div>
+  </div>
+);
 
 export default ViewExpense;

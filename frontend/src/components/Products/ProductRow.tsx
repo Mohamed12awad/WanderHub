@@ -5,7 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -29,24 +29,23 @@ const ProductRow: React.FC<ProductRowProps> = ({
   const navigate = useNavigate();
 
   return (
-    <TableRow className="cursor-pointer" onClick={() => navigate(`/products/${id}`)}>
+    <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/products/${id}`)}>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="hidden md:table-cell">
         <Badge variant="outline">{type}</Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">{capacity}</TableCell>
-      <TableCell className="hidden md:table-cell capitalize">{location}</TableCell>
-      <TableCell className="hidden md:table-cell">{date}</TableCell>
+      <TableCell className="hidden md:table-cell font-medium tabular-nums">{capacity}</TableCell>
+      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{location}</TableCell>
+      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-haspopup="true" size="icon" variant="ghost">
+            <Button aria-haspopup="true" size="icon" variant="ghost" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
               <span className="sr-only">Toggle menu</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <Link to={`/products/${id}`}>
               <DropdownMenuItem>View</DropdownMenuItem>
             </Link>
@@ -54,9 +53,12 @@ const ProductRow: React.FC<ProductRowProps> = ({
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
             {["admin", "super admin"].includes(user!.role) && (
-              <DropdownMenuItem onClick={() => handleDelete(id)}>
-                Delete
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>

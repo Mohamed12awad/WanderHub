@@ -1,155 +1,176 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useQuery } from "react-query";
-import { useSearchParams } from "react-router-dom";
-import { getPayments } from "@/utils/api";
-import { Pagination } from "@/components/ui/pagination";
-import LoadingSpinner from "@/components/common/spinner";
+import React, { useRef, useState, useCallback } from "react";
+import { useQueryClient } from "react-query";
+import { getPayments, deleteInvoicePayment } from "@/utils/api";
+import { GenericTable, FilterConfig } from "@/components/common/GenericTable";
+import { useAuth } from "@/contexts/authContext";
+import RecordPaymentDialog from "@/components/Finance/RecordPaymentDialog";
+import PaymentRow, { PaymentRecord } from "@/components/Finance/PaymentRow";
+import { InvoicePayment } from "@/types/types";
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
+const PAYMENT_METHODS = ["cash", "bank_transfer", "card", "cheque", "other"];
 const METHOD_LABELS: Record<string, string> = {
-  cash: "Cash",
-  bank_transfer: "Bank Transfer",
-  card: "Card",
-  cheque: "Cheque",
-  other: "Other",
+  cash: "Cash", bank_transfer: "Bank Transfer", card: "Card", cheque: "Cheque", other: "Other",
 };
 
-const METHOD_COLORS: Record<string, string> = {
-  cash: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  bank_transfer: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  card: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  cheque: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  other: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+const PAYMENT_FILTER_CONFIGS: FilterConfig[] = [
+  {
+    label: "Method",
+    field: "method",
+    type: "select",
+    options: PAYMENT_METHODS.map((m) => ({ label: METHOD_LABELS[m], value: m })),
+  },
+  {
+    label: "Currency",
+    field: "currency",
+    type: "select",
+    options: CURRENCIES.map((c) => ({ label: c, value: c })),
+  },
+  {
+    label: "Amount",
+    field: "amount",
+    type: "number-range",
+  },
+  {
+    label: "Date",
+    field: "date",
+    type: "date-range",
+  },
+];
+
+// ── Client-side fetch wrapper ─────────────────────────────────────────────────
+
+type TableParams = {
+  page: number;
+  limit: number;
+  q: string;
+  filters?: Record<string, string>;
+  sort?: string;
+  dir?: "asc" | "desc";
 };
 
-interface PaymentRecord {
-  _id: string;
-  invoice: {
-    _id: string;
-    invoiceNumber: string;
-    title: string;
-    customer: { _id: string; name: string };
-  };
-  amount: number;
-  currency: string;
-  date: string;
-  method: string;
-  reference?: string;
-  createdBy?: { name: string };
+function paginate<T>(list: T[], page: number, limit: number) {
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const data = list.slice((page - 1) * limit, page * limit);
+  return { data, total, page, pages };
 }
 
+// ── Payments Page ─────────────────────────────────────────────────────────────
+
 const Payments: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const limit = Math.max(10, parseInt(searchParams.get("limit") ?? "25"));
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
+  const invoiceMapRef = useRef<Map<string, string>>(new Map());
 
-  const setPage = (p: number) => setSearchParams((prev) => { prev.set("page", String(p)); return prev; });
-  const setLimit = (l: number) => setSearchParams((prev) => { prev.set("limit", String(l)); prev.set("page", "1"); return prev; });
+  const fetchPaymentsForTable = useCallback(async (params: TableParams): Promise<{ data: ReturnType<typeof paginate<PaymentRecord>> }> => {
+    const resp = await getPayments({ page: 1, limit: 1000 });
+    let list: PaymentRecord[] = resp.data?.data ?? [];
 
-  const { data, isLoading } = useQuery(
-    ["payments", page, limit],
-    () => getPayments({ page, limit }),
-    { keepPreviousData: true }
-  );
+    invoiceMapRef.current.clear();
+    for (const p of list) invoiceMapRef.current.set(p._id, p.invoice._id);
 
-  const payments: PaymentRecord[] = data?.data?.data ?? [];
-  const paginationInfo = data?.data?.pages != null
-    ? { page: data.data.page, pages: data.data.pages, total: data.data.total }
-    : null;
+    if (params.q) {
+      const s = params.q.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.invoice?.invoiceNumber?.toLowerCase().includes(s) ||
+          p.invoice?.customer?.name?.toLowerCase().includes(s) ||
+          p.invoice?.title?.toLowerCase().includes(s) ||
+          p.reference?.toLowerCase().includes(s),
+      );
+    }
+
+    const f = params.filters ?? {};
+    if (f.method) list = list.filter((p) => p.method === f.method);
+    if (f.currency) list = list.filter((p) => p.currency === f.currency);
+    if (f.amount_min) list = list.filter((p) => p.amount >= Number(f.amount_min));
+    if (f.amount_max) list = list.filter((p) => p.amount <= Number(f.amount_max));
+    if (f.date_from) list = list.filter((p) => p.date >= f.date_from);
+    if (f.date_to) list = list.filter((p) => p.date <= f.date_to + "T23:59:59");
+
+    if (params.sort) {
+      const key = { Date: "date", Amount: "amount" }[params.sort] as keyof PaymentRecord | undefined;
+      if (key) {
+        list = [...list].sort((a, b) => {
+          const va = a[key] ?? "";
+          const vb = b[key] ?? "";
+          const d = params.dir ?? "desc";
+          if (va < vb) return d === "asc" ? -1 : 1;
+          if (va > vb) return d === "asc" ? 1 : -1;
+          return 0;
+        });
+      }
+    }
+
+    return { data: paginate(list, params.page, params.limit) };
+  }, []);
+
+  const deletePayment = useCallback(async (paymentId: string) => {
+    const invoiceId = invoiceMapRef.current.get(paymentId);
+    if (!invoiceId) throw new Error("Invoice not found for payment");
+    await deleteInvoicePayment(invoiceId, paymentId);
+  }, []);
+
+  const toInvoicePayment = (p: PaymentRecord): InvoicePayment => ({
+    _id: p._id,
+    invoice: p.invoice._id,
+    amount: p.amount,
+    currency: p.currency,
+    date: p.date,
+    method: p.method as InvoicePayment["method"],
+    reference: p.reference,
+    notes: p.notes,
+    accountId: p.accountId,
+    account: p.account,
+    createdBy: p.createdBy ?? { _id: "", name: "" },
+    createdAt: p.createdAt,
+  });
 
   return (
-    <main className="p-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Payments</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <LoadingSpinner loading />
-          ) : payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No payments recorded yet.</p>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead className="hidden md:table-cell">Reference</TableHead>
-                      <TableHead className="hidden md:table-cell">Recorded By</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.map((p) => (
-                      <TableRow key={p._id}>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          {new Date(p.date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {p.invoice?.customer ? (
-                            <Link
-                              to={`/customers/${p.invoice.customer._id}`}
-                              className="text-blue-500 hover:underline"
-                            >
-                              {p.invoice.customer.name}
-                            </Link>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {p.invoice ? (
-                            <Link
-                              to={`/finance/invoices/${p.invoice._id}`}
-                              className="font-mono text-sm text-blue-500 hover:underline"
-                            >
-                              {p.invoice.invoiceNumber}
-                            </Link>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium whitespace-nowrap">
-                          {p.amount.toLocaleString()} {p.currency}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={METHOD_COLORS[p.method] ?? METHOD_COLORS.other}>
-                            {METHOD_LABELS[p.method] ?? p.method}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                          {p.reference ?? "—"}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                          {p.createdBy?.name ?? "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {paginationInfo && (
-                <div className="mt-4">
-                  <Pagination
-                    page={paginationInfo.page}
-                    pages={paginationInfo.pages}
-                    total={paginationInfo.total}
-                    limit={limit}
-                    onPageChange={setPage}
-                    onLimitChange={setLimit}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+    <>
+      <GenericTable<PaymentRecord>
+        queryKey="payments-gt"
+        fetchData={fetchPaymentsForTable}
+        deleteData={deletePayment}
+        headers={["Date", "Customer", "Invoice", "Amount", "Method", "Reference", "Recorded By"]}
+        sortableHeaders={["Date", "Amount"]}
+        filterConfigs={PAYMENT_FILTER_CONFIGS}
+        renderRow={(item, handleDelete) => (
+          <PaymentRow
+            key={item._id}
+            item={item}
+            handleDelete={handleDelete}
+            handleEdit={setEditingPayment}
+            canDelete={canDelete}
+          />
+        )}
+        title="Payments"
+        description="All recorded invoice payments"
+        addLink="/finance/invoices"
+        addLabel="View Invoices"
+        emptyMessage="No payments recorded yet"
+      />
+
+      {editingPayment && (
+        <RecordPaymentDialog
+          mode="edit"
+          invoiceId={editingPayment.invoice._id}
+          currency={editingPayment.currency}
+          payment={toInvoicePayment(editingPayment)}
+          open={!!editingPayment}
+          onOpenChange={(o) => { if (!o) setEditingPayment(null); }}
+          onSuccess={() => {
+            setEditingPayment(null);
+            queryClient.invalidateQueries("payments-gt");
+          }}
+        />
+      )}
+    </>
   );
 };
 
