@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
+import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 
 interface RawLineItem {
@@ -45,7 +46,21 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly numberSequence: NumberSequenceService,
+    private readonly timeline: TimelineService,
   ) {}
+
+  private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
+    const config = await this.prisma.workspaceConfig.findFirst();
+    const approvals = (config?.approvals as any[]) ?? [];
+    const cfg = approvals.find((c: any) => c.module === module);
+    return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
+  }
+
+  private canUserApprove(approverRoles: string[], userRole: string): boolean {
+    if (['admin', 'super admin'].includes(userRole)) return true;
+    if (!approverRoles.length) return true;
+    return approverRoles.includes(userRole);
+  }
 
   // ── Quotes ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +82,7 @@ export class FinanceService {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');
+    const { enabled } = await this.getApprovalConfig('quotes');
     const quote = await this.prisma.quote.create({
       data: {
         ...rest,
@@ -75,6 +91,7 @@ export class FinanceService {
         subtotal: totals.subtotal,
         tax: totals.tax,
         total: totals.total,
+        approvalStatus: enabled ? 'pending' : 'approved',
         customerId: typeof customer === 'object' ? customer?._id : customer,
         ...(deal ? { dealId: typeof deal === 'object' ? deal?._id : deal } : {}),
         createdById: userId,
@@ -82,6 +99,7 @@ export class FinanceService {
       } as any,
       include: QUOTE_INCLUDE,
     });
+    await this.timeline.log('quote.created', `Quote ${quote.quoteNumber} created`, quote.id, 'Quote', { total: quote.total, currency: quote.currency }, userId);
     return toClient(quote);
   }
 
@@ -90,6 +108,7 @@ export class FinanceService {
     if (!quote) return null;
     const { items, taxRate, customer, deal, _id, id: _id2, createdAt, updatedAt, ...rest } = body;
     const data: any = { ...rest };
+    if (quote.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (items) {
       const tr = taxRate !== undefined ? taxRate : quote.taxRate;
       const totals = calcTotals(items, tr);
@@ -106,9 +125,11 @@ export class FinanceService {
     return toClient(updated);
   }
 
-  async approveQuote(id: string, userId: string) {
+  async approveQuote(id: string, userId: string, userRole: string) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
     if (!quote) return null;
+    const { approverRoles } = await this.getApprovalConfig('quotes');
+    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -117,9 +138,11 @@ export class FinanceService {
     return toClient(updated);
   }
 
-  async rejectQuote(id: string, userId: string, reason: string) {
+  async rejectQuote(id: string, userId: string, reason: string, userRole: string) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
     if (!quote) return null;
+    const { approverRoles } = await this.getApprovalConfig('quotes');
+    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -217,6 +240,7 @@ export class FinanceService {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
+    const { enabled } = await this.getApprovalConfig('invoices');
     const invoice = await this.prisma.invoice.create({
       data: {
         ...rest,
@@ -225,6 +249,7 @@ export class FinanceService {
         subtotal: totals.subtotal,
         tax: totals.tax,
         total: totals.total,
+        approvalStatus: enabled ? 'pending' : 'approved',
         issueDate: rest.issueDate ? new Date(rest.issueDate) : new Date(),
         customerId: typeof customer === 'object' ? customer?._id : customer,
         ...(deal ? { dealId: typeof deal === 'object' ? deal?._id : deal } : {}),
@@ -233,6 +258,7 @@ export class FinanceService {
       } as any,
       include: INVOICE_INCLUDE,
     });
+    await this.timeline.log('invoice.created', `Invoice ${invoice.invoiceNumber} created`, invoice.id, 'Invoice', { total: invoice.total, currency: invoice.currency }, userId);
     return toClient(invoice);
   }
 
@@ -241,6 +267,7 @@ export class FinanceService {
     if (!invoice) return null;
     const { items, taxRate, customer, deal, _id, id: _id2, createdAt, updatedAt, payments, fromQuote, ...rest } = body;
     const data: any = { ...rest };
+    if (invoice.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (items) {
       const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
       const totals = calcTotals(items, tr);
@@ -263,9 +290,11 @@ export class FinanceService {
     return true;
   }
 
-  async approveInvoice(id: string, userId: string) {
+  async approveInvoice(id: string, userId: string, userRole: string) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) return null;
+    const { approverRoles } = await this.getApprovalConfig('invoices');
+    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -274,9 +303,11 @@ export class FinanceService {
     return toClient(updated);
   }
 
-  async rejectInvoice(id: string, userId: string, reason: string) {
+  async rejectInvoice(id: string, userId: string, reason: string, userRole: string) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) return null;
+    const { approverRoles } = await this.getApprovalConfig('invoices');
+    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -307,6 +338,7 @@ export class FinanceService {
       await this.prisma.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
     }
 
+    await this.timeline.log('payment.received', `Payment of ${payment.amount} ${payment.currency ?? invoice.currency} recorded`, invoiceId, 'Invoice', { amount: payment.amount, currency: payment.currency ?? invoice.currency, method: payment.method }, userId);
     return { payment: toClient(payment), invoice: toClient(updatedInvoice) };
   }
 

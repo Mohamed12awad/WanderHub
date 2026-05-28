@@ -9,14 +9,17 @@ import {
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useModules } from "@/contexts/ModulesContext";
+import { useSidebar } from "@/contexts/SidebarContext";
 
-const NavSection: React.FC<{ label: string }> = ({ label }) => (
-  <div className="pt-4 pb-1 px-3">
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">
-      {label}
-    </p>
-  </div>
-);
+const NavSection: React.FC<{ label: string }> = ({ label }) => {
+  const { collapsed } = useSidebar();
+  if (collapsed) return <div className="pt-3 border-t border-white/[0.06] mx-2" />;
+  return (
+    <div className="pt-4 pb-1 px-3">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">{label}</p>
+    </div>
+  );
+};
 
 function NavLinks() {
   const { user } = useAuth();

@@ -34,6 +34,7 @@ export interface Customer {
   mobile: string;
   email: string;
   location: string;
+  source?: string;
   owner: Owner | string;
   status: string;
   notes: string;
@@ -70,14 +71,17 @@ export interface ErrorResponse {
 export interface DealData {
   title?: string;
   customer: string;
-  product: string;
+  category?: string;
+  owner?: string;
+  dealType?: string;
   expectedCloseDate: Date;
   price: number;
   currency: string;
-  totalPaid: number;
   status: string;
-  quantity: number;
+  priority?: string;
+  probability?: number;
   source: string;
+  lostReason?: string;
   notes: string;
   customFields?: Record<string, string>;
 }
@@ -117,6 +121,7 @@ export interface LogEntry {
   method: string;
   endpoint: string;
   recordId?: string;
+  recordName?: string;
   timestamp: string;
 }
 
@@ -131,6 +136,8 @@ export interface UserData {
   password?: string;
   name?: string;
   role?: string;
+  phone?: string;
+  reportsTo?: string | null;
 }
 
 export interface PaymentData {
@@ -190,11 +197,14 @@ export interface Note {
 }
 
 export type TimelineEventType =
-  | "deal.created" | "deal.stage_changed" | "deal.won" | "deal.lost"
+  | "deal.created" | "deal.updated" | "deal.stage_changed" | "deal.won" | "deal.lost"
   | "payment.received" | "payment.deleted"
   | "task.created" | "task.completed"
   | "note.added"
-  | "contact.created" | "activity.logged" | "custom";
+  | "contact.created" | "contact.updated"
+  | "quote.created" | "invoice.created"
+  | "expense.created" | "expense.approved" | "expense.rejected"
+  | "activity.logged" | "custom";
 
 export interface TimelineItem {
   _id: string;
@@ -204,7 +214,7 @@ export interface TimelineItem {
   title: string;
   payload?: Record<string, unknown>;
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: "Customer" | "Deal" | "Quote" | "Invoice" | "Expense" | "Product" | "Task";
   triggeredBy?: { _id: string; name: string };
   isSystem?: boolean;
   createdAt: string;
@@ -304,6 +314,7 @@ export interface Invoice {
   total: number;
   totalPaid: number;
   currency: string;
+  exchangeRate?: number;
   issueDate: string;
   dueDate?: string;
   notes?: string;

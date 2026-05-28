@@ -13,7 +13,7 @@ export class TimelineService {
     eventType: string,
     title: string,
     linkedTo: string,
-    linkedModel: 'Customer' | 'Deal',
+    linkedModel: 'Customer' | 'Deal' | 'Quote' | 'Invoice' | 'Expense' | 'Product' | 'Task',
     payload?: Record<string, unknown>,
     triggeredBy?: string,
   ): Promise<void> {

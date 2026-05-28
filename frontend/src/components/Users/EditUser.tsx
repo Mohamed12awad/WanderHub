@@ -1,192 +1,209 @@
-import { updateUser, getUserById, getRoles } from "@/utils/api";
-import React, { useState, useEffect } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useQuery, useMutation } from "react-query";
-import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../contexts/authContext";
+import React, { useCallback, useEffect, useState } from "react";
+import { updateUser, getUserById, getRoles, getUsers } from "@/utils/api";
+import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/authContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { AxiosError, AxiosResponse } from "axios";
-import { ErrorResponse } from "@/types/types";
-import LoadingSpinner from "../common/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
+import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
+import { CircleArrowLeft } from "lucide-react";
+import { AxiosResponse } from "axios";
+import { toast } from "@/components/ui/use-toast";
 
-interface Roles {
-  name: string;
-  _id: string;
-}
-
-interface User {
+interface Role { _id: string; name: string }
+interface UserDetail {
   email: string;
   name: string;
   phone: string;
-  role: Roles;
+  role: Role;
+  active: boolean;
+  reportsTo?: { _id: string; name: string } | null;
 }
 
 const EditUser: React.FC = () => {
-  const [email, setEmail] = useState("");
+  const { id: userId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+
   const [name, setName] = useState("");
-  const [role, setRole] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { id: userId } = useParams<{ id: string }>();
+  const [role, setRole] = useState("");
+  const [reportsTo, setReportsTo] = useState("");
+  const [reportsToLabel, setReportsToLabel] = useState("");
 
-  const updateUserMutation = useMutation(
-    (userData: {
-      email: string;
-      name: string;
-      role: string;
-      password?: string;
-      phone: string;
-    }) => updateUser(userId!, userData)
+  const { data: rolesData, isLoading: rolesLoading } = useQuery("roles", getRoles);
+  const { data: userData, isLoading: userLoading } = useQuery(
+    ["user", userId],
+    () => getUserById(userId!),
+    { enabled: !!userId }
   );
 
-  const {
-    data: roles,
-    isLoading: rolesLoading,
-    error: rolesError,
-  } = useQuery("roles", getRoles);
-  const {
-    data: userData,
-    isLoading: userLoading,
-    error: userError,
-  } = useQuery(["user", userId], () => getUserById(userId!), {
-    enabled: !!userId,
-  });
-
   useEffect(() => {
-    if (userData) {
-      const user = (userData as AxiosResponse<User>).data;
-
-      setEmail(user.email);
-      setName(user.name);
-      setRole(user.role._id);
-      setPhone(user.phone);
-    }
+    if (!userData) return;
+    const u = (userData as AxiosResponse<UserDetail>).data;
+    setName(u.name);
+    setEmail(u.email);
+    setPhone(u.phone);
+    setRole(u.role._id);
+    setReportsTo(u.reportsTo?._id ?? "");
+    setReportsToLabel(u.reportsTo?.name ?? "");
   }, [userData]);
 
-  if (rolesError || userError) return <div>Error loading data</div>;
+  const fetchUsers = useCallback(
+    (q: string) =>
+      getUsers({ page: 1, limit: 20, q }).then((r) =>
+        ((r.data as any).data ?? r.data)
+          .filter((u: { _id: string }) => u._id !== userId)
+          .map((u: { _id: string; name: string }) => ({ value: u._id, label: u.name }))
+      ),
+    [userId]
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateUserMutation.mutateAsync({
-        email,
-        name,
-        role,
-        password,
-        phone,
-      });
-
-      navigate("/users");
-    } catch (error) {
-      const axiosError = error as AxiosError<ErrorResponse>;
-      const errMsg = axiosError.response?.data?.errMsg;
-      console.error("Error updating user:", errMsg);
-      // Handle error state
+  const mutation = useMutation(
+    () => updateUser(userId!, { name, email, phone, role, ...(password ? { password } : {}), reportsTo: reportsTo || null }),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries("users");
+        queryClient.invalidateQueries(["user", userId]);
+        toast({ title: "User updated." });
+        navigate("/settings/users");
+      },
+      onError: () => { toast({ title: "Failed to update user.", variant: "destructive" }); },
     }
-  };
+  );
 
-  if (!user || !["admin", "super admin"].includes(user.role)) {
-    return (
-      <p className="text-xl text-center font-bold">
-        You do not have permission to edit users.
-      </p>
-    );
+  if (!currentUser || !["admin", "super admin"].includes(currentUser.role)) {
+    return <p className="p-8 text-center font-semibold">You do not have permission to edit users.</p>;
   }
 
-  return (
-    <div className="flex items-center justify-center py-0">
-      <LoadingSpinner loading={rolesLoading || userLoading} />
+  const isLoading = rolesLoading || userLoading;
+  const userDetail = userData ? (userData as AxiosResponse<UserDetail>).data : null;
 
-      <div className="mx-auto grid gap-6">
-        <div className="grid gap-2 text-center">
-          <h1 className="text-3xl font-bold">Edit user</h1>
-          <p className="text-balance text-muted-foreground">
-            Edit the details below to update the user
-          </p>
-        </div>
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="John Doe"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+  return (
+    <main className="p-4 max-w-2xl space-y-5">
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0">
+            <AppBreadcrumb crumbs={[{ label: "Users", href: "/settings/users" }, { label: name || "Edit User" }]} />
+            <CardTitle className="flex items-center gap-3 mt-1">
+              <Link to="/settings/users"><CircleArrowLeft /></Link>
+              <span className="truncate">{name || "Edit User"}</span>
+              {userDetail && (
+                <Badge variant="outline" className={
+                  userDetail.active
+                    ? "bg-emerald-500 text-white border-emerald-500"
+                    : "bg-slate-400 text-white border-slate-400"
+                }>
+                  {userDetail.active ? "Active" : "Inactive"}
+                </Badge>
+              )}
+            </CardTitle>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              name="phone"
-              placeholder="01234567890"
-              value={phone}
-              onChange={(e) => {
-                e.target.value = e.target.value
-                  .replace(/\D/g, "")
-                  .substring(0, 11);
-                setPhone(e.target.value);
-              }}
-              required
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="john.doe@example.com"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="********"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="role">Role</Label>
-            <Select onValueChange={setRole} value={role}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a Role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {roles?.data.map((item: Roles) => (
-                    <SelectItem key={item._id} value={item._id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" className="w-full">
-            Update User
-          </Button>
-        </form>
-      </div>
-    </div>
+        </CardHeader>
+
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <form
+              className="space-y-5"
+              onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
+            >
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="John Doe" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").substring(0, 11))}
+                    placeholder="01234567890"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="john@example.com" />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={role} onValueChange={setRole}>
+                    <SelectTrigger id="role">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {rolesData?.data.map((r: Role) => (
+                          <SelectItem key={r._id} value={r._id}>{r.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Reports To</Label>
+                  <AsyncSearchableSelect
+                    value={reportsTo}
+                    onChange={(val) => { setReportsTo(val); if (!val) setReportsToLabel(""); }}
+                    onSelectItem={(item) => setReportsToLabel(item.label)}
+                    fetchFn={fetchUsers}
+                    selectedLabel={reportsToLabel}
+                    placeholder="Search users…"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password">
+                  New Password
+                  <span className="text-muted-foreground font-normal text-xs ms-1">(leave blank to keep current)</span>
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => navigate("/settings/users")}>Cancel</Button>
+                <Button type="submit" disabled={mutation.isLoading}>
+                  {mutation.isLoading ? "Saving…" : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </main>
   );
 };
 

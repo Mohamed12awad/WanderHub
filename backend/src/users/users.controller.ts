@@ -7,6 +7,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from './users.service';
+import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -34,7 +35,7 @@ export class UsersController {
   @RequirePermission('users:create')
   async create(@Body() body: Record<string, any>, @Res() res: Response) {
     try { return res.status(201).json(await this.users.create(body)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+    catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put(':id')
@@ -50,7 +51,7 @@ export class UsersController {
       if (!result) return res.status(404).json({ message: 'User not found' });
       if ((result as any).forbidden) return res.status(403).json({ message: 'Access denied. Super admin only.' });
       return res.json(result);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+    } catch (e) { return handlePrismaError(e, res); }
   }
 
   @Patch(':id/toggle-active')

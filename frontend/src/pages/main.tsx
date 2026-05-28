@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { ModulesProvider } from "@/contexts/ModulesContext";
+import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 
 import NavBar from "@/components/layout/NavBar";
 import Sidebar from "@/components/layout/Sidebar";
@@ -92,29 +93,43 @@ const AppRoutes = () => (
   </Routes>
 );
 
+const MainLayout: React.FC = () => {
+  const { collapsed } = useSidebar();
+  return (
+    <div
+      className={[
+        "grid min-h-screen md:h-screen w-full md:grid-rows-[60px_1fr] bg-background transition-all duration-200",
+        collapsed ? "md:grid-cols-[64px_1fr]" : "md:grid-cols-[240px_1fr]",
+      ].join(" ")}
+    >
+      <Sidebar />
+      <NavBar />
+      <main className="overflow-auto">
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
+      </main>
+    </div>
+  );
+};
+
 const DefaultLayout: React.FC = () => {
   const location = useLocation();
   const isSettings = location.pathname.startsWith("/settings");
 
   return (
     <ModulesProvider>
-      {isSettings ? (
-        <div className="h-screen w-full overflow-hidden bg-background">
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </div>
-      ) : (
-        <div className="grid min-h-screen md:h-screen w-full md:grid-cols-[240px_1fr] md:grid-rows-[60px_1fr] bg-background">
-          <Sidebar />
-          <NavBar />
-          <main className="overflow-auto">
+      <SidebarProvider>
+        {isSettings ? (
+          <div className="h-screen w-full overflow-hidden bg-background">
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>
-          </main>
-        </div>
-      )}
+          </div>
+        ) : (
+          <MainLayout />
+        )}
+      </SidebarProvider>
     </ModulesProvider>
   );
 };

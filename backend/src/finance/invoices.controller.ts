@@ -5,6 +5,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { FinanceService } from './finance.service';
+import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('finance')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -39,7 +40,7 @@ export class InvoicesController {
   @RequirePermission('finance:create')
   async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.finance.createInvoice(body, user.id)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+    catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put('invoices/:id')
@@ -49,7 +50,7 @@ export class InvoicesController {
       const inv = await this.finance.updateInvoice(id, body);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
       return res.json(inv);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+    } catch (e) { return handlePrismaError(e, res); }
   }
 
   @Delete('invoices/:id')
@@ -66,8 +67,9 @@ export class InvoicesController {
   @RequirePermission('finance:approve')
   async approve(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      const inv = await this.finance.approveInvoice(id, user.id);
+      const inv = await this.finance.approveInvoice(id, user.id, user.role);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
+      if ((inv as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve invoices' });
       return res.json(inv);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -77,8 +79,9 @@ export class InvoicesController {
   async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser, @Res() res: Response) {
     if (!body.reason?.trim()) return res.status(400).json({ message: 'Rejection reason is required' });
     try {
-      const inv = await this.finance.rejectInvoice(id, user.id, body.reason.trim());
+      const inv = await this.finance.rejectInvoice(id, user.id, body.reason.trim(), user.role);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
+      if ((inv as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject invoices' });
       return res.json(inv);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }

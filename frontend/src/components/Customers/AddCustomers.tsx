@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { createCustomer, getUsers } from "@/utils/api";
+import { useLocation } from "react-router-dom";
+
+const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "react-query";
 import { CircleArrowLeft } from "lucide-react";
@@ -58,6 +61,7 @@ const initialFormData = {
     relationship: "",
   },
   location: "",
+  source: "",
   status: "Draft",
   owner: "",
   notes: "",
@@ -65,42 +69,56 @@ const initialFormData = {
 };
 
 const AddCustomer = () => {
-  const [formData, setFormData] = useState(initialFormData);
+  const location = useLocation();
+  const cloneData = (location.state as any)?.clone;
+  const [formData, setFormData] = useState(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const { data: users } = useQuery("users", () => getUsers());
   const navigate = useNavigate();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name } = e.target;
     let { value } = e.target;
     if (["phone", "mobile"].includes(name)) {
       value = value.replace(/\D/g, "").substring(0, 11);
     }
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      address: {
-        ...prevData.address,
-        [name]: value,
-      },
-    }));
+    setFormData((prev) => ({ ...prev, address: { ...prev.address, [name]: value } }));
+  };
+
+  const handleIdentificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, identification: { ...prev.identification, [name]: value } }));
+  };
+
+  const handleEmergencyContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, emergencyContact: { ...prev.emergencyContact, [name]: value } }));
+  };
+
+  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, paymentInformation: { ...prev.paymentInformation, [name]: value } }));
+  };
+
+  const handleLoyaltyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, loyaltyProgram: { ...prev.loyaltyProgram, [name]: value } }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const customerData: Customer = formData;
+      const customerData: Customer = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth || null,
+      } as any;
       setIsLoading(true);
       await createCustomer(customerData);
       setIsLoading(false);
@@ -181,6 +199,36 @@ const AddCustomer = () => {
                   onChange={handleChange}
                 />
               </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="dateOfBirth">
+                  Date of Birth
+                </Label>
+                <Input
+                  id="dateOfBirth"
+                  name="dateOfBirth"
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="gender">
+                  Gender
+                </Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, gender: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Gender" />
+                  </SelectTrigger>
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Work Related */}
@@ -252,6 +300,23 @@ const AddCustomer = () => {
                 </Select>
               </div>
               <div className="flex flex-col">
+                <Label className="my-3">Lead Source</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, source: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="How did they find you?" />
+                  </SelectTrigger>
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
+                    {LEAD_SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
                 <Label className="my-3" htmlFor="notes">
                   Notes
                 </Label>
@@ -263,6 +328,7 @@ const AddCustomer = () => {
                 />
               </div>
             </div>
+
             {/* Address Information */}
             <div className="flex flex-col">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 mt-5 md:mt-0">
@@ -335,10 +401,10 @@ const AddCustomer = () => {
                   Passport Number
                 </Label>
                 <Input
-                  id="passportNumber"
+                  id="identification.passportNumber"
                   name="passportNumber"
                   value={formData.identification.passportNumber}
-                  onChange={handleChange}
+                  onChange={handleIdentificationChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -346,10 +412,10 @@ const AddCustomer = () => {
                   National ID
                 </Label>
                 <Input
-                  id="nationalId"
+                  id="identification.nationalId"
                   name="nationalId"
                   value={formData.identification.nationalId}
-                  onChange={handleChange}
+                  onChange={handleIdentificationChange}
                 />
               </div>
             </div>
@@ -357,39 +423,39 @@ const AddCustomer = () => {
             {/* Contact Information */}
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                Contact Information
+                Emergency Contact
               </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="emergencyContact.name">
-                  Emergency Contact Name
+                  Name
                 </Label>
                 <Input
                   id="emergencyContact.name"
                   name="name"
                   value={formData.emergencyContact.name}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="emergencyContact.phone">
-                  Emergency Contact Phone
+                  Phone
                 </Label>
                 <Input
                   id="emergencyContact.phone"
                   name="phone"
                   value={formData.emergencyContact.phone}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="emergencyContact.relationship">
-                  Emergency Contact Relationship
+                  Relationship
                 </Label>
                 <Input
                   id="emergencyContact.relationship"
                   name="relationship"
                   value={formData.emergencyContact.relationship}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
             </div>
@@ -407,7 +473,7 @@ const AddCustomer = () => {
                   id="paymentInformation.cardType"
                   name="cardType"
                   value={formData.paymentInformation.cardType}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -418,21 +484,18 @@ const AddCustomer = () => {
                   id="paymentInformation.cardNumber"
                   name="cardNumber"
                   value={formData.paymentInformation.cardNumber}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
               <div className="flex flex-col">
-                <Label
-                  className="my-3"
-                  htmlFor="paymentInformation.expirationDate"
-                >
+                <Label className="my-3" htmlFor="paymentInformation.expirationDate">
                   Expiration Date
                 </Label>
                 <Input
                   id="paymentInformation.expirationDate"
                   name="expirationDate"
                   value={formData.paymentInformation.expirationDate}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
             </div>
@@ -450,7 +513,7 @@ const AddCustomer = () => {
                   id="loyaltyProgram.memberId"
                   name="memberId"
                   value={formData.loyaltyProgram.memberId}
-                  onChange={handleChange}
+                  onChange={handleLoyaltyChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -461,7 +524,7 @@ const AddCustomer = () => {
                   id="loyaltyProgram.points"
                   name="points"
                   value={formData.loyaltyProgram.points}
-                  onChange={handleChange}
+                  onChange={handleLoyaltyChange}
                 />
               </div>
             </div>

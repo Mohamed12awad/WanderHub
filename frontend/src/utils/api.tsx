@@ -179,6 +179,8 @@ export const getLogs = (params?: {
   startDate?: string;
   endDate?: string;
   action?: string;
+  actionType?: string;
+  user?: string;
   page?: number;
   limit?: number;
 }) => api.get("/logs", { params });
@@ -195,7 +197,7 @@ export const deleteNote = (id: string): Promise<void> => api.delete(`/notes/${id
 // Timeline API Requests
 export const getTimeline = (params: {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: string;
 }) => api.get("/timeline", { params });
 
 // Tasks API Requests
@@ -289,3 +291,7 @@ export const updateWorkspaceSettings = (data: {
   fieldGroups?: { module: string; fields: { id: string; name: string; label: string; type: string; required: boolean; options?: string }[] }[];
   moduleSettings?: { module: string; enabled: boolean }[];
 }) => api.put("/settings/workspace", data);
+
+export const getOrgSettings = () => api.get("/settings/organization");
+export const updateOrgSettings = (data: { baseCurrency?: string; locale?: string }) =>
+  api.put("/settings/organization", data);

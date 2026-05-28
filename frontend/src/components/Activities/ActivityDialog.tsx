@@ -95,7 +95,7 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {(["call", "meeting", "task", "note", "email"] as ActivityType[]).map(
+                    {(["call", "meeting", "task", "email"] as ActivityType[]).map(
                       (t) => (
                         <SelectItem key={t} value={t} className="capitalize">
                           {ACTIVITY_ICONS[t]} {t}

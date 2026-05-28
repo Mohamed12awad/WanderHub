@@ -19,8 +19,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import LoadingSpinner from "@/components/common/spinner";
 import { Quote } from "@/types/types";
 import { RejectDialog } from "@/components/common/RejectDialog";
-import { PermissionGate } from "@/components/common/PermissionGate";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import { useAuth } from "@/contexts/authContext";
 
@@ -43,8 +43,9 @@ const QuoteDetail: React.FC = () => {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const canDelete = ["admin", "super admin"].includes(user!.role);
-  const { isApprovalEnabled } = useApprovalConfig();
+  const isAdmin = ["admin", "super admin"].includes(user!.role);
+  const canDelete = isAdmin;
+  const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
   const { data, isLoading } = useQuery(["quotes", id], () => getQuoteById(id!));
   const quote: Quote | undefined = data?.data;
 
@@ -52,9 +53,12 @@ const QuoteDetail: React.FC = () => {
   if (!quote) return <div className="p-4">Quote not found.</div>;
 
   const approvalEnabled = isApprovalEnabled("quotes");
-  const isPending = quote.approvalStatus === "pending";
-  const canEdit = !approvalEnabled || !isPending;
-  const canConvert = !approvalEnabled || quote.approvalStatus === "approved";
+  const approvalStatus = quote.approvalStatus;
+  const isPending = approvalStatus === "pending";
+  const isRejected = approvalStatus === "rejected";
+  const canEdit = isAdmin || !approvalEnabled || isRejected;
+  const canConvert = isAdmin || !approvalEnabled || approvalStatus === "approved";
+  const userCanApprove = canUserApprove("quotes", user!.role);
 
   const handleConvert = async () => {
     setConverting(true);
@@ -117,7 +121,7 @@ const QuoteDetail: React.FC = () => {
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300 print:hidden">
           <Clock className="h-4 w-4 shrink-0" />
           <p className="text-sm">This quote is awaiting approval. Editing and conversion are locked until approved.</p>
-          <PermissionGate require="finance:approve">
+          {userCanApprove && (
             <div className="ms-auto flex gap-2">
               <Button size="sm" variant="outline" className="h-7 gap-1 text-green-600 border-green-300 hover:bg-green-50" onClick={handleApprove} disabled={actionLoading}>
                 <CheckCircle className="h-3.5 w-3.5" />Approve
@@ -126,7 +130,24 @@ const QuoteDetail: React.FC = () => {
                 <XCircle className="h-3.5 w-3.5" />Reject
               </Button>
             </div>
-          </PermissionGate>
+          )}
+        </div>
+      )}
+
+      {/* Rejection banner */}
+      {approvalEnabled && isRejected && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 dark:bg-destructive/10 px-4 py-3 text-destructive print:hidden">
+          <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Quote rejected</p>
+            {quote.rejectionReason && <p className="text-xs mt-0.5 text-muted-foreground">{quote.rejectionReason}</p>}
+            <p className="text-xs mt-1">Edit the quote to fix the issues and it will be resubmitted for approval.</p>
+          </div>
+          {userCanApprove && (
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-green-600 border-green-300 hover:bg-green-50 shrink-0" onClick={handleApprove} disabled={actionLoading}>
+              <CheckCircle className="h-3.5 w-3.5" />Approve anyway
+            </Button>
+          )}
         </div>
       )}
 
@@ -138,7 +159,7 @@ const QuoteDetail: React.FC = () => {
           </CardTitle>
           <div className="flex gap-2 items-center">
             <Link to={canEdit ? `/finance/quotes/${id}/edit` : "#"}>
-              <Button size="sm" variant="outline" className="h-8 px-4" disabled={!canEdit} title={!canEdit ? "Pending approval — cannot edit." : undefined}>
+              <Button size="sm" variant="outline" className="h-8 px-4" disabled={!canEdit} title={isPending ? "Pending approval — cannot edit." : undefined}>
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
@@ -165,24 +186,14 @@ const QuoteDetail: React.FC = () => {
                 <DropdownMenuItem onClick={() => window.print()}>
                   <Printer className="h-3.5 w-3.5 me-2" />Print
                 </DropdownMenuItem>
-                <PermissionGate require="finance:approve">
-                  {!isPending && quote.approvalStatus === "approved" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
-                        <XCircle className="h-3.5 w-3.5 me-2" />Reject
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {!isPending && quote.approvalStatus === "rejected" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleApprove} disabled={actionLoading} className="text-green-600 focus:text-green-600">
-                        <CheckCircle className="h-3.5 w-3.5 me-2" />Approve
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </PermissionGate>
+                {userCanApprove && approvalStatus === "approved" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
+                      <XCircle className="h-3.5 w-3.5 me-2" />Reject
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />
@@ -226,7 +237,7 @@ const QuoteDetail: React.FC = () => {
                 ) : "—"
               } />
               <InfoRow label={f.status} value={<FinanceStatusBadge status={quote.status} type="quote" />} />
-              <InfoRow label="Approval" value={<ApprovalBadge status={quote.approvalStatus} rejectionReason={quote.rejectionReason} />} />
+              {approvalEnabled && <InfoRow label="Approval" value={<ApprovalBadge status={quote.approvalStatus} rejectionReason={quote.rejectionReason} />} />}
               <InfoRow label={f.currency} value={quote.currency} />
               <InfoRow label={f.validUntil} value={quote.validUntil ? new Date(quote.validUntil).toLocaleDateString() : "—"} />
             </section>
@@ -302,10 +313,14 @@ const QuoteDetail: React.FC = () => {
       {/* Notes */}
       <Card className="print:hidden">
         <CardContent className="py-5">
-          <Tabs defaultValue="notes">
+          <Tabs defaultValue="timeline">
             <TabsList className="mb-4">
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
             </TabsList>
+            <TabsContent value="timeline">
+              <RecordTimeline linkedTo={id!} linkedModel="Quote" />
+            </TabsContent>
             <TabsContent value="notes">
               <NotesPanel linkedTo={id!} linkedModel="Quote" />
             </TabsContent>

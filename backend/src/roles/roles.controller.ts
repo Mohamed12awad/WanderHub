@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { RolesService } from './roles.service';
+import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('roles')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -21,7 +22,7 @@ export class RolesController {
   @RequirePermission('roles:manage')
   async create(@Body() body: { name: string; permissions: string[] }, @Res() res: Response) {
     try { return res.status(201).json(await this.roles.create(body.name, body.permissions)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+    catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put(':id')

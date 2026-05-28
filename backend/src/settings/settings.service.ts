@@ -38,4 +38,18 @@ export class SettingsService {
     const updated = await this.prisma.workspaceConfig.update({ where: { id: config.id }, data: data as any });
     return { fieldGroups: updated.fieldGroups, moduleSettings: updated.moduleSettings };
   }
+
+  async getOrganization() {
+    const config = await this.getOrCreate();
+    return { baseCurrency: config.baseCurrency, locale: config.locale };
+  }
+
+  async updateOrganization(body: { baseCurrency?: string; locale?: string }) {
+    const config = await this.getOrCreate();
+    const data: Record<string, unknown> = {};
+    if (body.baseCurrency) data.baseCurrency = body.baseCurrency;
+    if (body.locale) data.locale = body.locale;
+    const updated = await this.prisma.workspaceConfig.update({ where: { id: config.id }, data: data as any });
+    return { baseCurrency: updated.baseCurrency, locale: updated.locale };
+  }
 }

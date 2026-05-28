@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/authContext";
 import { cn } from "@/lib/utils";
 import {
   User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck,
-  LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2,
+  LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2, Building2,
 } from "lucide-react";
 import ProfileSettings from "./settings/ProfileSettings";
 import AppearanceSettings from "./settings/AppearanceSettings";
@@ -12,6 +12,7 @@ import ModulesSettings from "./settings/ModulesSettings";
 import FieldsSettings from "./settings/FieldsSettings";
 import ApprovalsSettings from "./settings/ApprovalsSettings";
 import AccountsSettings from "./settings/AccountsSettings";
+import OrganizationSettings from "./settings/OrganizationSettings";
 import { Tasks } from "@/pages/Tasks";
 import { Logs } from "@/components/Logs/Logs";
 import { Roles } from "@/components/Roles/Roles";
@@ -35,6 +36,7 @@ export default function Settings() {
   ];
 
   const workspaceItems: NavItem[] = [
+    { to: "organization", icon: Building2, label: "Organization" },
     { to: "modules", icon: LayoutGrid, label: s.modules },
     { to: "fields", icon: TableProperties, label: s.fields },
   ];
@@ -118,8 +120,9 @@ export default function Settings() {
           <Route path="logs"       element={<Logs />} />
           <Route path="roles"      element={<Roles />} />
           <Route path="users"      element={<UsersPage />} />
-          <Route path="approvals"  element={<ApprovalsSettings />} />
-          <Route path="accounts"   element={<AccountsSettings />} />
+          <Route path="approvals"     element={<ApprovalsSettings />} />
+          <Route path="accounts"      element={<AccountsSettings />} />
+          <Route path="organization"  element={<OrganizationSettings />} />
         </Routes>
       </main>
     </div>

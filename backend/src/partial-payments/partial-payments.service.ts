@@ -24,8 +24,12 @@ export class PartialPaymentsService {
     const { booking, amount, ...rest } = body;
     const deal = await this.prisma.deal.findUnique({ where: { id: booking } });
     if (!deal) return { notFound: true };
-    const newTotalPaid = (deal.totalPaid ?? 0) + Number(amount);
-    if (newTotalPaid > deal.price) return { overPayment: true };
+    const existingSum = await this.prisma.partialPayment.aggregate({
+      where: { dealId: booking },
+      _sum: { amount: true },
+    });
+    const currentTotal = existingSum._sum.amount ?? 0;
+    if (currentTotal + Number(amount) > deal.price) return { overPayment: true };
 
     const payment = await this.prisma.partialPayment.create({
       data: { ...rest, dealId: booking, amount: Number(amount), date: new Date(body.date ?? Date.now()), createdById: userId },

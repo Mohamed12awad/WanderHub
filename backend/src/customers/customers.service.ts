@@ -19,6 +19,10 @@ export class CustomersService {
     } else if (owner && typeof owner === 'object' && owner._id) {
       rest.ownerId = owner._id;
     }
+    // Prisma rejects empty strings for DateTime fields — coerce to null
+    for (const field of ['dateOfBirth'] as const) {
+      if (rest[field] === '') rest[field] = null;
+    }
     return rest;
   }
 
@@ -89,13 +93,24 @@ export class CustomersService {
     return toClient(customer);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: Record<string, any>, userId?: string) {
     const existing = await this.prisma.customer.findUnique({ where: { id } });
     if (!existing) return null;
-    const customer = await this.prisma.customer.update({
-      where: { id },
-      data: this.cleanData(body),
-    });
+    const cleaned = this.cleanData(body);
+    const customer = await this.prisma.customer.update({ where: { id }, data: cleaned });
+
+    const TRACKED_FIELDS = ['name', 'email', 'phone', 'mobile', 'location', 'status', 'gender', 'source', 'notes'];
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const field of TRACKED_FIELDS) {
+      if (cleaned[field] === undefined) continue;
+      const oldVal = (existing as any)[field];
+      const newVal = cleaned[field];
+      if (String(oldVal ?? '') !== String(newVal ?? '')) changes[field] = { from: oldVal, to: newVal };
+    }
+    if (Object.keys(changes).length > 0 && userId) {
+      await this.timeline.log('contact.updated', 'Contact updated', id, 'Customer', { changes }, userId);
+    }
+
     return toClient(customer);
   }
 

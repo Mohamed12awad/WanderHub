@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createProduct } from "@/utils/api";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
 import DynamicFields from "@/components/common/DynamicFields";
@@ -30,7 +30,9 @@ interface FormErrors {
 }
 
 const AddProduct = () => {
-  const [formData, setFormData] = useState(initialFormData);
+  const location = useLocation();
+  const cloneData = (location.state as any)?.clone;
+  const [formData, setFormData] = useState(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();

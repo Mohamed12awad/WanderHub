@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,17 +11,18 @@ import {
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense,
+  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense, getNotes,
 } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { ApprovalBadge } from "@/components/Finance/FinanceStatusBadge";
 import { RejectDialog } from "@/components/common/RejectDialog";
-import { PermissionGate } from "@/components/common/PermissionGate";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import type { ApprovalStatus } from "@/types/types";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
@@ -54,14 +55,22 @@ const ViewExpense = () => {
   const navigate = useNavigate();
   const { id: expenseId } = useParams<{ id: string }>();
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const { isApprovalEnabled } = useApprovalConfig();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
+  const isAdmin = ["admin", "super admin"].includes(user!.role);
+  const canDelete = isAdmin;
 
   const { data: expenseData, isLoading, error } = useQuery(
     ["expenses", expenseId],
     async () => (await getExpenseById(expenseId!)).data
   );
+  const { data: notesData } = useQuery(
+    ["notes", expenseId, "Expense"],
+    () => getNotes({ linkedTo: expenseId!, linkedModel: "Expense" }),
+    { enabled: !!expenseId }
+  );
+  const notesCount = ((notesData?.data) as any[])?.length ?? 0;
 
   const [formData, setFormData] = useState<ExpenseData | null>(null);
   useEffect(() => { if (expenseData) setFormData(expenseData); }, [expenseData]);
@@ -98,8 +107,19 @@ const ViewExpense = () => {
     }
   };
 
+  const handleClone = () => {
+    if (!formData) return;
+    navigate("/expenses/add", {
+      state: {
+        clone: {
+          title: `Copy of ${formData.title}`,
+          expenses: formData.expenses.map(({ _id, ...item }) => item),
+        },
+      },
+    });
+  };
+
   const handleDelete = async () => {
-    if (!confirm("Delete this expense report? This action cannot be undone.")) return;
     try {
       await deleteExpense(expenseId!);
       navigate("/expenses");
@@ -114,15 +134,60 @@ const ViewExpense = () => {
   const canDeleteItem = ["admin", "super admin"].includes(user!.role);
   const approvalStatus = formData.approvalStatus ?? (formData.approved ? "approved" : "pending");
   const approvalEnabled = isApprovalEnabled("expenses");
-  const canEdit = !approvalEnabled || approvalStatus === "approved" || approvalStatus === "rejected";
+  const isPending = approvalStatus === "pending";
+  const isRejected = approvalStatus === "rejected";
+  const canEdit = isAdmin || !approvalEnabled || isRejected;
+  const userCanApprove = canUserApprove("expenses", user!.role);
 
   return (
     <main className="p-4 space-y-5">
+      {/* Approval pending banner */}
+      {approvalEnabled && isPending && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
+          <Clock className="h-4 w-4 shrink-0" />
+          <p className="text-sm">This expense report is awaiting approval. Editing is locked until approved or rejected.</p>
+          {userCanApprove && (
+            <div className="ms-auto flex gap-2">
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-green-600 border-green-300 hover:bg-green-50" onClick={handleApprove} disabled={actionLoading}>
+                <CheckCircle className="h-3.5 w-3.5" />Approve
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 gap-1 text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => setRejectOpen(true)} disabled={actionLoading}>
+                <XCircle className="h-3.5 w-3.5" />Reject
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rejection banner */}
+      {approvalEnabled && isRejected && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 dark:bg-destructive/10 px-4 py-3 text-destructive">
+          <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Expense report rejected</p>
+            {formData.rejectionReason && <p className="text-xs mt-0.5 text-muted-foreground">{formData.rejectionReason}</p>}
+            <p className="text-xs mt-1">Edit the report to fix the issues and it will be resubmitted for approval.</p>
+          </div>
+          {userCanApprove && (
+            <Button size="sm" variant="outline" className="h-7 gap-1 text-green-600 border-green-300 hover:bg-green-50 shrink-0" onClick={handleApprove} disabled={actionLoading}>
+              <CheckCircle className="h-3.5 w-3.5" />Approve anyway
+            </Button>
+          )}
+        </div>
+      )}
+
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}
         onCancel={() => setRejectOpen(false)}
         loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={confirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handleDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
+        title="Delete Expense Report"
+        description="Delete this expense report? This action cannot be undone."
       />
 
       <Card>
@@ -136,7 +201,7 @@ const ViewExpense = () => {
           </div>
           <div className="flex gap-2 shrink-0">
             <Link to={canEdit ? `/expenses/${expenseId}/edit` : "#"}>
-              <Button size="sm" className="h-8 px-4" disabled={!canEdit} title={!canEdit ? "Record is pending approval and cannot be edited." : undefined}>
+              <Button size="sm" className="h-8 px-4" disabled={!canEdit} title={isPending ? "Pending approval — cannot edit." : undefined}>
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
@@ -148,22 +213,21 @@ const ViewExpense = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <PermissionGate require="expenses:approve">
-                  {approvalStatus !== "approved" && (
-                    <DropdownMenuItem onClick={handleApprove} disabled={actionLoading} className="text-green-600 focus:text-green-600">
-                      <CheckCircle className="h-3.5 w-3.5 me-2" />Approve
-                    </DropdownMenuItem>
-                  )}
-                  {approvalStatus !== "rejected" && (
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
+                {userCanApprove && approvalStatus === "approved" && (
+                  <>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
                       <XCircle className="h-3.5 w-3.5 me-2" />Reject
                     </DropdownMenuItem>
-                  )}
-                </PermissionGate>
+                  </>
+                )}
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
                       <Trash2 className="h-3.5 w-3.5 me-2" />Delete
                     </DropdownMenuItem>
                   </>
@@ -177,18 +241,22 @@ const ViewExpense = () => {
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Report Information</h2>
               <InfoRow label="Title" value={formData.title} />
-              <InfoRow label="Approval">
-                <ApprovalBadge status={approvalStatus} rejectionReason={formData.rejectionReason} />
-              </InfoRow>
-              {formData.approvedBy && (
-                <InfoRow label={approvalStatus === "rejected" ? "Rejected by" : "Approved by"}>
-                  <span className="text-sm">
-                    {typeof formData.approvedBy === "object" ? formData.approvedBy.name : "—"}
-                    {formData.approvedAt && (
-                      <span className="text-muted-foreground ms-1">· {new Date(formData.approvedAt).toLocaleDateString()}</span>
-                    )}
-                  </span>
-                </InfoRow>
+              {approvalEnabled && (
+                <>
+                  <InfoRow label="Approval">
+                    <ApprovalBadge status={approvalStatus} rejectionReason={formData.rejectionReason} />
+                  </InfoRow>
+                  {formData.approvedBy && (
+                    <InfoRow label={approvalStatus === "rejected" ? "Rejected by" : "Approved by"}>
+                      <span className="text-sm">
+                        {typeof formData.approvedBy === "object" ? formData.approvedBy.name : "—"}
+                        {formData.approvedAt && (
+                          <span className="text-muted-foreground ms-1">· {new Date(formData.approvedAt).toLocaleDateString()}</span>
+                        )}
+                      </span>
+                    </InfoRow>
+                  )}
+                </>
               )}
               <InfoRow label="Total">
                 <span className="text-sm font-semibold">
@@ -248,10 +316,19 @@ const ViewExpense = () => {
 
       <Card>
         <CardContent className="py-5">
-          <Tabs defaultValue="notes">
+          <Tabs defaultValue="timeline">
             <TabsList className="mb-4">
-              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="notes">
+                Notes
+                {notesCount > 0 && (
+                  <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{notesCount}</span>
+                )}
+              </TabsTrigger>
             </TabsList>
+            <TabsContent value="timeline">
+              {expenseId && <RecordTimeline linkedTo={expenseId} linkedModel="Expense" />}
+            </TabsContent>
             <TabsContent value="notes">
               {expenseId && <NotesPanel linkedTo={expenseId} linkedModel="Expense" />}
             </TabsContent>

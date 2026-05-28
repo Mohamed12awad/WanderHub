@@ -8,16 +8,17 @@ import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import {
   Handshake, ArrowRight, Trophy, AlertCircle,
   Banknote, Trash2, CheckSquare, CheckCircle2,
-  UserPlus, Calendar, StickyNote, Zap,
+  UserPlus, Calendar, StickyNote, Zap, FileText, Receipt, XCircle,
 } from "lucide-react";
 
 interface Props {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: "Customer" | "Deal" | "Quote" | "Invoice" | "Expense" | "Product" | "Task";
 }
 
 const EVENT_ICON: Record<TimelineEventType, React.ReactNode> = {
   "deal.created":       <Handshake className="h-3.5 w-3.5" />,
+  "deal.updated":       <Zap className="h-3.5 w-3.5" />,
   "deal.stage_changed": <ArrowRight className="h-3.5 w-3.5" />,
   "deal.won":           <Trophy className="h-3.5 w-3.5" />,
   "deal.lost":          <AlertCircle className="h-3.5 w-3.5" />,
@@ -27,12 +28,19 @@ const EVENT_ICON: Record<TimelineEventType, React.ReactNode> = {
   "task.completed":     <CheckCircle2 className="h-3.5 w-3.5" />,
   "note.added":         <StickyNote className="h-3.5 w-3.5" />,
   "contact.created":    <UserPlus className="h-3.5 w-3.5" />,
+  "contact.updated":    <Zap className="h-3.5 w-3.5" />,
+  "quote.created":      <FileText className="h-3.5 w-3.5" />,
+  "invoice.created":    <FileText className="h-3.5 w-3.5" />,
+  "expense.created":    <Receipt className="h-3.5 w-3.5" />,
+  "expense.approved":   <CheckCircle2 className="h-3.5 w-3.5" />,
+  "expense.rejected":   <XCircle className="h-3.5 w-3.5" />,
   "activity.logged":    <Calendar className="h-3.5 w-3.5" />,
   "custom":             <Zap className="h-3.5 w-3.5" />,
 };
 
 const EVENT_COLOR: Record<TimelineEventType, string> = {
   "deal.created":       "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  "deal.updated":       "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
   "deal.stage_changed": "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
   "deal.won":           "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
   "deal.lost":          "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
@@ -42,6 +50,12 @@ const EVENT_COLOR: Record<TimelineEventType, string> = {
   "task.completed":     "bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400",
   "note.added":         "bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400",
   "contact.created":    "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  "contact.updated":    "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
+  "quote.created":      "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
+  "invoice.created":    "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+  "expense.created":    "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
+  "expense.approved":   "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+  "expense.rejected":   "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
   "activity.logged":    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   "custom":             "bg-muted text-muted-foreground",
 };
@@ -179,6 +193,26 @@ function TimelineItemRow({
   );
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  title: "Title", price: "Amount", currency: "Currency",
+  priority: "Priority", probability: "Win Probability", source: "Source",
+  category: "Category", dealType: "Deal Type", expectedCloseDate: "Expected Close",
+  lostReason: "Lost Reason", name: "Name", email: "Email",
+  phone: "Phone", mobile: "Mobile", location: "Location",
+  status: "Status", gender: "Gender", notes: "Notes",
+};
+
+function formatFieldValue(field: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (field === "probability") return `${value}%`;
+  if (field === "price") return Number(value).toLocaleString();
+  if (field === "expectedCloseDate") {
+    const d = value instanceof Date ? value : new Date(String(value));
+    return isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+  return String(value);
+}
+
 function PayloadChips({
   payload,
   eventType,
@@ -189,13 +223,31 @@ function PayloadChips({
   if (eventType === "deal.stage_changed" || eventType === "deal.won" || eventType === "deal.lost") {
     return (
       <div className="flex items-center gap-1 mt-1 text-xs">
-        <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
-          {String(payload.from)}
-        </span>
+        <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">{String(payload.from)}</span>
         <ArrowRight className="h-3 w-3 text-muted-foreground" />
-        <span className="px-1.5 py-0.5 rounded bg-muted text-foreground capitalize font-medium">
-          {String(payload.to)}
-        </span>
+        <span className="px-1.5 py-0.5 rounded bg-muted text-foreground capitalize font-medium">{String(payload.to)}</span>
+      </div>
+    );
+  }
+  if (eventType === "deal.updated" || eventType === "contact.updated") {
+    const changes = payload.changes as Record<string, { from: unknown; to: unknown }> | undefined;
+    if (!changes || Object.keys(changes).length === 0) return null;
+    return (
+      <div className="mt-1.5 space-y-1">
+        {Object.entries(changes).map(([field, { from, to }]) => (
+          <div key={field} className="flex items-center gap-1 text-xs flex-wrap">
+            <span className="text-muted-foreground font-medium shrink-0">
+              {FIELD_LABELS[field] ?? field}:
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground max-w-[120px] truncate capitalize">
+              {formatFieldValue(field, from)}
+            </span>
+            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary max-w-[120px] truncate capitalize font-medium">
+              {formatFieldValue(field, to)}
+            </span>
+          </div>
+        ))}
       </div>
     );
   }

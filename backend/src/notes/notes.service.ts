@@ -22,12 +22,13 @@ export class NotesService {
   }
 
   async create(body: Record<string, any>, userId: string) {
-    const { _id, id, createdAt, updatedAt, createdBy, ...rest } = body;
-    const data: any = { ...rest, createdById: userId };
-    if (rest.linkedModel === 'Customer') data.customerId = rest.linkedToId;
-    if (rest.linkedModel === 'Deal') data.dealId = rest.linkedToId;
-    if (rest.linkedModel === 'Product') data.productId = rest.linkedToId;
-    if (rest.linkedModel === 'Expense') data.expenseReportId = rest.linkedToId;
+    const { _id, id, createdAt, updatedAt, createdBy, linkedTo, linkedToId: _ltId, ...rest } = body;
+    const linkedId: string = _ltId ?? linkedTo;
+    const data: any = { ...rest, linkedToId: linkedId, createdById: userId };
+    if (rest.linkedModel === 'Customer') data.customerId = linkedId;
+    if (rest.linkedModel === 'Deal') data.dealId = linkedId;
+    if (rest.linkedModel === 'Product') data.productId = linkedId;
+    if (rest.linkedModel === 'Expense') data.expenseReportId = linkedId;
 
     const note = await this.prisma.note.create({
       data,

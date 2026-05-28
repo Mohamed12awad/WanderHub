@@ -11,7 +11,6 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { toggleUserState } from "@/utils/api";
 import { useQueryClient } from "react-query";
 
@@ -23,12 +22,12 @@ interface UserRowProps {
   active: boolean;
   date: string;
   handleDelete: (id: string) => void;
+  onEdit: (id: string) => void;
 }
 
-const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, handleDelete }) => {
+const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, handleDelete, onEdit }) => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const handleToggleState = async () => {
     await toggleUserState(id);
@@ -36,7 +35,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
   };
 
   return (
-    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/users/${id}/edit`)}>
+    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => onEdit(id)}>
       <TableCell className="font-medium">{name}</TableCell>
       <TableCell className="hidden md:table-cell text-foreground/70">{email}</TableCell>
       <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{role}</TableCell>
@@ -61,9 +60,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <Link to={`/users/${id}/edit`}>
-              <DropdownMenuItem>Edit</DropdownMenuItem>
-            </Link>
+            <DropdownMenuItem onClick={() => onEdit(id)}>Edit</DropdownMenuItem>
             <DropdownMenuItem disabled={user?.id === id} onClick={handleToggleState}>
               {active ? "Deactivate" : "Activate"}
             </DropdownMenuItem>

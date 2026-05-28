@@ -5,6 +5,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { FinanceService } from './finance.service';
+import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('finance/quotes')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -32,7 +33,7 @@ export class QuotesController {
   @RequirePermission('finance:create')
   async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.finance.createQuote(body, user.id)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+    catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put(':id')
@@ -42,7 +43,7 @@ export class QuotesController {
       const q = await this.finance.updateQuote(id, body);
       if (!q) return res.status(404).json({ message: 'Quote not found' });
       return res.json(q);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+    } catch (e) { return handlePrismaError(e, res); }
   }
 
   @Delete(':id')
@@ -59,8 +60,9 @@ export class QuotesController {
   @RequirePermission('finance:approve')
   async approve(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      const q = await this.finance.approveQuote(id, user.id);
+      const q = await this.finance.approveQuote(id, user.id, user.role);
       if (!q) return res.status(404).json({ message: 'Quote not found' });
+      if ((q as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve quotes' });
       return res.json(q);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -70,8 +72,9 @@ export class QuotesController {
   async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser, @Res() res: Response) {
     if (!body.reason?.trim()) return res.status(400).json({ message: 'Rejection reason is required' });
     try {
-      const q = await this.finance.rejectQuote(id, user.id, body.reason.trim());
+      const q = await this.finance.rejectQuote(id, user.id, body.reason.trim(), user.role);
       if (!q) return res.status(404).json({ message: 'Quote not found' });
+      if ((q as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject quotes' });
       return res.json(q);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }

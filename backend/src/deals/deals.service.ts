@@ -13,50 +13,27 @@ export class DealsService {
     private readonly numberSequence: NumberSequenceService,
   ) {}
 
-  /** Maps frontend deal payload (customer/product as strings) to Prisma data. */
+  /** Maps frontend deal payload (customer/owner as strings) to Prisma data. */
   private cleanData(body: Record<string, any>) {
     const {
-      _id,
-      id,
-      customer,
-      product,
-      totalPaid,
-      createdAt,
-      updatedAt,
-      quotes,
-      invoices,
-      partialPayments,
-      activities,
-      tasks,
+      _id, id, customer, product, owner,
+      totalPaid, quantity, createdAt, updatedAt,
+      quotes, invoices, partialPayments, activities, tasks,
+      startDate, endDate,
       ...rest
     } = body;
     const data: Record<string, any> = { ...rest };
     if (customer !== undefined) {
       data.customerId = typeof customer === 'object' ? customer?._id : customer;
     }
-    if (product !== undefined && product !== '' && product !== null) {
-      data.productId = typeof product === 'object' ? product?._id : product;
-    } else if (product === '' || product === null) {
-      data.productId = null;
+    if (owner !== undefined) {
+      data.ownerId = owner === '' || owner === null ? null : (typeof owner === 'object' ? owner?._id : owner);
     }
-    if (totalPaid !== undefined) data.totalPaid = totalPaid;
     return data;
   }
 
   async create(body: Record<string, any>, userId: string) {
-    const { totalPaid } = body;
     const deal = await this.prisma.deal.create({ data: this.cleanData(body) as any });
-
-    if (totalPaid && totalPaid > 0) {
-      await this.prisma.partialPayment.create({
-        data: {
-          dealId: deal.id,
-          amount: totalPaid,
-          date: new Date(),
-          createdById: userId,
-        },
-      });
-    }
 
     await this.timeline.log(
       'deal.created',
@@ -71,13 +48,13 @@ export class DealsService {
   }
 
   async findAll(query: Record<string, string>) {
-    const { page, limit: limitRaw, q, status, source, currency, closeDate_from, closeDate_to, createdAt_from, createdAt_to, price_min, price_max } = query;
+    const { page, limit: limitRaw, q, status, source, currency, customerId, priority, ownerId, closeDate_from, closeDate_to, createdAt_from, createdAt_to, price_min, price_max } = query;
     const customerSelect = { select: { id: true, name: true } };
-    const productSelect = { select: { id: true, name: true } };
+    const ownerSelect = { select: { id: true, name: true } };
 
     if (!page) {
       const deals = await this.prisma.deal.findMany({
-        include: { customer: customerSelect, product: productSelect },
+        include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
       });
       return toClient(deals);
@@ -86,10 +63,13 @@ export class DealsService {
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
     const where: any = {};
+    if (customerId) where.customerId = customerId;
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (status) where.status = status;
     if (source) where.source = source;
     if (currency) where.currency = currency;
+    if (priority) where.priority = priority;
+    if (ownerId) where.ownerId = ownerId;
     if (closeDate_from || closeDate_to) {
       where.expectedCloseDate = {};
       if (closeDate_from) where.expectedCloseDate.gte = new Date(closeDate_from);
@@ -110,7 +90,7 @@ export class DealsService {
     const [data, total] = await Promise.all([
       this.prisma.deal.findMany({
         where,
-        include: { customer: customerSelect, product: productSelect },
+        include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
         skip: (p - 1) * limit,
         take: limit,
@@ -133,7 +113,7 @@ export class DealsService {
             owner: { select: { id: true, name: true, phone: true } },
           },
         },
-        product: { select: { id: true, name: true } },
+        owner: { select: { id: true, name: true } },
       },
     });
     if (!deal) return null;
@@ -152,7 +132,7 @@ export class DealsService {
   async getInvoiceData(id: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { id },
-      include: { customer: true, product: true },
+      include: { customer: true },
     });
     if (!deal) return null;
     const payments = await this.prisma.partialPayment.findMany({
@@ -165,27 +145,36 @@ export class DealsService {
     const oldDeal = await this.prisma.deal.findUnique({ where: { id } });
     if (!oldDeal) return null;
 
+    const cleaned = this.cleanData(body);
     const newStatus = body.status as string | undefined;
-    const deal = await this.prisma.deal.update({
-      where: { id },
-      data: this.cleanData(body),
-    });
+    const deal = await this.prisma.deal.update({ where: { id }, data: cleaned });
 
     if (newStatus && newStatus !== oldDeal.status) {
       const eventType =
-        newStatus === 'won'
-          ? 'deal.won'
-          : newStatus === 'lost'
-            ? 'deal.lost'
-            : 'deal.stage_changed';
+        newStatus === 'won' ? 'deal.won'
+        : newStatus === 'lost' ? 'deal.lost'
+        : 'deal.stage_changed';
       await this.timeline.log(
         eventType,
         `Status changed: ${oldDeal.status} → ${newStatus}`,
-        id,
-        'Deal',
+        id, 'Deal',
         { from: oldDeal.status, to: newStatus },
         userId,
       );
+    }
+
+    const TRACKED_FIELDS = ['title', 'price', 'currency', 'priority', 'probability', 'source', 'category', 'dealType', 'expectedCloseDate', 'lostReason'];
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    for (const field of TRACKED_FIELDS) {
+      if (cleaned[field] === undefined) continue;
+      const oldVal = (oldDeal as any)[field];
+      const newVal = cleaned[field];
+      const oldStr = oldVal instanceof Date ? oldVal.toISOString().slice(0, 10) : String(oldVal ?? '');
+      const newStr = newVal instanceof Date ? (newVal as Date).toISOString().slice(0, 10) : String(newVal ?? '');
+      if (oldStr !== newStr) changes[field] = { from: oldVal, to: newVal };
+    }
+    if (Object.keys(changes).length > 0) {
+      await this.timeline.log('deal.updated', 'Deal updated', id, 'Deal', { changes }, userId);
     }
 
     return toClient(deal);
@@ -194,32 +183,19 @@ export class DealsService {
   async createQuoteFromDeal(id: string, userId: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { id },
-      include: {
-        customer: { select: { id: true, name: true } },
-        product: { select: { id: true, name: true } },
-      },
+      include: { customer: { select: { id: true, name: true } } },
     });
     if (!deal) return null;
 
-    const items = deal.product
-      ? [
-          {
-            description: deal.product.name ?? 'Service',
-            quantity: deal.quantity || 1,
-            unitPrice: deal.price,
-            discount: 0,
-            total: deal.price * (deal.quantity || 1),
-          },
-        ]
-      : [
-          {
-            description: deal.title,
-            quantity: 1,
-            unitPrice: deal.price,
-            discount: 0,
-            total: deal.price,
-          },
-        ];
+    const items = [
+      {
+        description: deal.title,
+        quantity: 1,
+        unitPrice: deal.price,
+        discount: 0,
+        total: deal.price,
+      },
+    ];
 
     const subtotal = items.reduce((s, i) => s + i.total, 0);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');

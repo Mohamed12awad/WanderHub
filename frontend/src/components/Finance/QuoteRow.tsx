@@ -53,7 +53,7 @@ const QuoteRow: React.FC<{
         {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
       </TableCell>
       <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">
-        {new Date(q.createdAt).toLocaleDateString()}
+        {new Date(q.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

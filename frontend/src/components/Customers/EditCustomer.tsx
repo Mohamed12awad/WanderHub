@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { updateCustomer, getCustomerById, getUsers } from "@/utils/api";
+
+const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
 import { Link, useNavigate, useParams } from "react-router-dom";
 import DynamicFields from "@/components/common/DynamicFields";
 import { CircleArrowLeft } from "lucide-react";
@@ -58,11 +60,20 @@ const initialFormData = {
     relationship: "",
   },
   location: "",
+  source: "",
   status: "Draft",
   owner: "",
   notes: "",
   customFields: {} as Record<string, string>,
 };
+
+/** Format an ISO datetime string or Date to YYYY-MM-DD for <input type="date">. */
+function toDateInputValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+}
 
 const EditCustomer = () => {
   const [formData, setFormData] = useState(initialFormData);
@@ -71,7 +82,6 @@ const EditCustomer = () => {
   const [users, setUsers] = useState([]);
   const { user } = useAuth();
   const originalRef = useRef<string | null>(null);
-  //   const { data: users } = useQuery("users", getUsers);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -82,7 +92,14 @@ const EditCustomer = () => {
         const { data: users } = await getUsers();
         setUsers(users);
         const { data } = await getCustomerById(id);
-        const loaded = { ...initialFormData, ...data, owner: data.owner?._id || "", customFields: data.customFields ?? {} };
+        const loaded = {
+          ...initialFormData,
+          ...data,
+          dateOfBirth: toDateInputValue(data.dateOfBirth),
+          owner: data.owner?._id || "",
+          source: data.source ?? "",
+          customFields: data.customFields ?? {},
+        };
         setFormData(loaded);
         originalRef.current = JSON.stringify(loaded);
       } catch (error) {
@@ -101,30 +118,38 @@ const EditCustomer = () => {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name } = e.target;
     let { value } = e.target;
     if (["phone", "mobile"].includes(name)) {
       value = value.replace(/\D/g, "").substring(0, 11);
     }
-
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      address: {
-        ...prevData.address,
-        [name]: value,
-      },
-    }));
+    setFormData((prev) => ({ ...prev, address: { ...prev.address, [name]: value } }));
+  };
+
+  const handleIdentificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, identification: { ...prev.identification, [name]: value } }));
+  };
+
+  const handleEmergencyContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, emergencyContact: { ...prev.emergencyContact, [name]: value } }));
+  };
+
+  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, paymentInformation: { ...prev.paymentInformation, [name]: value } }));
+  };
+
+  const handleLoyaltyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, loyaltyProgram: { ...prev.loyaltyProgram, [name]: value } }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -132,7 +157,10 @@ const EditCustomer = () => {
     if (!id) return;
 
     try {
-      const customerData: Customer = formData;
+      const customerData: Customer = {
+        ...formData,
+        dateOfBirth: formData.dateOfBirth || null,
+      } as any;
       setIsLoading(true);
       await updateCustomer(id, customerData);
       setIsLoading(false);
@@ -287,6 +315,24 @@ const EditCustomer = () => {
                 </Select>
               </div>
               <div className="flex flex-col">
+                <Label className="my-3">Lead Source</Label>
+                <Select
+                  value={formData.source}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, source: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="How did they find you?" />
+                  </SelectTrigger>
+                  <SelectContent className="overflow-y-auto max-h-[12rem]">
+                    {LEAD_SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col">
                 <Label className="my-3" htmlFor="notes">
                   Notes
                 </Label>
@@ -374,7 +420,7 @@ const EditCustomer = () => {
                   id="passportNumber"
                   name="passportNumber"
                   value={formData.identification.passportNumber}
-                  onChange={handleChange}
+                  onChange={handleIdentificationChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -385,7 +431,7 @@ const EditCustomer = () => {
                   id="nationalId"
                   name="nationalId"
                   value={formData.identification.nationalId}
-                  onChange={handleChange}
+                  onChange={handleIdentificationChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -432,7 +478,7 @@ const EditCustomer = () => {
                   id="emergencyContact.name"
                   name="name"
                   value={formData.emergencyContact.name}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -443,7 +489,7 @@ const EditCustomer = () => {
                   id="emergencyContact.phone"
                   name="phone"
                   value={formData.emergencyContact.phone}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -454,7 +500,7 @@ const EditCustomer = () => {
                   id="emergencyContact.relationship"
                   name="relationship"
                   value={formData.emergencyContact.relationship}
-                  onChange={handleChange}
+                  onChange={handleEmergencyContactChange}
                 />
               </div>
             </div>
@@ -470,7 +516,7 @@ const EditCustomer = () => {
                   id="loyaltyProgram.memberId"
                   name="memberId"
                   value={formData.loyaltyProgram.memberId}
-                  onChange={handleChange}
+                  onChange={handleLoyaltyChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -481,7 +527,7 @@ const EditCustomer = () => {
                   id="loyaltyProgram.points"
                   name="points"
                   value={formData.loyaltyProgram.points}
-                  onChange={handleChange}
+                  onChange={handleLoyaltyChange}
                 />
               </div>
             </div>
@@ -499,7 +545,7 @@ const EditCustomer = () => {
                   id="paymentInformation.cardType"
                   name="cardType"
                   value={formData.paymentInformation.cardType}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
               <div className="flex flex-col">
@@ -510,14 +556,11 @@ const EditCustomer = () => {
                   id="paymentInformation.cardNumber"
                   name="cardNumber"
                   value={formData.paymentInformation.cardNumber}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
               <div className="flex flex-col">
-                <Label
-                  className="my-3"
-                  htmlFor="paymentInformation.expirationDate"
-                >
+                <Label className="my-3" htmlFor="paymentInformation.expirationDate">
                   Expiration Date
                 </Label>
                 <Input
@@ -525,7 +568,7 @@ const EditCustomer = () => {
                   name="expirationDate"
                   type="date"
                   value={formData.paymentInformation.expirationDate}
-                  onChange={handleChange}
+                  onChange={handlePaymentChange}
                 />
               </div>
             </div>

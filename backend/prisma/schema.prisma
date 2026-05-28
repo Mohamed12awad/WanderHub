@@ -83,18 +83,22 @@ model Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  phone     String
-  password  String
-  active    Boolean  @default(true)
-  roleId    String
-  role      Role     @relation(fields: [roleId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String
+  password    String
+  active      Boolean  @default(true)
+  roleId      String
+  role        Role     @relation(fields: [roleId], references: [id])
+  reportsToId String?
+  reportsTo   User?    @relation("ReportsTo", fields: [reportsToId], references: [id])
+  directReports User[] @relation("ReportsTo")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   ownedCustomers      Customer[]       @relation("CustomerOwner")
+  ownedDeals          Deal[]           @relation("DealOwner")
   createdQuotes       Quote[]          @relation("QuoteCreatedBy")
   approvedQuotes      Quote[]          @relation("QuoteApprovedBy")
   createdInvoices     Invoice[]        @relation("InvoiceCreatedBy")
@@ -132,6 +136,7 @@ model Customer {
   location               String?
   ownerId                String?
   owner                  User?     @relation("CustomerOwner", fields: [ownerId], references: [id])
+  source                 String?
   status                 String?
   notes                  String?
   customFields           Json?
@@ -150,18 +155,19 @@ model Deal {
   id                String     @id @default(cuid())
   customerId        String
   customer          Customer   @relation(fields: [customerId], references: [id])
-  productId         String?
-  product           Product?   @relation(fields: [productId], references: [id])
+  ownerId           String?
+  owner             User?      @relation("DealOwner", fields: [ownerId], references: [id])
   title             String
+  category          String?
+  dealType          String?
   price             Float
-  currency          String     @default("USD")
-  totalPaid         Float      @default(0)
+  currency          String     @default("EGP")
   status            DealStatus @default(lead)
+  priority          String?    @default("medium")
+  probability       Float?     @default(10)
   source            String?
-  quantity          Int        @default(1)
   expectedCloseDate DateTime?
-  startDate         DateTime?
-  endDate           DateTime?
+  lostReason        String?
   notes             String?
   customFields      Json?
   createdAt         DateTime   @default(now())
@@ -190,7 +196,6 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  deals        Deal[]
   productNotes Note[]
 }
 
@@ -258,6 +263,7 @@ model Invoice {
   total           Float          @default(0)
   totalPaid       Float          @default(0)
   currency        String         @default("USD")
+  exchangeRate    Float?
   issueDate       DateTime       @default(now())
   dueDate         DateTime?
   notes           String?
@@ -464,14 +470,15 @@ model TimelineEvent {
 // ─── System ──────────────────────────────────────────────────────────────────
 
 model Log {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  action    String
-  method    String
-  endpoint  String
-  recordId  String?
-  timestamp DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  method     String
+  endpoint   String
+  recordId   String?
+  recordName String?
+  timestamp  DateTime @default(now())
 }
 
 model Purchase {
@@ -504,6 +511,8 @@ model WorkspaceConfig {
   approvals      Json     @default("[]")
   fieldGroups    Json     @default("[]")
   moduleSettings Json     @default("[]")
+  baseCurrency   String   @default("EGP")
+  locale         String   @default("en-US")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

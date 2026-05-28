@@ -28,7 +28,7 @@ export function useWorkspaceSettings() {
   );
 
   const getFieldsForModule = (module: string): FieldDef[] => {
-    return data?.fieldGroups.find((g) => g.module === module)?.fields ?? [];
+    return data?.fieldGroups?.find((g) => g.module === module)?.fields ?? [];
   };
 
   /** Returns only custom (non-system) filterable fields for use in filter panels */

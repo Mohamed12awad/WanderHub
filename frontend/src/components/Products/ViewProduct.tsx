@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -6,13 +6,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getProductById, deleteProduct } from "@/utils/api";
+import { getProductById, deleteProduct, getNotes } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, MoreHorizontal, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { useQuery } from "react-query";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -30,20 +32,32 @@ const ViewProduct: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const canDelete = ["admin", "super admin"].includes(user!.role);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: response, isLoading, error } = useQuery(
     ["product", id],
     () => getProductById(id!),
     { enabled: !!id }
   );
+  const { data: notesData } = useQuery(["notes", id, "Product"], () => getNotes({ linkedTo: id!, linkedModel: "Product" }), { enabled: !!id });
+  const notesCount = ((notesData?.data) as any[])?.length ?? 0;
 
   const { getFieldsForModule } = useWorkspaceSettings();
-  const fieldLabels = Object.fromEntries(getFieldsForModule("products").map((f) => [f.id, f.label]));
+  const _prodFields = getFieldsForModule("products");
+  const fieldLabels = Object.fromEntries([
+    ..._prodFields.map((f) => [f.id, f.label]),
+    ..._prodFields.map((f) => [f.name, f.label]),
+  ]);
 
   const product = response?.data ?? null;
 
+  const handleClone = () => {
+    if (!product) return;
+    const { _id, id: _, createdAt, updatedAt, ...rest } = product as any;
+    navigate("/products/add", { state: { clone: { ...rest, name: `Copy of ${product.name}` } } });
+  };
+
   const handleDelete = async () => {
-    if (!confirm("Delete this product? This action cannot be undone.")) return;
     try {
       await deleteProduct(id!);
       navigate("/products");
@@ -113,10 +127,13 @@ const ViewProduct: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
                       <Trash2 className="h-3.5 w-3.5 me-2" />Delete
                     </DropdownMenuItem>
                   </>
@@ -152,10 +169,19 @@ const ViewProduct: React.FC = () => {
       {id && (
         <Card>
           <CardContent className="py-5">
-            <Tabs defaultValue="notes">
+            <Tabs defaultValue="timeline">
               <TabsList className="mb-4">
-                <TabsTrigger value="notes">Notes</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="notes">
+                  Notes
+                  {notesCount > 0 && (
+                    <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{notesCount}</span>
+                  )}
+                </TabsTrigger>
               </TabsList>
+              <TabsContent value="timeline">
+                <RecordTimeline linkedTo={id} linkedModel="Product" />
+              </TabsContent>
               <TabsContent value="notes">
                 <NotesPanel linkedTo={id} linkedModel="Product" />
               </TabsContent>
@@ -163,6 +189,14 @@ const ViewProduct: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handleDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
+        title="Delete Product"
+        description="Delete this product? This action cannot be undone."
+      />
     </main>
   );
 };

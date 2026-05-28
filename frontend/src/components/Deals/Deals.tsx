@@ -7,8 +7,11 @@ export interface Deal {
   _id: string;
   title: string;
   customer: { name: string };
-  product?: { name: string };
+  category?: string;
+  owner?: { name: string };
   status: string;
+  priority?: string;
+  probability?: number;
   price: number;
   currency: string;
   source: string;
@@ -55,6 +58,16 @@ const DEAL_FILTERS = [
       { value: "SAR", label: "SAR" },
     ],
   },
+  {
+    label: "Priority",
+    field: "priority",
+    type: "select" as const,
+    options: [
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+    ],
+  },
   { label: "Deal Value", field: "price", type: "number-range" as const },
   { label: "Expected Close Date", field: "closeDate", type: "date-range" as const },
   { label: "Created Date", field: "createdAt", type: "date-range" as const },
@@ -70,7 +83,7 @@ export function Deals() {
       fetchData={({ page, limit, q, filters, sort, dir }) => getDeals({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
       deleteData={deleteDeal}
       headers={d.headers}
-      sortableHeaders={["Title", "Value", "Created"]}
+      sortableHeaders={["Title", "Value", "Created", "Priority"]}
       renderRow={(item, handleDelete) => (
         <DealRow
           key={item._id}
@@ -78,8 +91,10 @@ export function Deals() {
           title={item.title}
           customer={item.customer?.name ?? "—"}
           status={item.status}
+          priority={item.priority}
+          owner={item.owner?.name}
           value={`${item.price?.toLocaleString()} ${item.currency}`}
-          date={new Date(item.createdAt).toLocaleDateString()}
+          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}
@@ -108,8 +123,10 @@ export function Deals() {
         getRow: (deal) => ({
           Title: deal.title,
           Customer: deal.customer?.name ?? "",
-          Product: deal.product?.name ?? "",
+          Category: deal.category ?? "",
           Status: deal.status,
+          Priority: deal.priority ?? "",
+          Owner: deal.owner?.name ?? "",
           Price: deal.price,
           Currency: deal.currency,
           Source: deal.source,

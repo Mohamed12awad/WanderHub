@@ -42,6 +42,7 @@ type GenericTableProps<T extends DataItem> = {
   description: string;
   addLink: string;
   addLabel: string;
+  onAdd?: () => void;
   emptyMessage?: string;
   noSearchMessage?: (q: string) => string;
   exportConfig?: {
@@ -70,6 +71,7 @@ export function GenericTable<T extends DataItem>({
   description,
   addLink,
   addLabel,
+  onAdd,
   emptyMessage,
   noSearchMessage,
   exportConfig,
@@ -285,12 +287,19 @@ export function GenericTable<T extends DataItem>({
               <span className="hidden sm:inline">{tr.common.exportCsv}</span>
             </Button>
           )}
-          <Link to={addLink}>
-            <Button size="sm" className="h-8 gap-1.5">
+          {onAdd ? (
+            <Button size="sm" className="h-8 gap-1.5" onClick={onAdd}>
               <PlusCircle className="h-3.5 w-3.5" />
               {addLabel}
             </Button>
-          </Link>
+          ) : (
+            <Link to={addLink}>
+              <Button size="sm" className="h-8 gap-1.5">
+                <PlusCircle className="h-3.5 w-3.5" />
+                {addLabel}
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -523,12 +532,19 @@ export function GenericTable<T extends DataItem>({
                       )}
                     </div>
                     {!committedQ && (
-                      <Link to={addLink}>
-                        <Button size="sm" variant="outline" className="gap-1.5 mt-1">
+                      onAdd ? (
+                        <Button size="sm" variant="outline" className="gap-1.5 mt-1" onClick={onAdd}>
                           <PlusCircle className="h-3.5 w-3.5" />
                           {addLabel}
                         </Button>
-                      </Link>
+                      ) : (
+                        <Link to={addLink}>
+                          <Button size="sm" variant="outline" className="gap-1.5 mt-1">
+                            <PlusCircle className="h-3.5 w-3.5" />
+                            {addLabel}
+                          </Button>
+                        </Link>
+                      )
                     )}
                   </div>
                 </TableCell>

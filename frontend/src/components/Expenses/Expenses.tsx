@@ -52,7 +52,7 @@ export function Expenses() {
           total={item.expenses.reduce((t, i) => t + i.amount, 0)}
           approved={item.approved}
           owner={item.userId?.name ?? "—"}
-          date={new Date(item.createdAt).toLocaleDateString()}
+          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}

@@ -16,8 +16,20 @@ import LineItemsTable, { LineItemRow } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { InvoiceStatus } from "@/types/types";
+import { useOrgSettings } from "@/hooks/useOrgSettings";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
+
+async function fetchExchangeRate(baseCurrency: string, toCurrency: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://api.frankfurter.app/latest?from=${baseCurrency}&to=${toCurrency}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.rates?.[toCurrency] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const InvoiceForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +39,7 @@ const InvoiceForm: React.FC = () => {
   const { toast } = useToast();
   const { tr } = useLanguage();
   const f = tr.finance;
+  const { baseCurrency } = useOrgSettings();
 
   const dealParam = searchParams.get("deal");
   const [title, setTitle] = useState("");
@@ -35,7 +48,7 @@ const InvoiceForm: React.FC = () => {
   const [deal, setDeal] = useState(dealParam ?? "none");
   const [dealLabel, setDealLabel] = useState("");
   const [status, setStatus] = useState<InvoiceStatus>("draft");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("EGP");
   const [taxRate, setTaxRate] = useState(0);
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
@@ -45,6 +58,8 @@ const InvoiceForm: React.FC = () => {
     { description: "", quantity: 1, unitPrice: 0, discount: 0 },
   ]);
   const [saving, setSaving] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<number | "">("");
+  const [fetchingRate, setFetchingRate] = useState(false);
 
   const fetchCustomers = useCallback(
     (q: string) =>
@@ -80,6 +95,16 @@ const InvoiceForm: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealParam, isEdit]);
 
+  // Auto-fetch today's rate whenever the currency changes (create mode only)
+  useEffect(() => {
+    if (isEdit || currency === baseCurrency) { setExchangeRate(""); return; }
+    setFetchingRate(true);
+    fetchExchangeRate(baseCurrency, currency).then((rate) => {
+      setExchangeRate(rate ?? "");
+    }).finally(() => setFetchingRate(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currency, isEdit, baseCurrency]);
+
   const { data: invoiceData } = useQuery(
     ["invoices", id],
     () => getInvoiceById(id!),
@@ -107,6 +132,7 @@ const InvoiceForm: React.FC = () => {
       unitPrice: i.unitPrice,
       discount: i.discount,
     })));
+    setExchangeRate(inv.exchangeRate ?? "");
   }, [invoiceData]);
 
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice * (1 - i.discount / 100), 0);
@@ -126,6 +152,7 @@ const InvoiceForm: React.FC = () => {
         deal: deal || undefined,
         status,
         currency,
+        exchangeRate: currency !== baseCurrency && exchangeRate !== "" ? Number(exchangeRate) : undefined,
         taxRate,
         issueDate: issueDate || undefined,
         dueDate: dueDate || undefined,
@@ -207,6 +234,27 @@ const InvoiceForm: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {currency !== baseCurrency && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    Exchange Rate
+                    <span className="text-xs text-muted-foreground font-normal">1 {baseCurrency} =</span>
+                    {fetchingRate && <span className="text-xs text-muted-foreground animate-pulse">Fetching…</span>}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="e.g. 50.5"
+                      value={exchangeRate}
+                      onChange={(e) => setExchangeRate(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="max-w-[160px]"
+                    />
+                    <span className="text-sm text-muted-foreground">{currency}</span>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>{f.issueDate}</Label>
                 <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />

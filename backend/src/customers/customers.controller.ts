@@ -16,6 +16,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { CustomersService } from './customers.service';
+import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -55,7 +56,7 @@ export class CustomersController {
       const customer = await this.customers.create(body, user.id);
       return res.status(201).json(customer);
     } catch (error) {
-      return res.status(400).json({ message: (error as Error).message });
+      return handlePrismaError(error, res);
     }
   }
 
@@ -64,14 +65,15 @@ export class CustomersController {
   async update(
     @Param('id') id: string,
     @Body() body: Record<string, any>,
+    @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {
     try {
-      const customer = await this.customers.update(id, body);
+      const customer = await this.customers.update(id, body, user.id);
       if (!customer) return res.status(404).json({ message: 'Customer not found' });
       return res.json(customer);
     } catch (error) {
-      return res.status(400).json({ message: (error as Error).message });
+      return handlePrismaError(error, res);
     }
   }
 

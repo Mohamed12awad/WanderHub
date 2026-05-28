@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createExpense } from "@/utils/api";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
 import { ErrorResponse } from "@/types/types";
@@ -13,8 +13,10 @@ import { toast } from "@/components/ui/use-toast";
 import ExpenseLineTable, { blankLine, ExpenseLine } from "./ExpenseLineTable";
 
 const AddExpenseReport: React.FC = () => {
-  const [title, setTitle] = useState("");
-  const [lines, setLines] = useState<ExpenseLine[]>([blankLine()]);
+  const location = useLocation();
+  const cloneData = (location.state as any)?.clone;
+  const [title, setTitle] = useState(cloneData?.title ?? "");
+  const [lines, setLines] = useState<ExpenseLine[]>(cloneData?.expenses?.length ? cloneData.expenses : [blankLine()]);
   const [titleError, setTitleError] = useState("");
   const [linesError, setLinesError] = useState("");
   const [isLoading, setIsLoading] = useState(false);

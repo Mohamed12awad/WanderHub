@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getDealById, deleteDeal } from "@/utils/api";
+import { getDealById, deleteDeal, getNotes, getActivities, getQuotes, getInvoices } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { useQuery } from "react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
@@ -20,6 +20,13 @@ import { NotesPanel } from "@/components/common/NotesPanel";
 import FinanceTab from "@/components/Finance/FinanceTab";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { useToast } from "@/components/ui/use-toast";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+
+function oneWeekFromNow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().split("T")[0];
+}
 
 const STATUS_COLORS: Record<string, string> = {
   lead:        "bg-sky-500     text-white border-sky-500     dark:bg-sky-600     dark:border-sky-600",
@@ -45,14 +52,18 @@ interface DealData {
   customerID: string;
   customer: string;
   customerPhone: string;
-  product: string;
+  category: string;
+  owner: string;
+  ownerID: string;
+  dealType: string;
   price: number;
   currency: string;
-  totalPaid: number;
   status: string;
-  quantity: number;
+  priority: string;
+  probability: number;
   source: string;
   expectedCloseDate: Date | null;
+  lostReason: string;
   notes: string;
   createdAt: string;
   customFields?: Record<string, string>;
@@ -64,13 +75,18 @@ const ViewDeal = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const canDelete = ["admin", "super admin"].includes(user!.role);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: dealData, isLoading, error } = useQuery(
     ["deals", dealId],
     () => getDealById(dealId!)
   );
   const { getFieldsForModule } = useWorkspaceSettings();
-  const fieldLabels = Object.fromEntries(getFieldsForModule("deals").map((f) => [f.id, f.label]));
+  const _dealFields = getFieldsForModule("deals");
+  const fieldLabels = Object.fromEntries([
+    ..._dealFields.map((f) => [f.id, f.label]),
+    ..._dealFields.map((f) => [f.name, f.label]),
+  ]);
 
   const [formData, setFormData] = useState<DealData | null>(null);
 
@@ -81,18 +97,60 @@ const ViewDeal = () => {
       ...d,
       customerID: d.customer?._id,
       customer: d.customer?.name,
-      customerPhone: d.customer?.phone,
-      product: d.product?.name ?? "—",
+      customerPhone: d.customer?.phone ?? d.customer?.mobile,
+      category: d.category ?? "",
+      owner: d.owner?.name ?? "—",
+      ownerID: d.owner?._id ?? "",
+      dealType: d.dealType ?? "",
       price: Number(d.price),
-      totalPaid: Number(d.totalPaid),
-      quantity: Number(d.quantity),
+      priority: d.priority ?? "medium",
+      probability: Number(d.probability ?? 0),
       expectedCloseDate: d.expectedCloseDate ? new Date(d.expectedCloseDate) : null,
+      lostReason: d.lostReason ?? "",
       customFields: d.customFields ?? {},
     });
   }, [dealData]);
 
+  const { data: notesData }      = useQuery(["notes", dealId, "Deal"],      () => getNotes({ linkedTo: dealId!, linkedModel: "Deal" }),  { enabled: !!dealId });
+  const { data: activitiesData } = useQuery(["activities", dealId],          () => getActivities(dealId!, "Deal"),                        { enabled: !!dealId });
+  const { data: quotesData }     = useQuery(["quotes",   { deal: dealId }],  () => getQuotes({ deal: dealId }),                           { enabled: !!dealId });
+  const { data: invoicesData }   = useQuery(["invoices", { deal: dealId }],  () => getInvoices({ deal: dealId }),                         { enabled: !!dealId });
+
+  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
+  const quotesCount     = ((quotesData?.data)     as any[])?.length ?? 0;
+  const invoicesCount   = ((invoicesData?.data)   as any[])?.length ?? 0;
+
+  const invoicesList: any[] = ((invoicesData?.data) as any[]) ?? [];
+  const invoicedTotal = invoicesList.reduce((s, inv) => s + (inv.total ?? 0), 0);
+  const invoicesPaid  = invoicesList.reduce((s, inv) => s + (inv.totalPaid ?? 0), 0);
+  const invoicesOutstanding = invoicedTotal - invoicesPaid;
+
+  const handleClone = () => {
+    if (!formData) return;
+    navigate("/deals/add", {
+      state: {
+        clone: {
+          title: `Copy of ${formData.title}`,
+          customer: formData.customerID,
+          category: formData.category,
+          owner: formData.ownerID,
+          dealType: formData.dealType,
+          price: String(formData.price),
+          currency: formData.currency,
+          status: "lead",
+          priority: formData.priority,
+          probability: "10",
+          source: formData.source,
+          notes: formData.notes,
+          expectedCloseDate: oneWeekFromNow(),
+          customFields: formData.customFields ?? {},
+        },
+      },
+    });
+  };
+
   const handleDelete = async () => {
-    if (!confirm("Delete this deal? This action cannot be undone.")) return;
     try {
       await deleteDeal(dealId!);
       navigate("/deals");
@@ -138,7 +196,6 @@ const ViewDeal = () => {
 
   if (error) return <div className="p-4">Error loading deal</div>;
 
-  const outstanding = formData.price - formData.totalPaid;
   const nextStep = NEXT_STEPS[formData.status];
 
   return (
@@ -186,10 +243,13 @@ const ViewDeal = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
                       <Trash2 className="h-3.5 w-3.5 me-2" />Delete
                     </DropdownMenuItem>
                   </>
@@ -200,27 +260,67 @@ const ViewDeal = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Deal details */}
             <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Deal Information</h2>
-              <InfoRow label="Title" value={formData.title} />
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Deal Details</h2>
               <InfoRow label="Customer">
                 <Link to={`/customers/${formData.customerID}`} className="text-sm text-blue-500 hover:underline">{formData.customer}</Link>
               </InfoRow>
               <InfoRow label="Phone" value={formData.customerPhone} />
-              <InfoRow label="Product" value={formData.product} />
-              <InfoRow label="Quantity" value={formData.quantity} />
-              <InfoRow label="Status">
+              {formData.category && <InfoRow label="Category" value={formData.category} />}
+              {formData.dealType && (
+                <InfoRow label="Deal Type" value={
+                  formData.dealType === "new_business" ? "New Business"
+                  : formData.dealType === "cross_sell" ? "Cross-sell"
+                  : formData.dealType.charAt(0).toUpperCase() + formData.dealType.slice(1)
+                } />
+              )}
+              <InfoRow label="Owner" value={formData.owner !== "—" ? formData.owner : undefined} />
+              {formData.notes && <InfoRow label="Notes" value={formData.notes} />}
+            </div>
+
+            {/* Sales info */}
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Sales Information</h2>
+              <InfoRow label="Stage">
                 <Badge className={`${STATUS_COLORS[formData.status] ?? ""} w-fit capitalize`} variant="outline">{formData.status}</Badge>
               </InfoRow>
+              <InfoRow label="Priority">
+                <span className={`text-sm font-medium capitalize ${
+                  formData.priority === "high" ? "text-red-600" :
+                  formData.priority === "medium" ? "text-amber-600" :
+                  "text-muted-foreground"
+                }`}>{formData.priority || "—"}</span>
+              </InfoRow>
+              <InfoRow label="Win Probability" value={`${formData.probability}%`} />
               <InfoRow label="Source" value={formData.source} />
               <InfoRow label="Expected Close" value={formData.expectedCloseDate?.toISOString().split("T")[0] ?? "—"} />
+              {formData.status === "lost" && formData.lostReason && (
+                <InfoRow label="Lost Reason" value={formData.lostReason} />
+              )}
             </div>
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Financial</h2>
-              <InfoRow label="Price" value={`${formData.price.toLocaleString()} ${formData.currency}`} />
-              <InfoRow label="Total Paid" value={`${formData.totalPaid.toLocaleString()} ${formData.currency}`} />
-              <InfoRow label="Outstanding" value={`${outstanding.toLocaleString()} ${formData.currency}`} />
-              <InfoRow label="Notes" value={formData.notes} />
+
+            {/* Financial summary */}
+            <div className="md:col-span-2 border-t pt-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Financial Summary</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Deal Value</p>
+                  <p className="text-base font-semibold tabular-nums">{formData.price.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Invoiced</p>
+                  <p className="text-base font-semibold tabular-nums text-foreground">{invoicedTotal.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Collected</p>
+                  <p className="text-base font-semibold tabular-nums text-emerald-600">{invoicesPaid.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Outstanding</p>
+                  <p className={`text-base font-semibold tabular-nums ${invoicesOutstanding > 0 ? "text-red-500" : "text-emerald-600"}`}>{invoicesOutstanding.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                </div>
+              </div>
             </div>
 
             {formData.customFields && Object.keys(formData.customFields).length > 0 && (
@@ -240,14 +340,21 @@ const ViewDeal = () => {
       <Card className="print:hidden">
         <CardContent className="py-5">
           <Tabs defaultValue="timeline">
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 flex-wrap h-auto">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="notes">Notes</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
-              <TabsTrigger value="finance">Finance</TabsTrigger>
+              <TabsTrigger value="quotes">Quotes<Cnt n={quotesCount} /></TabsTrigger>
+              <TabsTrigger value="invoices">Invoices<Cnt n={invoicesCount} /></TabsTrigger>
+              <TabsTrigger value="notes">Notes<Cnt n={notesCount} /></TabsTrigger>
+              <TabsTrigger value="activities">Activities<Cnt n={activitiesCount} /></TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={dealId!} linkedModel="Deal" />
+            </TabsContent>
+            <TabsContent value="quotes">
+              <FinanceTab linkedModel="Deal" linkedId={dealId!} customerId={formData.customerID} view="quotes" />
+            </TabsContent>
+            <TabsContent value="invoices">
+              <FinanceTab linkedModel="Deal" linkedId={dealId!} customerId={formData.customerID} view="invoices" />
             </TabsContent>
             <TabsContent value="notes">
               <NotesPanel linkedTo={dealId!} linkedModel="Deal" />
@@ -255,15 +362,23 @@ const ViewDeal = () => {
             <TabsContent value="activities">
               <ActivityList linkedTo={dealId!} linkedModel="Deal" />
             </TabsContent>
-            <TabsContent value="finance">
-              <FinanceTab linkedModel="Deal" linkedId={dealId!} customerId={formData.customerID} />
-            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handleDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
+        title="Delete Deal"
+        description="Delete this deal? This action cannot be undone."
+      />
     </main>
   );
 };
+
+const Cnt: React.FC<{ n: number }> = ({ n }) =>
+  n > 0 ? <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{n}</span> : null;
 
 const InfoRow: React.FC<{ label: string; value?: string | number | null; children?: React.ReactNode }> = ({ label, value, children }) => (
   <div className="mb-2 grid grid-cols-[160px_1fr] items-start gap-2">

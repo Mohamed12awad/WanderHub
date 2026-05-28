@@ -45,7 +45,7 @@ export function Products() {
           type={item.type}
           capacity={item.capacity}
           location={item.location}
-          date={new Date(item.createdAt).toLocaleDateString()}
+          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}

@@ -37,4 +37,18 @@ export class SettingsController {
     try { return res.json(await this.settings.updateWorkspace(body)); }
     catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
+
+  @Get('organization')
+  @RequirePermission('settings:view')
+  async getOrganization(@Res() res: Response) {
+    try { return res.json(await this.settings.getOrganization()); }
+    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  }
+
+  @Put('organization')
+  @RequirePermission('settings:manage')
+  async updateOrganization(@Body() body: { baseCurrency?: string; locale?: string }, @Res() res: Response) {
+    try { return res.json(await this.settings.updateOrganization(body)); }
+    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  }
 }

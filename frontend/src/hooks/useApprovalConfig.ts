@@ -21,5 +21,13 @@ export function useApprovalConfig() {
     return cfg?.enabled ?? false;
   };
 
-  return { configs, isApprovalEnabled };
+  const canUserApprove = (module: string, userRole: string): boolean => {
+    const cfg = configs.find((c) => c.module === module);
+    if (!cfg?.enabled) return false;
+    if (["admin", "super admin"].includes(userRole)) return true;
+    if (!cfg.approverRoles?.length) return true;
+    return cfg.approverRoles.includes(userRole);
+  };
+
+  return { configs, isApprovalEnabled, canUserApprove };
 }
