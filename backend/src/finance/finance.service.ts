@@ -3,6 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CreateQuoteDto } from './dto/create-quote.dto';
+import { UpdateQuoteDto } from './dto/update-quote.dto';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { RecordPaymentDto } from './dto/record-payment.dto';
+import { EditPaymentDto } from './dto/edit-payment.dto';
 
 interface RawLineItem {
   description: string;
@@ -78,7 +84,7 @@ export class FinanceService {
     return quote ? toClient(quote) : null;
   }
 
-  async createQuote(body: Record<string, any>, userId: string) {
+  async createQuote(body: CreateQuoteDto, userId: string) {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');
@@ -103,10 +109,13 @@ export class FinanceService {
     return toClient(quote);
   }
 
-  async updateQuote(id: string, body: Record<string, any>) {
+  async updateQuote(id: string, body: UpdateQuoteDto) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
     if (!quote) return null;
-    const { items, taxRate, customer, deal, _id, id: _id2, createdAt, updatedAt, ...rest } = body;
+    // customer/deal are extracted to keep them out of `rest`; the update path
+    // intentionally does not reassign them. The DTO has already stripped any
+    // server-controlled fields, so `rest` is safe to spread.
+    const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (quote.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (items) {
@@ -236,7 +245,7 @@ export class FinanceService {
     return { invoice: toClient(invoice), payments: toClient(payments) };
   }
 
-  async createInvoice(body: Record<string, any>, userId: string) {
+  async createInvoice(body: CreateInvoiceDto, userId: string) {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
@@ -262,10 +271,10 @@ export class FinanceService {
     return toClient(invoice);
   }
 
-  async updateInvoice(id: string, body: Record<string, any>) {
+  async updateInvoice(id: string, body: UpdateInvoiceDto) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) return null;
-    const { items, taxRate, customer, deal, _id, id: _id2, createdAt, updatedAt, payments, fromQuote, ...rest } = body;
+    const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (invoice.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (items) {
@@ -316,13 +325,12 @@ export class FinanceService {
     return toClient(updated);
   }
 
-  async recordPayment(invoiceId: string, body: Record<string, any>, userId: string) {
+  async recordPayment(invoiceId: string, body: RecordPaymentDto, userId: string) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
     if (!invoice) return null;
 
-    const { _id, id, createdAt, updatedAt, ...paymentData } = body;
     const payment = await this.prisma.invoicePayment.create({
-      data: { ...paymentData, amount: Number(body.amount), date: new Date(body.date), invoiceId, createdById: userId },
+      data: { ...body, amount: Number(body.amount), date: new Date(body.date), invoiceId, createdById: userId } as any,
       include: { createdBy: { select: { id: true, name: true } } },
     });
 
@@ -356,15 +364,14 @@ export class FinanceService {
     return true;
   }
 
-  async editPayment(invoiceId: string, paymentId: string, body: Record<string, any>) {
+  async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto) {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
     if (!payment) return null;
 
     const oldAmount = payment.amount;
-    const { _id, id, createdAt, updatedAt, ...data } = body;
     const updated = await this.prisma.invoicePayment.update({
       where: { id: paymentId },
-      data: { ...data as any, amount: Number(body.amount), date: body.date ? new Date(body.date) : payment.date },
+      data: { ...body, amount: Number(body.amount), date: body.date ? new Date(body.date) : payment.date } as any,
     });
 
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });

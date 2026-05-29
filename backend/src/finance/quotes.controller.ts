@@ -6,6 +6,8 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { FinanceService } from './finance.service';
 import { handlePrismaError } from '../common/prisma-error';
+import { CreateQuoteDto } from './dto/create-quote.dto';
+import { UpdateQuoteDto } from './dto/update-quote.dto';
 
 @Controller('finance/quotes')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -31,14 +33,14 @@ export class QuotesController {
 
   @Post()
   @RequirePermission('finance:create')
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateQuoteDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.finance.createQuote(body, user.id)); }
     catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put(':id')
   @RequirePermission('finance:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateQuoteDto, @Res() res: Response) {
     try {
       const q = await this.finance.updateQuote(id, body);
       if (!q) return res.status(404).json({ message: 'Quote not found' });

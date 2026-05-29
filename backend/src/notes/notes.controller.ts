@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { NotesService } from './notes.service';
+import { CreateNoteDto } from './dto/create-note.dto';
 
 @Controller('notes')
 @UseGuards(JwtAuthGuard)
@@ -17,7 +18,7 @@ export class NotesController {
   }
 
   @Post()
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateNoteDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.notes.create(body, user.id)); }
     catch (e) { return res.status(400).json({ message: (e as Error).message }); }
   }

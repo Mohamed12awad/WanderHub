@@ -4,6 +4,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { ProductsService } from './products.service';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -29,14 +31,14 @@ export class ProductsController {
 
   @Post()
   @RequirePermission('products:create')
-  async create(@Body() body: Record<string, any>, @Res() res: Response) {
+  async create(@Body() body: CreateProductDto, @Res() res: Response) {
     try { return res.status(201).json(await this.products.create(body)); }
     catch (e) { return res.status(400).json({ message: (e as Error).message }); }
   }
 
   @Put(':id')
   @RequirePermission('products:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateProductDto, @Res() res: Response) {
     try {
       const p = await this.products.update(id, body);
       if (!p) return res.status(404).json({ message: 'Product not found' });

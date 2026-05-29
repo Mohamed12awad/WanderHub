@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 
 @Injectable()
 export class AccountsService {
@@ -11,16 +13,16 @@ export class AccountsService {
     return toClient(accounts);
   }
 
-  async create(body: Record<string, any>) {
-    const { _id, id, createdAt, updatedAt, ...data } = body;
+  async create(body: CreateAccountDto) {
+    const { _id, id, createdAt, updatedAt, ...data } = body as any;
     const account = await this.prisma.account.create({ data: data as any });
     return toClient(account);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateAccountDto) {
     const existing = await this.prisma.account.findUnique({ where: { id } });
     if (!existing) return null;
-    const { _id, id: _id2, createdAt, updatedAt, ...data } = body;
+    const { _id, id: _id2, createdAt, updatedAt, ...data } = body as any;
     const account = await this.prisma.account.update({ where: { id }, data: data as any });
     return toClient(account);
   }

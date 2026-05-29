@@ -4,6 +4,8 @@ import { TimelineService } from '../timeline/timeline.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CreateDealDto } from './dto/create-deal.dto';
+import { UpdateDealDto } from './dto/update-deal.dto';
 
 @Injectable()
 export class DealsService {
@@ -32,7 +34,7 @@ export class DealsService {
     return data;
   }
 
-  async create(body: Record<string, any>, userId: string) {
+  async create(body: CreateDealDto, userId: string) {
     const deal = await this.prisma.deal.create({ data: this.cleanData(body) as any });
 
     await this.timeline.log(
@@ -141,7 +143,7 @@ export class DealsService {
     return { deal: toClient(deal), payments: toClient(payments) };
   }
 
-  async update(id: string, body: Record<string, any>, userId: string) {
+  async update(id: string, body: UpdateDealDto, userId: string) {
     const oldDeal = await this.prisma.deal.findUnique({ where: { id } });
     if (!oldDeal) return null;
 

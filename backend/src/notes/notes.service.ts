@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CreateNoteDto } from './dto/create-note.dto';
 
 const TIMELINE_MODELS = new Set(['Customer', 'Deal']);
 
@@ -21,8 +22,8 @@ export class NotesService {
     return toClient(notes);
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { _id, id, createdAt, updatedAt, createdBy, linkedTo, linkedToId: _ltId, ...rest } = body;
+  async create(body: CreateNoteDto, userId: string) {
+    const { _id, id, createdAt, updatedAt, createdBy, linkedTo, linkedToId: _ltId, ...rest } = body as any;
     const linkedId: string = _ltId ?? linkedTo;
     const data: any = { ...rest, linkedToId: linkedId, createdById: userId };
     if (rest.linkedModel === 'Customer') data.customerId = linkedId;

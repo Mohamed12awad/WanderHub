@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
 export class CustomersService {
@@ -26,7 +28,7 @@ export class CustomersService {
     return rest;
   }
 
-  async create(body: Record<string, any>, userId: string) {
+  async create(body: CreateCustomerDto, userId: string) {
     const customer = await this.prisma.customer.create({
       data: this.cleanData(body) as any,
     });
@@ -93,7 +95,7 @@ export class CustomersService {
     return toClient(customer);
   }
 
-  async update(id: string, body: Record<string, any>, userId?: string) {
+  async update(id: string, body: UpdateCustomerDto, userId?: string) {
     const existing = await this.prisma.customer.findUnique({ where: { id } });
     if (!existing) return null;
     const cleaned = this.cleanData(body);

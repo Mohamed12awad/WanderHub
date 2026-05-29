@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
+import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
 @Injectable()
 export class ExpensesService {
@@ -58,8 +60,8 @@ export class ExpensesService {
     return report ? toClient(report) : null;
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { title, expenses } = body as { title: string; expenses: any[] };
+  async create(body: CreateExpenseReportDto, userId: string) {
+    const { title, expenses } = body;
     const { enabled } = await this.getApprovalConfig('expenses');
     const report = await this.prisma.expenseReport.create({
       data: {
@@ -84,10 +86,10 @@ export class ExpensesService {
     return toClient(report);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateExpenseReportDto) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
     if (!existing) return null;
-    const { expenses, userId, _id, id: _id2, createdAt, updatedAt, user, ...rest } = body;
+    const { expenses, ...rest } = body;
     // Replace expense items entirely if provided
     const data: any = { ...rest };
     if (existing.approvalStatus === 'rejected') { data.approvalStatus = 'pending'; data.approved = false; }

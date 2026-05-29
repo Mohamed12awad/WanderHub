@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
 export class TasksService {
@@ -55,11 +57,12 @@ export class TasksService {
     return task ? toClient(task) : null;
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+  async create(body: CreateTaskDto, userId: string) {
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
     const data: any = { ...rest, createdById: userId };
     if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
-    if (rest.linkedModel === 'Deal' && rest.linkedToId) data.dealId = rest.linkedToId;
+    if (linkedTo && !data.linkedToId) data.linkedToId = linkedTo;
+    if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
 
     const task = await this.prisma.task.create({
       data,
@@ -80,12 +83,13 @@ export class TasksService {
     return toClient(task);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateTaskDto) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) return null;
-    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
     const data: any = { ...rest };
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if (linkedTo !== undefined) data.linkedToId = linkedTo;
     const task = await this.prisma.task.update({
       where: { id },
       data,

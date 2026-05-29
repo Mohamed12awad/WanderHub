@@ -7,6 +7,8 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { DealsService } from './deals.service';
+import { CreateDealDto } from './dto/create-deal.dto';
+import { UpdateDealDto } from './dto/update-deal.dto';
 
 @Controller('deals')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -42,14 +44,14 @@ export class DealsController {
 
   @Post()
   @RequirePermission('deals:create')
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateDealDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.deals.create(body, user.id)); }
     catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
 
   @Put(':id')
   @RequirePermission('deals:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateDealDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
       const deal = await this.deals.update(id, body, user.id);
       if (!deal) return res.status(404).json({ message: 'Deal not found' });
