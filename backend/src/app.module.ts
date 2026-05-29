@@ -25,6 +25,8 @@ import { SummeryModule } from './summery/summery.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { LeadsModule } from './leads/leads.module';
 
 @Module({
   providers: [
@@ -39,8 +41,10 @@ import { AccountsModule } from './accounts/accounts.module';
     TimelineModule,
     NumberSequenceModule,
     AuthModule,
+    NotificationsModule,
     CustomersModule,
     DealsModule,
+    LeadsModule,
     UsersModule,
     RolesModule,
     ProductsModule,

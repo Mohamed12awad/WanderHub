@@ -14,6 +14,7 @@ import { useAuth } from "../../contexts/authContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import NavLinks from "./NavLinks";
 import { ModeToggle } from "@/components/common/toggleTheme";
+import { NotificationBell } from "./NotificationBell";
 
 export default function NavBar() {
   const { logout, user } = useAuth();
@@ -67,6 +68,7 @@ export default function NavBar() {
       </button>
 
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
+        <NotificationBell />
         <ModeToggle />
 
         {/* User avatar dropdown */}

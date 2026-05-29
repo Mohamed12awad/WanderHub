@@ -46,9 +46,9 @@ export class TasksController {
 
   @Put(':id')
   @RequirePermission('tasks:edit')
-  async update(@Param('id') id: string, @Body() body: UpdateTaskDto, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateTaskDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      const t = await this.tasks.update(id, body);
+      const t = await this.tasks.update(id, body, user.id);
       if (!t) return res.status(404).json({ message: 'Task not found' });
       return res.json(t);
     } catch (e) { return res.status(400).json({ message: (e as Error).message }); }

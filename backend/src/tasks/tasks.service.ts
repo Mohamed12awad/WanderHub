@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { toClient } from '../common/serialize';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -10,6 +11,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -80,10 +82,19 @@ export class TasksService {
       );
     }
 
+    if (task.assignedToId && task.assignedToId !== userId) {
+      await this.notifications.create({
+        userId: task.assignedToId,
+        type: 'task_assigned',
+        title: `Task assigned: ${task.title}`,
+        link: task.linkedToId ? `/${task.linkedModel?.toLowerCase()}s/${task.linkedToId}` : undefined,
+      });
+    }
+
     return toClient(task);
   }
 
-  async update(id: string, body: UpdateTaskDto) {
+  async update(id: string, body: UpdateTaskDto, userId?: string) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) return null;
     const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
@@ -95,6 +106,16 @@ export class TasksService {
       data,
       include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
     });
+
+    if (data.assignedToId && data.assignedToId !== existing.assignedToId && data.assignedToId !== userId) {
+      await this.notifications.create({
+        userId: data.assignedToId,
+        type: 'task_assigned',
+        title: `Task assigned: ${task.title}`,
+        link: task.linkedToId ? `/${task.linkedModel?.toLowerCase()}s/${task.linkedToId}` : undefined,
+      });
+    }
+
     return toClient(task);
   }
 

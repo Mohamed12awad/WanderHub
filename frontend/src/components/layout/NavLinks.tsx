@@ -4,7 +4,7 @@ import NavItem from "./NavItem";
 import {
   Users2, Handshake, WalletCards, LayoutDashboard,
   Package, Banknote, KanbanSquare,
-  CalendarDays, CheckSquare, FileText, Receipt, CreditCard,
+  CalendarDays, CheckSquare, FileText, Receipt, CreditCard, UserSearch,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -30,7 +30,7 @@ function NavLinks() {
   const isActive = (path: string) => location.pathname.startsWith(path);
   const isAdminOrAbove = ["admin", "manager", "super admin"].includes(user!.role);
 
-  const hasCRM = modules.customers || modules.deals || modules.pipeline;
+  const hasCRM = modules.customers || modules.deals || modules.pipeline || modules.leads;
   const hasWork = modules.calendar || modules.tasks;
   const hasFinance = modules.expenses || modules.finance;
   const hasCatalog = (isAdminOrAbove && modules.products) || modules.reports;
@@ -43,6 +43,9 @@ function NavLinks() {
       {hasCRM && <NavSection label={lang === "ar" ? "إدارة العملاء" : "CRM"} />}
       {modules.customers && (
         <NavItem href="/customers" icon={Users2} label={tr.nav.contacts} active={isActive("/customers")} />
+      )}
+      {modules.leads && (
+        <NavItem href="/leads" icon={UserSearch} label={tr.nav.leads} active={isActive("/leads")} />
       )}
       {modules.deals && (
         <NavItem href="/deals" icon={Handshake} label={tr.nav.deals} active={isActive("/deals")} />

@@ -58,6 +58,13 @@ export class ReportsController {
     catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
 
+  @Get('leads')
+  @RequirePermission('reports:view')
+  async leadsFunnel(@Res() res: Response) {
+    try { return res.json(await this.reports.getLeadsFunnel()); }
+    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  }
+
   @Get()
   @RequirePermission('reports:view')
   async accounting(

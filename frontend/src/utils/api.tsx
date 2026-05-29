@@ -309,3 +309,23 @@ export const updateWorkspaceSettings = (data: {
 export const getOrgSettings = () => api.get("/settings/organization");
 export const updateOrgSettings = (data: { baseCurrency?: string; locale?: string }) =>
   api.put("/settings/organization", data);
+
+// Leads
+export const getLeads = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
+  api.get("/leads", { params });
+export const getLeadById = (id: string) => api.get(`/leads/${id}`);
+export const createLead = (data: Record<string, unknown>) => api.post("/leads", data);
+export const updateLead = (id: string, data: Record<string, unknown>) => api.put(`/leads/${id}`, data);
+export const deleteLead = (id: string): Promise<void> => api.delete(`/leads/${id}`);
+export const convertLead = (id: string) => api.post(`/leads/${id}/convert`);
+
+// Leads report
+export const getLeadsFunnelReport = () => api.get("/reports/leads");
+
+// Notifications
+export const getNotifications = (params?: { unread?: boolean; page?: number }) =>
+  api.get("/notifications", { params });
+export const getUnreadCount = () => api.get("/notifications/unread-count");
+export const markNotificationRead = (id: string) => api.put(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => api.put("/notifications/read-all");
+export const deleteNotification = (id: string): Promise<void> => api.delete(`/notifications/${id}`);

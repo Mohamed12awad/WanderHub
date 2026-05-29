@@ -43,6 +43,10 @@ const QuoteDetail      = lazy(() => import("@/components/Finance/QuoteDetail"));
 const InvoiceForm      = lazy(() => import("@/components/Finance/InvoiceForm"));
 const InvoiceDetail    = lazy(() => import("@/components/Finance/InvoiceDetail"));
 const Payments         = lazy(() => import("@/pages/Payments"));
+const LeadsPage        = lazy(() => import("@/components/Leads/Leads").then((m) => ({ default: m.Leads })));
+const AddLead          = lazy(() => import("@/components/Leads/AddLead").then((m) => ({ default: m.AddLead })));
+const EditLead         = lazy(() => import("@/components/Leads/EditLead").then((m) => ({ default: m.EditLead })));
+const ViewLead         = lazy(() => import("@/components/Leads/ViewLead").then((m) => ({ default: m.ViewLead })));
 
 const PageLoader = () => (
   <div className="flex h-full items-center justify-center">
@@ -89,6 +93,10 @@ const AppRoutes = () => (
       <Route path="/finance/invoices/:id"         element={<InvoiceDetail />} />
       <Route path="/finance/invoices/:id/edit"    element={<InvoiceForm />} />
       <Route path="/finance/payments"             element={<Payments />} />
+      <Route path="/leads"                        element={<LeadsPage />} />
+      <Route path="/leads/add"                    element={<AddLead />} />
+      <Route path="/leads/:id"                    element={<ViewLead />} />
+      <Route path="/leads/:id/edit"               element={<EditLead />} />
       <Route path="*"                             element={<NotFound />} />
     </Routes>
   </Suspense>
