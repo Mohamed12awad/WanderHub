@@ -244,7 +244,7 @@ export function GenericTable<T extends DataItem>({
     if (pendingDeleteId) { mutation.mutate(pendingDeleteId); setPendingDeleteId(null); }
   };
 
-  if (error) return <div className="p-6 text-sm text-destructive">Error loading {title.toLowerCase()}.</div>;
+  if (error) return <div className="p-6 text-sm text-destructive">{tr.common.errorLoading}</div>;
 
   const rawPayload  = data?.data;
   const isPaged     = rawPayload !== undefined && !Array.isArray(rawPayload) && "data" in rawPayload;
@@ -316,7 +316,7 @@ export function GenericTable<T extends DataItem>({
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder={`Search ${title.toLowerCase()}…`}
+              placeholder={tr.table.searchPlaceholder(title)}
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               className="ps-8 h-8 text-sm bg-muted/40 border-transparent focus:border-input focus:bg-background transition-colors"
@@ -336,7 +336,7 @@ export function GenericTable<T extends DataItem>({
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm">
                   <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Filters
+                  {tr.table.filters}
                   {activeFilterCount > 0 && (
                     <Badge className="ms-0.5 h-4 min-w-4 px-1 text-[10px] rounded-full">
                       {activeFilterCount}
@@ -347,10 +347,10 @@ export function GenericTable<T extends DataItem>({
               <SheetContent side="right" className="w-[320px] p-0 flex flex-col">
                 <SheetHeader className="px-5 py-4 border-b shrink-0">
                   <div className="flex items-center justify-between">
-                    <SheetTitle className="text-base">Filters</SheetTitle>
+                    <SheetTitle className="text-base">{tr.table.filters}</SheetTitle>
                     {activeFilterCount > 0 && (
                       <button onClick={() => setFilterDraft({})} className="text-xs text-muted-foreground hover:text-destructive transition-colors">
-                        Reset all
+                        {tr.table.resetAll}
                       </button>
                     )}
                   </div>
@@ -382,18 +382,18 @@ export function GenericTable<T extends DataItem>({
                         </div>
                       )}
                       {fc.type === "text" && (
-                        <Input type="text" placeholder={`Search by ${fc.label.toLowerCase()}…`} className="h-8 text-sm"
+                        <Input type="text" placeholder={tr.table.filterSearchBy(fc.label)} className="h-8 text-sm"
                           value={filterDraft[fc.field] ?? ""} onChange={(e) => setFilterDraft((d) => ({ ...d, [fc.field]: e.target.value }))} />
                       )}
                       {fc.type === "date-range" && (
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">From</Label>
+                            <Label className="text-[10px] text-muted-foreground">{tr.table.filterFrom}</Label>
                             <Input type="date" className="h-8 text-sm"
                               value={filterDraft[`${fc.field}_from`] ?? ""} onChange={(e) => setFilterDraft((d) => ({ ...d, [`${fc.field}_from`]: e.target.value }))} />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">To</Label>
+                            <Label className="text-[10px] text-muted-foreground">{tr.table.filterTo}</Label>
                             <Input type="date" className="h-8 text-sm"
                               value={filterDraft[`${fc.field}_to`] ?? ""} onChange={(e) => setFilterDraft((d) => ({ ...d, [`${fc.field}_to`]: e.target.value }))} />
                           </div>
@@ -401,10 +401,10 @@ export function GenericTable<T extends DataItem>({
                       )}
                       {fc.type === "number-range" && (
                         <div className="flex items-center gap-2">
-                          <Input type="number" placeholder="Min" className="h-8 text-sm"
+                          <Input type="number" placeholder={tr.table.filterMin} className="h-8 text-sm"
                             value={filterDraft[`${fc.field}_min`] ?? ""} onChange={(e) => setFilterDraft((d) => ({ ...d, [`${fc.field}_min`]: e.target.value }))} />
                           <span className="text-muted-foreground text-xs shrink-0">–</span>
-                          <Input type="number" placeholder="Max" className="h-8 text-sm"
+                          <Input type="number" placeholder={tr.table.filterMax} className="h-8 text-sm"
                             value={filterDraft[`${fc.field}_max`] ?? ""} onChange={(e) => setFilterDraft((d) => ({ ...d, [`${fc.field}_max`]: e.target.value }))} />
                         </div>
                       )}
@@ -413,7 +413,7 @@ export function GenericTable<T extends DataItem>({
                 </div>
 
                 <div className="px-5 py-4 border-t shrink-0">
-                  <Button className="w-full h-9" onClick={applyFilters}>Apply Filters</Button>
+                  <Button className="w-full h-9" onClick={applyFilters}>{tr.table.applyFilters}</Button>
                 </div>
               </SheetContent>
             </Sheet>
@@ -432,7 +432,7 @@ export function GenericTable<T extends DataItem>({
               </span>
             ))}
             <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-destructive transition-colors">
-              Clear all
+              {tr.table.clearAll}
             </button>
           </div>
         )}
@@ -440,12 +440,18 @@ export function GenericTable<T extends DataItem>({
 
       {/* ── Quick status tabs ── */}
       {quickStatusFilter && (
-        <div className="px-6 pt-3 flex items-center gap-0.5 overflow-x-auto shrink-0">
-          {[{ value: "all", label: "All" }, ...quickStatusFilter.options].map(({ value, label }) => {
+        <div
+          role="tablist"
+          aria-label={title}
+          className="px-6 pt-3 flex items-center gap-0.5 overflow-x-auto shrink-0"
+        >
+          {[{ value: "all", label: tr.table.all }, ...quickStatusFilter.options].map(({ value, label }) => {
             const active = (searchParams.get(quickStatusFilter.field) ?? "all") === value;
             return (
               <button
                 key={value}
+                role="tab"
+                aria-selected={active}
                 onClick={() => setSearchParams((prev) => {
                   const next = new URLSearchParams(prev);
                   value === "all" ? next.delete(quickStatusFilter.field) : next.set(quickStatusFilter.field, value);
@@ -479,6 +485,15 @@ export function GenericTable<T extends DataItem>({
                 return (
                   <TableHead
                     key={header}
+                    aria-sort={
+                      isSortable
+                        ? isActive
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                        : undefined
+                    }
                     className={cn(
                       "h-9 text-[11px] font-semibold uppercase tracking-wider text-foreground/50 whitespace-nowrap",
                       i > 1 ? "hidden md:table-cell" : "",
@@ -524,11 +539,11 @@ export function GenericTable<T extends DataItem>({
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-foreground/70">
                         {committedQ
-                          ? (noSearchMessage ? noSearchMessage(committedQ) : `No results for "${committedQ}"`)
-                          : (emptyMessage ?? `No ${title.toLowerCase()} yet`)}
+                          ? (noSearchMessage ? noSearchMessage(committedQ) : tr.table.noResults(committedQ))
+                          : (emptyMessage ?? tr.table.noData(title))}
                       </p>
                       {!committedQ && (
-                        <p className="text-xs text-muted-foreground">Get started by adding your first {title.toLowerCase().replace(/s$/, "")}.</p>
+                        <p className="text-xs text-muted-foreground">{tr.table.getStarted(title)}</p>
                       )}
                     </div>
                     {!committedQ && (

@@ -16,6 +16,8 @@ interface User {
   permissions: string[];
 }
 
+export type AuthError = "network" | "credentials" | "blocked";
+
 interface AuthContextProps {
   user: User | null;
   isLoggedIn: boolean;
@@ -23,7 +25,7 @@ interface AuthContextProps {
   logout: () => void;
   updateCurrentUser: (updates: Partial<User>) => void;
   loading: boolean;
-  error: string | null;
+  error: AuthError | null;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -34,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // Initially true to indicate loading
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
 
   const navigate = useNavigate();
 
@@ -59,9 +61,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         ] = `Bearer ${response.data.token}`;
         navigate("/dashboard");
       }
-    } catch (error) {
-      setError("Login failed. Please check your credentials and try again.");
-      console.error("Login failed", error);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          setError("network");
+        } else if (err.response.status === 403) {
+          setError("blocked");
+        } else {
+          setError("credentials");
+        }
+      } else {
+        setError("network");
+      }
+      console.error("Login failed", err);
     } finally {
       setLoading(false);
     }

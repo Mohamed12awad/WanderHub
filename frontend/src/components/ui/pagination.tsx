@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -13,6 +14,8 @@ interface PaginationProps {
 }
 
 export function Pagination({ page, pages, total, limit, onPageChange, onLimitChange }: PaginationProps) {
+  const { tr } = useLanguage();
+
   if (pages <= 1 && !onLimitChange) return null;
 
   const getPageNumbers = () => {
@@ -34,11 +37,11 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
     <div className="flex items-center justify-between px-2 py-3 border-t flex-wrap gap-2">
       <div className="flex items-center gap-3">
         <p className="text-xs text-muted-foreground">
-          {total.toLocaleString()} results · page {page} of {pages}
+          {tr.table.pageInfo(total, page, pages)}
         </p>
         {onLimitChange && limit !== undefined && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Rows:</span>
+            <span className="text-xs text-muted-foreground">{tr.table.rows}</span>
             <select
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
