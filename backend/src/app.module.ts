@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { LoggingInterceptor } from './common/logging.interceptor';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
@@ -29,6 +29,7 @@ import { AccountsModule } from './accounts/accounts.module';
 @Module({
   providers: [
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),

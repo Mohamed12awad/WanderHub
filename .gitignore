@@ -11,7 +11,9 @@ dist/
 dist-ssr/
 
 # Logs
-logs/
+# Anchored to the repo root so it only matches a runtime log-output dir and
+# does NOT swallow source directories such as backend/src/logs/.
+/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*

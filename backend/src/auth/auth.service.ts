@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { toClient } from '../common/serialize';
 
 @Injectable()
 export class AuthService {
@@ -22,30 +21,26 @@ export class AuthService {
     );
   }
 
-  async signup(body: Record<string, any>) {
-    const { role, password, ...rest } = body;
-    const hashed = await bcrypt.hash(password, await bcrypt.genSalt());
-    const user = await this.prisma.user.create({
-      data: {
-        ...rest,
-        password: hashed,
-        ...(role ? { role: { connect: { id: role } } } : {}),
-      } as any,
-    });
-    return toClient(user);
-  }
-
   async signin(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { role: true },
     });
 
-    if (!user) return { status: 400, body: { message: 'User not found' } };
-    if (user.active === false) return { status: 400, body: { message: 'User is Blocked' } };
+    // Generic message for both unknown email and wrong password so the
+    // endpoint cannot be used to enumerate valid accounts.
+    const invalid = { status: 400, body: { message: 'Invalid email or password' } };
+
+    if (!user) return invalid;
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return { status: 400, body: { message: 'Invalid credentials' } };
+    if (!isMatch) return invalid;
+
+    // Only reveal the blocked state once the caller has proven they own the
+    // account (correct password) — keeps it from leaking via enumeration.
+    if (user.active === false) {
+      return { status: 403, body: { message: 'This account has been blocked' } };
+    }
 
     const token = this.generateToken(user as any);
 
