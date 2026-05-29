@@ -16,7 +16,7 @@ export class SearchService {
     const contains = { contains: q, mode: 'insensitive' as const };
 
     const customers = await this.prisma.customer.findMany({
-      where: { OR: [{ name: contains }, { email: contains }, { phone: contains }] },
+      where: { deletedAt: null, OR: [{ name: contains }, { email: contains }, { phone: contains }] },
       select: { id: true, name: true, email: true, phone: true, status: true },
       take: LIMIT,
     });
@@ -25,6 +25,7 @@ export class SearchService {
     const [deals, products, expenses, invoices] = await Promise.all([
       this.prisma.deal.findMany({
         where: {
+          deletedAt: null,
           OR: [
             { title: contains },
             { notes: contains },
@@ -36,17 +37,17 @@ export class SearchService {
         take: LIMIT,
       }),
       this.prisma.product.findMany({
-        where: { OR: [{ name: contains }, { type: contains }, { description: contains }] },
+        where: { deletedAt: null, OR: [{ name: contains }, { type: contains }, { description: contains }] },
         select: { id: true, name: true, type: true },
         take: LIMIT,
       }),
       this.prisma.expenseReport.findMany({
-        where: { OR: [{ title: contains }] },
+        where: { deletedAt: null, OR: [{ title: contains }] },
         select: { id: true, title: true, approved: true, createdAt: true },
         take: LIMIT,
       }),
       this.prisma.invoice.findMany({
-        where: { OR: [{ invoiceNumber: contains }, { title: contains }] },
+        where: { deletedAt: null, OR: [{ invoiceNumber: contains }, { title: contains }] },
         select: { id: true, invoiceNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
         take: LIMIT,
       }),

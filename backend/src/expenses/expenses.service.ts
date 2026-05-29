@@ -30,12 +30,12 @@ export class ExpensesService {
     const { page, limit: limitRaw, q, approved, createdAt_from, createdAt_to } = query;
     const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
-      const reports = await this.prisma.expenseReport.findMany({ include: baseInclude, orderBy: { createdAt: 'desc' } });
+      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' } });
       return toClient(reports);
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (approved !== undefined && approved !== '') where.approved = approved === 'true';
     if (createdAt_from || createdAt_to) {
@@ -53,8 +53,8 @@ export class ExpensesService {
   }
 
   async findOne(id: string) {
-    const report = await this.prisma.expenseReport.findUnique({
-      where: { id },
+    const report = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null },
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
     return report ? toClient(report) : null;
@@ -142,9 +142,9 @@ export class ExpensesService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
+    const existing = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.expenseReport.delete({ where: { id } });
+    await this.prisma.expenseReport.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 }

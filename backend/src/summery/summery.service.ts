@@ -8,7 +8,7 @@ export class SummeryService {
   private async getRevenue(start: Date, end: Date) {
     const rows = await this.prisma.deal.groupBy({
       by: ['currency'],
-      where: { createdAt: { gte: start, lte: end }, NOT: { status: 'cancelled' } },
+      where: { deletedAt: null, createdAt: { gte: start, lte: end }, NOT: { status: 'cancelled' } },
       _sum: { price: true },
     });
     return rows.reduce<Record<string, number>>((acc, r) => {
@@ -18,13 +18,13 @@ export class SummeryService {
   }
 
   private async getNewCustomers(start: Date, end: Date) {
-    return this.prisma.customer.count({ where: { createdAt: { gte: start, lte: end } } });
+    return this.prisma.customer.count({ where: { deletedAt: null, createdAt: { gte: start, lte: end } } });
   }
 
   private async getUnderCollection(start: Date, end: Date) {
     const rows = await this.prisma.deal.groupBy({
       by: ['currency'],
-      where: { createdAt: { gte: start, lte: end }, NOT: { status: 'cancelled' } },
+      where: { deletedAt: null, createdAt: { gte: start, lte: end }, NOT: { status: 'cancelled' } },
       _sum: { price: true, totalPaid: true },
     });
     return rows.reduce<Record<string, number>>((acc, r) => {
@@ -37,7 +37,7 @@ export class SummeryService {
     const [totalAgg, catRows] = await Promise.all([
       this.prisma.expenseItem.aggregate({
         _sum: { amount: true },
-        where: { expenseReport: { approved: true, createdAt: { gte: start, lte: end } } },
+        where: { expenseReport: { approved: true, deletedAt: null, createdAt: { gte: start, lte: end } } },
       }),
       this.prisma.expenseItem.groupBy({
         by: ['category'],

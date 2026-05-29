@@ -71,7 +71,7 @@ export class FinanceService {
   // ── Quotes ──────────────────────────────────────────────────────────────────
 
   async getQuotes(query: Record<string, string>) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.customer) where.customerId = query.customer;
     if (query.deal) where.dealId = query.deal;
@@ -80,7 +80,7 @@ export class FinanceService {
   }
 
   async getQuoteById(id: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id }, include: QUOTE_INCLUDE });
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null }, include: QUOTE_INCLUDE });
     return quote ? toClient(quote) : null;
   }
 
@@ -161,9 +161,9 @@ export class FinanceService {
   }
 
   async deleteQuote(id: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) return null;
-    await this.prisma.quote.delete({ where: { id } });
+    await this.prisma.quote.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
@@ -215,7 +215,7 @@ export class FinanceService {
 
   async getInvoices(query: Record<string, string>) {
     const { status, customer, deal, page, limit: limitRaw, q } = query;
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (status) where.status = status;
     if (customer) where.customerId = customer;
     if (deal) where.dealId = deal;
@@ -235,7 +235,7 @@ export class FinanceService {
   }
 
   async getInvoiceById(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id }, include: INVOICE_INCLUDE });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null }, include: INVOICE_INCLUDE });
     if (!invoice) return null;
     const payments = await this.prisma.invoicePayment.findMany({
       where: { invoiceId: id },
@@ -292,10 +292,11 @@ export class FinanceService {
   }
 
   async deleteInvoice(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) return null;
-    await this.prisma.invoicePayment.deleteMany({ where: { invoiceId: id } });
-    await this.prisma.invoice.delete({ where: { id } });
+    // Soft delete; payment history is preserved for audit but excluded from
+    // listings (payments are filtered by invoice.deletedAt).
+    await this.prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
@@ -387,8 +388,11 @@ export class FinanceService {
   async getPayments(query: Record<string, string>) {
     const p = Math.max(1, parseInt(query.page) || 1);
     const limit = Math.min(100, parseInt(query.limit) || 25);
+    // Exclude payments whose invoice has been (soft) deleted.
+    const where = { invoice: { deletedAt: null } };
     const [data, total] = await Promise.all([
       this.prisma.invoicePayment.findMany({
+        where,
         include: {
           invoice: { select: { id: true, invoiceNumber: true, title: true, customer: { select: { id: true, name: true } } } },
           createdBy: { select: { id: true, name: true } },
@@ -398,7 +402,7 @@ export class FinanceService {
         skip: (p - 1) * limit,
         take: limit,
       }),
-      this.prisma.invoicePayment.count(),
+      this.prisma.invoicePayment.count({ where }),
     ]);
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }

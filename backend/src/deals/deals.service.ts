@@ -56,6 +56,7 @@ export class DealsService {
 
     if (!page) {
       const deals = await this.prisma.deal.findMany({
+        where: { deletedAt: null },
         include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
       });
@@ -64,7 +65,7 @@ export class DealsService {
 
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (customerId) where.customerId = customerId;
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (status) where.status = status;
@@ -103,8 +104,8 @@ export class DealsService {
   }
 
   async findOne(id: string, includePayments: boolean) {
-    const deal = await this.prisma.deal.findUnique({
-      where: { id },
+    const deal = await this.prisma.deal.findFirst({
+      where: { id, deletedAt: null },
       include: {
         customer: {
           select: {
@@ -120,26 +121,17 @@ export class DealsService {
     });
     if (!deal) return null;
 
+    // Payments are unified on invoices: pull the payments recorded against
+    // this deal's invoices rather than the removed PartialPayment table.
     let payments: any[] = [];
     if (includePayments) {
-      payments = await this.prisma.partialPayment.findMany({
-        where: { dealId: id },
+      payments = await this.prisma.invoicePayment.findMany({
+        where: { invoice: { dealId: id } },
         include: { createdBy: { select: { id: true, name: true } } },
+        orderBy: { date: 'desc' },
       });
     }
 
-    return { deal: toClient(deal), payments: toClient(payments) };
-  }
-
-  async getInvoiceData(id: string) {
-    const deal = await this.prisma.deal.findUnique({
-      where: { id },
-      include: { customer: true },
-    });
-    if (!deal) return null;
-    const payments = await this.prisma.partialPayment.findMany({
-      where: { dealId: id },
-    });
     return { deal: toClient(deal), payments: toClient(payments) };
   }
 
@@ -223,10 +215,9 @@ export class DealsService {
   }
 
   async remove(id: string) {
-    const deal = await this.prisma.deal.findUnique({ where: { id } });
+    const deal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null } });
     if (!deal) return null;
-    await this.prisma.partialPayment.deleteMany({ where: { dealId: id } });
-    await this.prisma.deal.delete({ where: { id } });
+    await this.prisma.deal.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 }

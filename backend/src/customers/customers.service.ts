@@ -49,13 +49,14 @@ export class CustomersService {
     const { page, limit: limitRaw, q, status, gender, phone, createdAt_from, createdAt_to } = query;
     if (!page) {
       const customers = await this.prisma.customer.findMany({
+        where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
       });
       return toClient(customers);
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
@@ -87,9 +88,9 @@ export class CustomersService {
   }
 
   async findOne(id: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id },
-      include: { deals: true, owner: true },
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, deletedAt: null },
+      include: { deals: { where: { deletedAt: null } }, owner: true },
     });
     if (!customer) return null;
     return toClient(customer);
@@ -117,23 +118,14 @@ export class CustomersService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.customer.findUnique({ where: { id } });
+    const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
 
-    const deals = await this.prisma.deal.findMany({
-      where: { customerId: id },
-      select: { id: true },
-    });
-    const dealIds = deals.map((d) => d.id);
-
-    if (dealIds.length > 0) {
-      await this.prisma.partialPayment.deleteMany({
-        where: { dealId: { in: dealIds } },
-      });
-      await this.prisma.deal.deleteMany({ where: { id: { in: dealIds } } });
-    }
-
-    await this.prisma.customer.delete({ where: { id } });
+    // Soft delete: also soft-delete the customer's deals so neither resurfaces
+    // in listings. Related quotes/invoices keep their own lifecycle.
+    const now = new Date();
+    await this.prisma.deal.updateMany({ where: { customerId: id }, data: { deletedAt: now } });
+    await this.prisma.customer.update({ where: { id }, data: { deletedAt: now } });
     return true;
   }
 }

@@ -12,7 +12,7 @@ export class ProductsService {
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, type, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const products = await this.prisma.product.findMany({ orderBy: { createdAt: 'desc' } });
+      const products = await this.prisma.product.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } });
       return toClient(products);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -20,6 +20,7 @@ export class ProductsService {
     const where: any = q
       ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { type: { contains: q, mode: 'insensitive' } }] }
       : {};
+    where.deletedAt = null;
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (createdAt_from || createdAt_to) {
       where.createdAt = {};
@@ -36,7 +37,7 @@ export class ProductsService {
   }
 
   async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({ where: { id } });
+    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     return product ? toClient(product) : null;
   }
 
@@ -55,9 +56,9 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
+    const existing = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.product.delete({ where: { id } });
+    await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 }

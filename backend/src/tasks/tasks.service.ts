@@ -14,7 +14,7 @@ export class TasksService {
 
   async findAll(query: Record<string, string>) {
     const { status, priority, assignedTo, linkedTo, overdue, mine, page = '1' } = query;
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (assignedTo) where.assignedToId = assignedTo;
@@ -50,8 +50,8 @@ export class TasksService {
   }
 
   async findOne(id: string) {
-    const task = await this.prisma.task.findUnique({
-      where: { id },
+    const task = await this.prisma.task.findFirst({
+      where: { id, deletedAt: null },
       include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
     });
     return task ? toClient(task) : null;
@@ -99,14 +99,14 @@ export class TasksService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.task.findUnique({ where: { id } });
+    const existing = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.task.delete({ where: { id } });
+    await this.prisma.task.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
   async complete(id: string, userId: string) {
-    const task = await this.prisma.task.findUnique({ where: { id } });
+    const task = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
     if (!task) return null;
     const wasDone = task.status === 'done';
     const updated = await this.prisma.task.update({

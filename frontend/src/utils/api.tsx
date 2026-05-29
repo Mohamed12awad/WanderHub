@@ -4,7 +4,6 @@ import {
   DealData,
   Customer,
   ExpenseReportData,
-  PaymentData,
   ReportParams,
   Product,
   UserData,
@@ -62,29 +61,6 @@ export const updateDeal = (id: string, data: DealData) =>
   api.put(`/deals/${id}`, data);
 export const deleteDeal = (id: string): Promise<void> =>
   api.delete(`/deals/${id}`);
-export const downloadInvoice = async (dealId: string) => {
-  try {
-    const response = await api.get(`deals/${dealId}/invoice`, {
-      responseType: "blob",
-    });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `invoice_${dealId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  } catch (error) {
-    console.error("Error downloading the invoice:", error);
-  }
-};
-
-// Payment API Requests
-export const createPayment = (data: PaymentData) =>
-  api.post(`/partialPayments`, data);
-export const deletePayment = (PaymentId: string): Promise<void> =>
-  api.delete(`/partialPayments/${PaymentId}`);
-
 // Roles API Requests
 export const getRoles = () => api.get("/roles");
 

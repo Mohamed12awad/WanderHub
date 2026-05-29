@@ -17,7 +17,6 @@ import { FinanceModule } from './finance/finance.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { NotesModule } from './notes/notes.module';
 import { TasksModule } from './tasks/tasks.module';
-import { PartialPaymentsModule } from './partial-payments/partial-payments.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { LogsModule } from './logs/logs.module';
 import { SearchModule } from './search/search.module';
@@ -48,7 +47,6 @@ import { AccountsModule } from './accounts/accounts.module';
     ActivitiesModule,
     NotesModule,
     TasksModule,
-    PartialPaymentsModule,
     PurchasesModule,
     LogsModule,
     SearchModule,

@@ -32,16 +32,6 @@ export class DealsController {
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
 
-  @Get(':id/invoice')
-  @RequirePermission('deals:view')
-  async getInvoice(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const data = await this.deals.getInvoiceData(id);
-      if (!data) return res.status(404).json({ message: 'Deal not found' });
-      return res.json(data);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
-  }
-
   @Post()
   @RequirePermission('deals:create')
   async create(@Body() body: CreateDealDto, @CurrentUser() user: AuthUser, @Res() res: Response) {

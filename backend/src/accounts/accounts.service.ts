@@ -9,7 +9,7 @@ export class AccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
-    const accounts = await this.prisma.account.findMany({ orderBy: { createdAt: 'asc' } });
+    const accounts = await this.prisma.account.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'asc' } });
     return toClient(accounts);
   }
 
@@ -28,9 +28,9 @@ export class AccountsService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.account.findUnique({ where: { id } });
+    const existing = await this.prisma.account.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.account.delete({ where: { id } });
+    await this.prisma.account.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
