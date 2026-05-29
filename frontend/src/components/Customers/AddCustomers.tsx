@@ -84,32 +84,32 @@ const AddCustomer = () => {
     if (["phone", "mobile"].includes(name)) {
       value = value.replace(/\D/g, "").substring(0, 11);
     }
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, address: { ...prev.address, [name]: value } }));
+    setFormData((prev: any) => ({ ...prev, address: { ...prev.address, [name]: value } }));
   };
 
   const handleIdentificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, identification: { ...prev.identification, [name]: value } }));
+    setFormData((prev: any) => ({ ...prev, identification: { ...prev.identification, [name]: value } }));
   };
 
   const handleEmergencyContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, emergencyContact: { ...prev.emergencyContact, [name]: value } }));
+    setFormData((prev: any) => ({ ...prev, emergencyContact: { ...prev.emergencyContact, [name]: value } }));
   };
 
   const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, paymentInformation: { ...prev.paymentInformation, [name]: value } }));
+    setFormData((prev: any) => ({ ...prev, paymentInformation: { ...prev.paymentInformation, [name]: value } }));
   };
 
   const handleLoyaltyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, loyaltyProgram: { ...prev.loyaltyProgram, [name]: value } }));
+    setFormData((prev: any) => ({ ...prev, loyaltyProgram: { ...prev.loyaltyProgram, [name]: value } }));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -217,7 +217,7 @@ const AddCustomer = () => {
                 </Label>
                 <Select
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, gender: value }))
+                    setFormData((prev: any) => ({ ...prev, gender: value }))
                   }
                 >
                   <SelectTrigger>
@@ -242,7 +242,7 @@ const AddCustomer = () => {
                 </Label>
                 <Select
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, location: value }))
+                    setFormData((prev: any) => ({ ...prev, location: value }))
                   }
                 >
                   <SelectTrigger>
@@ -261,7 +261,7 @@ const AddCustomer = () => {
                 <Select
                   required
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, owner: value }))
+                    setFormData((prev: any) => ({ ...prev, owner: value }))
                   }
                 >
                   <SelectTrigger>
@@ -283,7 +283,7 @@ const AddCustomer = () => {
                 <Select
                   defaultValue="Draft"
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, status: value }))
+                    setFormData((prev: any) => ({ ...prev, status: value }))
                   }
                 >
                   <SelectTrigger>
@@ -303,7 +303,7 @@ const AddCustomer = () => {
                 <Label className="my-3">Lead Source</Label>
                 <Select
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, source: value }))
+                    setFormData((prev: any) => ({ ...prev, source: value }))
                   }
                 >
                   <SelectTrigger>
@@ -533,7 +533,7 @@ const AddCustomer = () => {
             <DynamicFields
               module="customers"
               values={formData.customFields}
-              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+              onChange={(k, v) => setFormData((prev: any) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
             />
 
             {/* Submit Button */}

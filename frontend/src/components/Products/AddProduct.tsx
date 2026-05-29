@@ -44,7 +44,7 @@ const AddProduct = () => {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -92,7 +92,7 @@ const AddProduct = () => {
             </div>
             <div className="flex flex-col col-span-2 md:col-span-1">
               <Label className="my-3" htmlFor="type">Type</Label>
-              <Select value={formData.type} onValueChange={(v) => { setFormData((prev) => ({ ...prev, type: v })); setErrors((prev) => ({ ...prev, type: "" })); }}>
+              <Select value={formData.type} onValueChange={(v) => { setFormData((prev: any) => ({ ...prev, type: v })); setErrors((prev) => ({ ...prev, type: "" })); }}>
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select type…" />
                 </SelectTrigger>
@@ -125,7 +125,7 @@ const AddProduct = () => {
             <DynamicFields
               module="products"
               values={formData.customFields}
-              onChange={(k, v) => setFormData((prev) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
+              onChange={(k, v) => setFormData((prev: any) => ({ ...prev, customFields: { ...prev.customFields, [k]: v } }))}
             />
 
             <div className="col-span-2">
