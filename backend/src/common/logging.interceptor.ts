@@ -91,11 +91,11 @@ export class LoggingInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: (body) => {
-          this.logs.write(user.id, action, method, cleanPath, recordId, extractRecordName(body), true);
+          void this.logs.write(user.id, action, method, cleanPath, recordId, extractRecordName(body), true);
         },
         // Record failed mutations too — rejected writes are security-relevant.
         error: () => {
-          this.logs.write(user.id, action, method, cleanPath, recordId, undefined, false);
+          void this.logs.write(user.id, action, method, cleanPath, recordId, undefined, false);
         },
       }),
     );
