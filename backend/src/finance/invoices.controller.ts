@@ -6,6 +6,10 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { FinanceService } from './finance.service';
 import { handlePrismaError } from '../common/prisma-error';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { RecordPaymentDto } from './dto/record-payment.dto';
+import { EditPaymentDto } from './dto/edit-payment.dto';
 
 @Controller('finance')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -38,14 +42,14 @@ export class InvoicesController {
 
   @Post('invoices')
   @RequirePermission('finance:create')
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateInvoiceDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.finance.createInvoice(body, user.id)); }
     catch (e) { return handlePrismaError(e, res); }
   }
 
   @Put('invoices/:id')
   @RequirePermission('finance:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateInvoiceDto, @Res() res: Response) {
     try {
       const inv = await this.finance.updateInvoice(id, body);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
@@ -88,7 +92,7 @@ export class InvoicesController {
 
   @Post('invoices/:id/payments')
   @RequirePermission('finance:create')
-  async recordPayment(@Param('id') id: string, @Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async recordPayment(@Param('id') id: string, @Body() body: RecordPaymentDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
       const result = await this.finance.recordPayment(id, body, user.id);
       if (!result) return res.status(404).json({ message: 'Invoice not found' });
@@ -98,7 +102,7 @@ export class InvoicesController {
 
   @Patch('invoices/:invoiceId/payments/:paymentId')
   @RequirePermission('finance:edit')
-  async editPayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async editPayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @Body() body: EditPaymentDto, @Res() res: Response) {
     try {
       const result = await this.finance.editPayment(invoiceId, paymentId, body);
       if (!result) return res.status(404).json({ message: 'Payment not found' });

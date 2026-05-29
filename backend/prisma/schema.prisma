@@ -104,7 +104,6 @@ model User {
   createdInvoices     Invoice[]        @relation("InvoiceCreatedBy")
   approvedInvoices    Invoice[]        @relation("InvoiceApprovedBy")
   invoicePayments     InvoicePayment[]
-  partialPayments     PartialPayment[]
   expenseReports      ExpenseReport[]  @relation("ExpenseUser")
   approvedExpenses    ExpenseReport[]  @relation("ExpenseApprovedBy")
   assignedActivities  Activity[]       @relation("ActivityAssignedTo")
@@ -142,6 +141,7 @@ model Customer {
   customFields           Json?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
 
   deals         Deal[]
   quotes        Quote[]
@@ -149,6 +149,10 @@ model Customer {
   activities    Activity[]
   customerNotes Note[]
   timelines     TimelineEvent[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([deletedAt])
 }
 
 model Deal {
@@ -172,14 +176,19 @@ model Deal {
   customFields      Json?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
 
   quotes          Quote[]
   invoices        Invoice[]
-  partialPayments PartialPayment[]
   activities      Activity[]
   dealNotes       Note[]
   timelines       TimelineEvent[]
   tasks           Task[]
+
+  @@index([customerId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([deletedAt])
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
@@ -193,8 +202,9 @@ model Product {
   description  String?
   notes        String?
   customFields Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   productNotes Note[]
 }
@@ -214,7 +224,7 @@ model Quote {
   taxRate              Float          @default(0)
   tax                  Float          @default(0)
   total                Float          @default(0)
-  currency             String         @default("USD")
+  currency             String         @default("EGP")
   validUntil           DateTime?
   notes                String?
   terms                String?
@@ -229,8 +239,14 @@ model Quote {
   rejectionReason      String?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
+  deletedAt            DateTime?
 
   items QuoteLineItem[]
+
+  @@index([customerId])
+  @@index([dealId])
+  @@index([status])
+  @@index([deletedAt])
 }
 
 model QuoteLineItem {
@@ -262,7 +278,7 @@ model Invoice {
   tax             Float          @default(0)
   total           Float          @default(0)
   totalPaid       Float          @default(0)
-  currency        String         @default("USD")
+  currency        String         @default("EGP")
   exchangeRate    Float?
   issueDate       DateTime       @default(now())
   dueDate         DateTime?
@@ -277,9 +293,15 @@ model Invoice {
   rejectionReason String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
 
   items    InvoiceLineItem[]
   payments InvoicePayment[]
+
+  @@index([customerId])
+  @@index([dealId])
+  @@index([status])
+  @@index([deletedAt])
 }
 
 model InvoiceLineItem {
@@ -297,9 +319,9 @@ model InvoiceLineItem {
 model InvoicePayment {
   id          String   @id @default(cuid())
   invoiceId   String
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   amount      Float
-  currency    String   @default("USD")
+  currency    String   @default("EGP")
   date        DateTime
   method      String   @default("cash")
   reference   String?
@@ -310,24 +332,10 @@ model InvoicePayment {
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
 
-// Legacy deal-level payment (pre-invoice system)
-model PartialPayment {
-  id          String   @id @default(cuid())
-  dealId      String
-  deal        Deal     @relation(fields: [dealId], references: [id])
-  amount      Float
-  currency    String   @default("EGP")
-  date        DateTime
-  createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  method      String   @default("cash")
-  notes       String?
-  accountId   String?
-  account     Account? @relation(fields: [accountId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  @@index([invoiceId])
+  @@index([accountId])
+  @@index([date])
 }
 
 // ─── Accounts ─────────────────────────────────────────────────────────────────
@@ -342,13 +350,13 @@ model Account {
   id              String           @id @default(cuid())
   name            String
   type            AccountType      @default(cash)
-  currency        String           @default("USD")
+  currency        String           @default("EGP")
   balance         Float            @default(0)
   notes           String?
   invoicePayments InvoicePayment[]
-  partialPayments PartialPayment[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
 }
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
@@ -366,9 +374,14 @@ model ExpenseReport {
   rejectionReason String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
 
   expenses     ExpenseItem[]
   expenseNotes Note[]
+
+  @@index([userId])
+  @@index([approvalStatus])
+  @@index([deletedAt])
 }
 
 model ExpenseItem {
@@ -404,6 +417,11 @@ model Activity {
   createdBy    User           @relation("ActivityCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+
+  @@index([linkedToId, linkedModel])
+  @@index([customerId])
+  @@index([dealId])
+  @@index([assignedToId])
 }
 
 model Note {
@@ -423,6 +441,10 @@ model Note {
   createdBy       User           @relation(fields: [createdById], references: [id])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  @@index([linkedToId, linkedModel])
+  @@index([customerId])
+  @@index([dealId])
 }
 
 // ─── Tasks ───────────────────────────────────────────────────────────────────
@@ -446,6 +468,12 @@ model Task {
   createdBy    User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([linkedToId, linkedModel])
+  @@index([deletedAt])
 }
 
 // ─── Timeline ────────────────────────────────────────────────────────────────
@@ -465,6 +493,10 @@ model TimelineEvent {
   triggeredBy   User?     @relation(fields: [triggeredById], references: [id])
   isSystem      Boolean   @default(false)
   createdAt     DateTime  @default(now())
+
+  @@index([linkedToId, linkedModel])
+  @@index([customerId])
+  @@index([dealId])
 }
 
 // ─── System ──────────────────────────────────────────────────────────────────
@@ -479,6 +511,9 @@ model Log {
   recordId   String?
   recordName String?
   timestamp  DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([timestamp])
 }
 
 model Purchase {

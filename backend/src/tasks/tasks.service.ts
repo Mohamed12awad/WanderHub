@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
 export class TasksService {
@@ -12,7 +14,7 @@ export class TasksService {
 
   async findAll(query: Record<string, string>) {
     const { status, priority, assignedTo, linkedTo, overdue, mine, page = '1' } = query;
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (assignedTo) where.assignedToId = assignedTo;
@@ -48,18 +50,19 @@ export class TasksService {
   }
 
   async findOne(id: string) {
-    const task = await this.prisma.task.findUnique({
-      where: { id },
+    const task = await this.prisma.task.findFirst({
+      where: { id, deletedAt: null },
       include: { assignedTo: { select: { id: true, name: true, email: true } }, createdBy: { select: { id: true, name: true } } },
     });
     return task ? toClient(task) : null;
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+  async create(body: CreateTaskDto, userId: string) {
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
     const data: any = { ...rest, createdById: userId };
     if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
-    if (rest.linkedModel === 'Deal' && rest.linkedToId) data.dealId = rest.linkedToId;
+    if (linkedTo && !data.linkedToId) data.linkedToId = linkedTo;
+    if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
 
     const task = await this.prisma.task.create({
       data,
@@ -80,12 +83,13 @@ export class TasksService {
     return toClient(task);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateTaskDto) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) return null;
-    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, ...rest } = body;
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
     const data: any = { ...rest };
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if (linkedTo !== undefined) data.linkedToId = linkedTo;
     const task = await this.prisma.task.update({
       where: { id },
       data,
@@ -95,14 +99,14 @@ export class TasksService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.task.findUnique({ where: { id } });
+    const existing = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.task.delete({ where: { id } });
+    await this.prisma.task.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
   async complete(id: string, userId: string) {
-    const task = await this.prisma.task.findUnique({ where: { id } });
+    const task = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
     if (!task) return null;
     const wasDone = task.status === 'done';
     const updated = await this.prisma.task.update({

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -45,7 +47,7 @@ export class UsersService {
     return user ? toClient(user) : null;
   }
 
-  async create(body: Record<string, any>) {
+  async create(body: CreateUserDto) {
     const { password, role, reportsTo, ...rest } = body;
     const hashed = await bcrypt.hash(password, await bcrypt.genSalt());
     const user = await this.prisma.user.create({
@@ -60,11 +62,11 @@ export class UsersService {
     return toClient(user);
   }
 
-  async update(id: string, body: Record<string, any>, requestingUserRole: string) {
+  async update(id: string, body: UpdateUserDto, requestingUserRole: string) {
     const existing = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!existing) return null;
 
-    const { password, role, reportsTo, _id, id: _id2, createdAt, updatedAt, ...rest } = body;
+    const { password, role, reportsTo, ...rest } = body;
     const data: Record<string, any> = { ...rest };
     if (reportsTo !== undefined) data.reportsToId = reportsTo || null;
 

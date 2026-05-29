@@ -16,6 +16,8 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { CustomersService } from './customers.service';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { handlePrismaError } from '../common/prisma-error';
 
 @Controller('customers')
@@ -48,7 +50,7 @@ export class CustomersController {
   @Post()
   @RequirePermission('contacts:create')
   async create(
-    @Body() body: Record<string, any>,
+    @Body() body: CreateCustomerDto,
     @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {
@@ -64,7 +66,7 @@ export class CustomersController {
   @RequirePermission('contacts:edit')
   async update(
     @Param('id') id: string,
-    @Body() body: Record<string, any>,
+    @Body() body: UpdateCustomerDto,
     @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {

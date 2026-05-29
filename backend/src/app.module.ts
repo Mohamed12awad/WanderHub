@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { LoggingInterceptor } from './common/logging.interceptor';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
@@ -17,7 +17,6 @@ import { FinanceModule } from './finance/finance.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { NotesModule } from './notes/notes.module';
 import { TasksModule } from './tasks/tasks.module';
-import { PartialPaymentsModule } from './partial-payments/partial-payments.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { LogsModule } from './logs/logs.module';
 import { SearchModule } from './search/search.module';
@@ -29,6 +28,7 @@ import { AccountsModule } from './accounts/accounts.module';
 @Module({
   providers: [
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -47,7 +47,6 @@ import { AccountsModule } from './accounts/accounts.module';
     ActivitiesModule,
     NotesModule,
     TasksModule,
-    PartialPaymentsModule,
     PurchasesModule,
     LogsModule,
     SearchModule,

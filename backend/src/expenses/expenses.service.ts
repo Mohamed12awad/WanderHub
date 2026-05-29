@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
+import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
 @Injectable()
 export class ExpensesService {
@@ -28,12 +30,12 @@ export class ExpensesService {
     const { page, limit: limitRaw, q, approved, createdAt_from, createdAt_to } = query;
     const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
-      const reports = await this.prisma.expenseReport.findMany({ include: baseInclude, orderBy: { createdAt: 'desc' } });
+      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' } });
       return toClient(reports);
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (approved !== undefined && approved !== '') where.approved = approved === 'true';
     if (createdAt_from || createdAt_to) {
@@ -51,15 +53,15 @@ export class ExpensesService {
   }
 
   async findOne(id: string) {
-    const report = await this.prisma.expenseReport.findUnique({
-      where: { id },
+    const report = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null },
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
     return report ? toClient(report) : null;
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { title, expenses } = body as { title: string; expenses: any[] };
+  async create(body: CreateExpenseReportDto, userId: string) {
+    const { title, expenses } = body;
     const { enabled } = await this.getApprovalConfig('expenses');
     const report = await this.prisma.expenseReport.create({
       data: {
@@ -84,10 +86,10 @@ export class ExpensesService {
     return toClient(report);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateExpenseReportDto) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
     if (!existing) return null;
-    const { expenses, userId, _id, id: _id2, createdAt, updatedAt, user, ...rest } = body;
+    const { expenses, ...rest } = body;
     // Replace expense items entirely if provided
     const data: any = { ...rest };
     if (existing.approvalStatus === 'rejected') { data.approvalStatus = 'pending'; data.approved = false; }
@@ -140,9 +142,9 @@ export class ExpensesService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
+    const existing = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.expenseReport.delete({ where: { id } });
+    await this.prisma.expenseReport.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 }

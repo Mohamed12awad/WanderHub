@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const Login = () => {
-  const [email, setEmail] = useState("Viewer@wonderhub.com");
-  const [password, setPassword] = useState("Wonder@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const { login, loading, error } = useAuth();
   const { lang, setLang, tr } = useLanguage();
 

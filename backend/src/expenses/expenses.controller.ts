@@ -5,6 +5,8 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { ExpensesService } from './expenses.service';
+import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
+import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
 @Controller('expenses')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -30,14 +32,14 @@ export class ExpensesController {
 
   @Post()
   @RequirePermission('expenses:create')
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateExpenseReportDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.expenses.create(body, user.id)); }
     catch (e) { return res.status(400).json({ message: (e as Error).message }); }
   }
 
   @Put(':id')
   @RequirePermission('expenses:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto, @Res() res: Response) {
     try {
       const r = await this.expenses.update(id, body);
       if (!r) return res.status(404).json({ message: 'Expense report not found' });

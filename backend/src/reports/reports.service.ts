@@ -26,12 +26,12 @@ export class ReportsService {
     const end = new Date(endDate);
     const [deals, purchases, expenses] = await Promise.all([
       this.prisma.deal.findMany({
-        where: { createdAt: { gte: start, lte: end } },
+        where: { deletedAt: null, createdAt: { gte: start, lte: end } },
         include: { customer: true, product: true },
       }),
       this.prisma.purchase.findMany({ where: { createdAt: { gte: start, lte: end } } }),
       this.prisma.expenseReport.findMany({
-        where: { createdAt: { gte: start, lte: end } },
+        where: { deletedAt: null, createdAt: { gte: start, lte: end } },
         include: { expenses: true },
       }),
     ]);
@@ -43,6 +43,7 @@ export class ReportsService {
     const end = new Date(endDate);
     const deals = await this.prisma.deal.findMany({
       where: {
+        deletedAt: null,
         createdAt: { gte: start, lte: end },
         ...(location ? { customer: { location } } : {}),
       },
@@ -53,19 +54,22 @@ export class ReportsService {
 
   async getRevenueByMonth(query: Record<string, string>) {
     const range = parseDateRange(query);
-    const whereClause = range
-      ? Prisma.sql`WHERE date >= ${range.gte!}::timestamp AND date <= ${range.lte!}::timestamp`
+    // Exclude payments belonging to soft-deleted invoices.
+    const dateClause = range
+      ? Prisma.sql`AND p.date >= ${range.gte!}::timestamp AND p.date <= ${range.lte!}::timestamp`
       : Prisma.sql``;
 
     const rows = await this.prisma.$queryRaw<{ year: number; month: number; revenue: number; count: number }[]>(
       Prisma.sql`
         SELECT
-          EXTRACT(YEAR FROM date)::int AS year,
-          EXTRACT(MONTH FROM date)::int AS month,
-          ROUND(SUM(amount)::numeric, 2)::float AS revenue,
+          EXTRACT(YEAR FROM p.date)::int AS year,
+          EXTRACT(MONTH FROM p.date)::int AS month,
+          ROUND(SUM(p.amount)::numeric, 2)::float AS revenue,
           COUNT(*)::int AS count
-        FROM "InvoicePayment"
-        ${whereClause}
+        FROM "InvoicePayment" p
+        JOIN "Invoice" i ON i.id = p."invoiceId"
+        WHERE i."deletedAt" IS NULL
+        ${dateClause}
         GROUP BY year, month
         ORDER BY year, month
       `,
@@ -76,6 +80,7 @@ export class ReportsService {
   async getPipelineFunnel() {
     const rows = await this.prisma.deal.groupBy({
       by: ['status'],
+      where: { deletedAt: null },
       _count: { id: true },
       _sum: { price: true },
     });
@@ -93,7 +98,7 @@ export class ReportsService {
       by: ['category'],
       _sum: { amount: true },
       _count: { id: true },
-      where: range ? { date: range } : undefined,
+      where: { ...(range ? { date: range } : {}), expenseReport: { deletedAt: null } },
       orderBy: { _sum: { amount: 'desc' } },
     });
     return rows.map((r) => ({
@@ -105,7 +110,7 @@ export class ReportsService {
 
   async getOutstandingInvoices() {
     const invoices = await this.prisma.invoice.findMany({
-      where: { status: { in: ['sent', 'partially_paid', 'overdue'] } },
+      where: { deletedAt: null, status: { in: ['sent', 'partially_paid', 'overdue'] } },
       include: {
         customer: { select: { id: true, name: true } },
         deal: { select: { id: true, title: true } },
@@ -130,8 +135,8 @@ export class ReportsService {
 
   async getCustomerAcquisition(query: Record<string, string>) {
     const range = parseDateRange(query);
-    const whereClause = range
-      ? Prisma.sql`WHERE "createdAt" >= ${range.gte!}::timestamp AND "createdAt" <= ${range.lte!}::timestamp`
+    const dateClause = range
+      ? Prisma.sql`AND "createdAt" >= ${range.gte!}::timestamp AND "createdAt" <= ${range.lte!}::timestamp`
       : Prisma.sql``;
 
     const rows = await this.prisma.$queryRaw<{ year: number; month: number; count: number }[]>(
@@ -141,7 +146,8 @@ export class ReportsService {
           EXTRACT(MONTH FROM "createdAt")::int AS month,
           COUNT(*)::int AS count
         FROM "Customer"
-        ${whereClause}
+        WHERE "deletedAt" IS NULL
+        ${dateClause}
         GROUP BY year, month
         ORDER BY year, month
       `,

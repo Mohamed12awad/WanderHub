@@ -5,6 +5,8 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { TasksService } from './tasks.service';
+import { CreateTaskDto } from './dto/create-task.dto';
+import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -37,14 +39,14 @@ export class TasksController {
 
   @Post()
   @RequirePermission('tasks:create')
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateTaskDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.tasks.create(body, user.id)); }
     catch (e) { return res.status(400).json({ message: (e as Error).message }); }
   }
 
   @Put(':id')
   @RequirePermission('tasks:edit')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateTaskDto, @Res() res: Response) {
     try {
       const t = await this.tasks.update(id, body);
       if (!t) return res.status(404).json({ message: 'Task not found' });

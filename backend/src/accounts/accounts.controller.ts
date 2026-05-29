@@ -4,6 +4,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { AccountsService } from './accounts.service';
+import { CreateAccountDto } from './dto/create-account.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 
 @Controller('accounts')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -19,14 +21,14 @@ export class AccountsController {
 
   @Post()
   @RequirePermission('settings:manage')
-  async create(@Body() body: Record<string, any>, @Res() res: Response) {
+  async create(@Body() body: CreateAccountDto, @Res() res: Response) {
     try { return res.json(await this.accounts.create(body)); }
     catch (e) { return res.status(500).json({ error: (e as Error).message }); }
   }
 
   @Patch(':id')
   @RequirePermission('settings:manage')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateAccountDto, @Res() res: Response) {
     try {
       const result = await this.accounts.update(id, body);
       if (!result) return res.status(404).json({ message: 'Not found' });

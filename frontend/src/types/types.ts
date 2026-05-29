@@ -140,15 +140,6 @@ export interface UserData {
   reportsTo?: string | null;
 }
 
-export interface PaymentData {
-  deal?: string;
-  amount: number;
-  date: Date | string;
-  method: string;
-  notes: string;
-  currency: string;
-}
-
 export interface ReportParams {
   startDate: string;
   endDate: string;

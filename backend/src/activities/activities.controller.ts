@@ -3,6 +3,8 @@ import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { ActivitiesService } from './activities.service';
+import { CreateActivityDto } from './dto/create-activity.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
 
 @Controller('activities')
 @UseGuards(JwtAuthGuard)
@@ -16,13 +18,13 @@ export class ActivitiesController {
   }
 
   @Post()
-  async create(@Body() body: Record<string, any>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+  async create(@Body() body: CreateActivityDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try { return res.status(201).json(await this.activities.create(body, user.id)); }
     catch (e) { return res.status(400).json({ message: (e as Error).message }); }
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: Record<string, any>, @Res() res: Response) {
+  async update(@Param('id') id: string, @Body() body: UpdateActivityDto, @Res() res: Response) {
     try {
       const a = await this.activities.update(id, body);
       if (!a) return res.status(404).json({ message: 'Activity not found' });

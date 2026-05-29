@@ -8,6 +8,8 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import { handlePrismaError } from '../common/prisma-error';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -33,7 +35,7 @@ export class UsersController {
 
   @Post()
   @RequirePermission('users:create')
-  async create(@Body() body: Record<string, any>, @Res() res: Response) {
+  async create(@Body() body: CreateUserDto, @Res() res: Response) {
     try { return res.status(201).json(await this.users.create(body)); }
     catch (e) { return handlePrismaError(e, res); }
   }
@@ -42,7 +44,7 @@ export class UsersController {
   @RequirePermission('users:edit')
   async update(
     @Param('id') id: string,
-    @Body() body: Record<string, any>,
+    @Body() body: UpdateUserDto,
     @CurrentUser() user: AuthUser,
     @Res() res: Response,
   ) {

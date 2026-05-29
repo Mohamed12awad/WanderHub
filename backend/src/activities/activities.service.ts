@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CreateActivityDto } from './dto/create-activity.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
 
 @Injectable()
 export class ActivitiesService {
@@ -28,8 +30,8 @@ export class ActivitiesService {
     return toClient(activities);
   }
 
-  async create(body: Record<string, any>, userId: string) {
-    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, customer, deal, linkedTo, ...rest } = body;
+  async create(body: CreateActivityDto, userId: string) {
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, customer, deal, linkedTo, ...rest } = body as any;
     const resolvedLinkedToId = rest.linkedToId ?? linkedTo;
     const data: any = { ...rest, linkedToId: resolvedLinkedToId, createdById: userId };
     delete data.linkedTo;
@@ -55,10 +57,10 @@ export class ActivitiesService {
     return toClient(activity);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateActivityDto) {
     const existing = await this.prisma.activity.findUnique({ where: { id } });
     if (!existing) return null;
-    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } = body;
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } = body as any;
     const data: any = { ...rest };
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
     const activity = await this.prisma.activity.update({ where: { id }, data });

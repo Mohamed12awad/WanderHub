@@ -27,7 +27,6 @@ const RULES: RouteRule[] = [
   { pattern: /^\/tasks/,              action: (m) => verb(m, 'task') },
   { pattern: /^\/notes/,              action: (m) => verb(m, 'note') },
   { pattern: /^\/activities/,         action: (m) => verb(m, 'activity') },
-  { pattern: /^\/partial-payments/,   action: (m) => verb(m, 'partial payment') },
 
   // Admin
   { pattern: /^\/users\/[^/]+\/password/, action: () => 'Changed a password' },

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -10,7 +12,7 @@ export class ProductsService {
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, type, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const products = await this.prisma.product.findMany({ orderBy: { createdAt: 'desc' } });
+      const products = await this.prisma.product.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } });
       return toClient(products);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -18,6 +20,7 @@ export class ProductsService {
     const where: any = q
       ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { type: { contains: q, mode: 'insensitive' } }] }
       : {};
+    where.deletedAt = null;
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (createdAt_from || createdAt_to) {
       where.createdAt = {};
@@ -34,28 +37,28 @@ export class ProductsService {
   }
 
   async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({ where: { id } });
+    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     return product ? toClient(product) : null;
   }
 
-  async create(body: Record<string, any>) {
-    const { _id, id, createdAt, updatedAt, deals, productNotes, ...data } = body;
-    const product = await this.prisma.product.create({ data: data as any });
+  async create(body: CreateProductDto) {
+    // The global ValidationPipe (whitelist) already strips any field not
+    // declared on the DTO, so the payload is safe to pass straight through.
+    const product = await this.prisma.product.create({ data: body as any });
     return toClient(product);
   }
 
-  async update(id: string, body: Record<string, any>) {
+  async update(id: string, body: UpdateProductDto) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) return null;
-    const { _id, id: _id2, createdAt, updatedAt, deals, productNotes, ...data } = body;
-    const product = await this.prisma.product.update({ where: { id }, data });
+    const product = await this.prisma.product.update({ where: { id }, data: body as any });
     return toClient(product);
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.product.findUnique({ where: { id } });
+    const existing = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    await this.prisma.product.delete({ where: { id } });
+    await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 }

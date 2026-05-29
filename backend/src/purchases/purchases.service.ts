@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { CreatePurchaseDto } from './dto/create-purchase.dto';
 
 @Injectable()
 export class PurchasesService {
@@ -11,8 +12,8 @@ export class PurchasesService {
     return toClient(purchases);
   }
 
-  async create(body: Record<string, any>) {
-    const { _id, id, createdAt, updatedAt, ...rest } = body;
+  async create(body: CreatePurchaseDto) {
+    const { _id, id, createdAt, updatedAt, ...rest } = body as any;
     const price = Number(rest.price ?? 0);
     const shippingCost = Number(rest.shippingCost ?? 0);
     const tax = Number(rest.tax ?? 0);
