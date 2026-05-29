@@ -14,6 +14,7 @@ import { useAuth } from "../../contexts/authContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import NavLinks from "./NavLinks";
 import { ModeToggle } from "@/components/common/toggleTheme";
+import { NotificationBell } from "./NotificationBell";
 
 export default function NavBar() {
   const { logout, user } = useAuth();
@@ -39,9 +40,9 @@ export default function NavBar() {
           <div className="flex h-[60px] items-center gap-3 px-5 shrink-0">
             <Link to="/" className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/40">
-                <img src="/logo.png" className="h-5 w-5" alt="WonderHub" />
+                <img src="/logo.png" className="h-5 w-5" alt="NawaHub" />
               </div>
-              <span className="text-sm font-semibold tracking-tight text-white">WonderHub</span>
+              <span className="text-sm font-semibold tracking-tight text-white">NawaHub</span>
             </Link>
           </div>
           <nav className="flex-1 overflow-y-auto px-3 py-3">
@@ -67,6 +68,7 @@ export default function NavBar() {
       </button>
 
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
+        <NotificationBell />
         <ModeToggle />
 
         {/* User avatar dropdown */}

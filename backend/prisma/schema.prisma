@@ -70,6 +70,24 @@ enum TaskStatus {
   cancelled
 }
 
+enum LeadStatus {
+  new
+  contacted
+  qualified
+  unqualified
+  converted
+}
+
+enum NotificationType {
+  task_assigned
+  deal_assigned
+  lead_assigned
+  approval_requested
+  approval_approved
+  approval_rejected
+  invoice_overdue
+}
+
 // ─── Auth & Config ────────────────────────────────────────────────────────────
 
 model Role {
@@ -113,6 +131,10 @@ model User {
   createdTasks        Task[]           @relation("TaskCreatedBy")
   triggeredTimelines  TimelineEvent[]
   logs                Log[]
+  refreshTokens       RefreshToken[]
+  ownedLeads          Lead[]          @relation("LeadOwner")
+  createdLeads        Lead[]          @relation("LeadCreator")
+  notifications       Notification[]
 }
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
@@ -149,6 +171,7 @@ model Customer {
   activities    Activity[]
   customerNotes Note[]
   timelines     TimelineEvent[]
+  fromLead      Lead?           @relation("LeadConversion")
 
   @@index([ownerId])
   @@index([status])
@@ -189,6 +212,46 @@ model Deal {
   @@index([ownerId])
   @@index([status])
   @@index([deletedAt])
+}
+
+model Lead {
+  id            String     @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  mobile        String?
+  source        String?
+  status        LeadStatus @default(new)
+  notes         String?
+  ownerId       String?
+  owner         User?      @relation("LeadOwner", fields: [ownerId], references: [id])
+  createdById   String?
+  createdBy     User?      @relation("LeadCreator", fields: [createdById], references: [id])
+  convertedAt   DateTime?
+  convertedToId String?    @unique
+  convertedTo   Customer?  @relation("LeadConversion", fields: [convertedToId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
@@ -510,10 +573,26 @@ model Log {
   endpoint   String
   recordId   String?
   recordName String?
+  success    Boolean  @default(true)
   timestamp  DateTime @default(now())
 
   @@index([userId, timestamp])
   @@index([timestamp])
+}
+
+// Rotating refresh tokens. Only the SHA-256 hash of the opaque token is
+// stored, never the token itself. Rotation revokes the old row and issues a
+// new one; logout / deactivation revoke without deleting (audit trail).
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Purchase {

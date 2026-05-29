@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { VisibilityService } from '../common/visibility.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
@@ -11,6 +13,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly visibility: VisibilityService,
   ) {}
 
   /** Strips relation/virtual fields the frontend may echo back on writes. */
@@ -45,18 +48,19 @@ export class CustomersService {
     return toClient(customer);
   }
 
-  async findAll(query: Record<string, string>) {
+  async findAll(query: Record<string, string>, user: AuthUser) {
     const { page, limit: limitRaw, q, status, gender, phone, createdAt_from, createdAt_to } = query;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
     if (!page) {
       const customers = await this.prisma.customer.findMany({
-        where: { deletedAt: null },
+        where: { deletedAt: null, ...scopeWhere },
         orderBy: { createdAt: 'desc' },
       });
       return toClient(customers);
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = { deletedAt: null };
+    const where: any = { deletedAt: null, ...scopeWhere };
     if (q) {
       where.OR = [
         { name: { contains: q, mode: 'insensitive' } },
@@ -87,9 +91,10 @@ export class CustomersService {
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
     const customer = await this.prisma.customer.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...scopeWhere },
       include: { deals: { where: { deletedAt: null } }, owner: true },
     });
     if (!customer) return null;

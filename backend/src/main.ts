@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bodyParser: true });
+  const app = await NestFactory.create(AppModule, { bodyParser: true, bufferLogs: true });
+  app.useLogger(app.get(Logger));
   app.setGlobalPrefix('api');
   app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
   app.useGlobalPipes(
@@ -12,6 +14,5 @@ async function bootstrap() {
   );
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Server running on port ${port}`);
 }
-bootstrap();
+void bootstrap();

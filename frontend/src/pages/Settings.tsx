@@ -87,44 +87,47 @@ export default function Settings() {
         </nav>
       </aside>
 
-      {/* ── Mobile: horizontal tab strip ── */}
-      <div className="sm:hidden flex border-b overflow-x-auto bg-white dark:bg-card px-2 gap-0.5 shrink-0 absolute top-[60px] start-0 end-0 z-10">
-        {[...personalItems, ...workspaceItems].map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors",
-                isActive
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )
-            }
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </NavLink>
-        ))}
-      </div>
+      {/* ── Right column: mobile tabs + content ── */}
+      <div className="flex flex-col flex-1 min-h-0 min-w-0">
+        {/* Mobile: horizontal tab strip */}
+        <div className="sm:hidden flex border-b overflow-x-auto bg-white dark:bg-card px-2 gap-0.5 shrink-0">
+          {[...personalItems, ...workspaceItems].map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors",
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )
+              }
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </NavLink>
+          ))}
+        </div>
 
-      {/* ── Content area ── */}
-      <main className="flex-1 overflow-auto sm:pt-0 pt-10 bg-muted/40 dark:bg-background">
-        <Routes>
-          <Route index element={<Navigate to="profile" replace />} />
-          <Route path="profile"    element={<ProfileSettings />} />
-          <Route path="appearance" element={<AppearanceSettings />} />
-          <Route path="modules"    element={<ModulesSettings />} />
-          <Route path="fields"     element={<FieldsSettings />} />
-          <Route path="tasks"      element={<Tasks />} />
-          <Route path="logs"       element={<Logs />} />
-          <Route path="roles"      element={<Roles />} />
-          <Route path="users"      element={<UsersPage />} />
-          <Route path="approvals"     element={<ApprovalsSettings />} />
-          <Route path="accounts"      element={<AccountsSettings />} />
-          <Route path="organization"  element={<OrganizationSettings />} />
-        </Routes>
-      </main>
+        {/* ── Content area ── */}
+        <main className="flex-1 overflow-auto bg-muted/40 dark:bg-background">
+          <Routes>
+            <Route index element={<Navigate to="profile" replace />} />
+            <Route path="profile"    element={<ProfileSettings />} />
+            <Route path="appearance" element={<AppearanceSettings />} />
+            <Route path="modules"    element={<ModulesSettings />} />
+            <Route path="fields"     element={<FieldsSettings />} />
+            <Route path="tasks"      element={<Tasks />} />
+            <Route path="logs"       element={<Logs />} />
+            <Route path="roles"      element={<Roles />} />
+            <Route path="users"      element={<UsersPage />} />
+            <Route path="approvals"     element={<ApprovalsSettings />} />
+            <Route path="accounts"      element={<AccountsSettings />} />
+            <Route path="organization"  element={<OrganizationSettings />} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }

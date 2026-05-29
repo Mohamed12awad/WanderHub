@@ -16,31 +16,40 @@ const Login = () => {
     await login(email, password);
   };
 
+  const errorMessage =
+    error === "network"
+      ? tr.auth.errorNetwork
+      : error === "blocked"
+      ? tr.auth.errorBlocked
+      : error === "credentials"
+      ? tr.auth.errorCredentials
+      : null;
+
   return (
     <div className="min-h-screen bg-[hsl(220_20%_97%)] dark:bg-[hsl(222_28%_8%)] flex">
       {/* Left panel — branding */}
       <div className="hidden lg:flex w-[420px] shrink-0 flex-col justify-between bg-[hsl(var(--sidebar-bg))] p-10">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/30">
-            <img src="/logo.png" className="h-5.5 w-5.5" alt="WonderHub" />
+            <img src="/logo.png" className="h-5.5 w-5.5" alt="NawaHub" />
           </div>
-          <span className="text-base font-semibold text-white">WonderHub</span>
+          <span className="text-base font-semibold text-white">NawaHub</span>
         </div>
 
         <div>
           <blockquote className="text-white/70 text-sm leading-relaxed italic">
-            "WonderHub keeps our pipeline clear, our invoices on time, and our team in sync — every day."
+            "NawaHub keeps our pipeline clear, our invoices on time, and our team in sync — every day."
           </blockquote>
           <div className="mt-4 flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white">SA</div>
             <div>
               <p className="text-xs font-semibold text-white/80">Sales Admin</p>
-              <p className="text-[11px] text-white/40">WonderHub Team</p>
+              <p className="text-[11px] text-white/40">NawaHub Team</p>
             </div>
           </div>
         </div>
 
-        <p className="text-[11px] text-white/25">WonderHub CRM · {new Date().getFullYear()}</p>
+        <p className="text-[11px] text-white/25">NawaHub CRM · {new Date().getFullYear()}</p>
       </div>
 
       {/* Right panel — form */}
@@ -57,9 +66,9 @@ const Login = () => {
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary shadow-lg shadow-primary/25 mb-3">
-              <img src="/logo.png" className="h-7 w-7" alt="WonderHub" />
+              <img src="/logo.png" className="h-7 w-7" alt="NawaHub" />
             </div>
-            <h1 className="text-xl font-bold">WonderHub</h1>
+            <h1 className="text-xl font-bold">NawaHub</h1>
             <p className="text-sm text-muted-foreground mt-1">{tr.auth.subtitle}</p>
           </div>
 
@@ -70,9 +79,9 @@ const Login = () => {
               <p className="text-sm text-muted-foreground mt-1 hidden lg:block">{tr.auth.subtitle}</p>
             </div>
 
-            {error && (
+            {errorMessage && (
               <div className="mb-5 rounded-lg bg-destructive/8 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-                {tr.auth.error}
+                {errorMessage}
               </div>
             )}
 
@@ -114,7 +123,7 @@ const Login = () => {
           </div>
 
           <p className="lg:hidden text-center text-xs text-muted-foreground mt-6">
-            WonderHub CRM · {new Date().getFullYear()}
+            NawaHub CRM · {new Date().getFullYear()}
           </p>
         </div>
       </div>

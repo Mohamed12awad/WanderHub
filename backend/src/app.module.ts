@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { VisibilityModule } from './common/visibility.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
 import { NumberSequenceModule } from './number-sequence/number-sequence.module';
@@ -24,6 +26,8 @@ import { SummeryModule } from './summery/summery.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { LeadsModule } from './leads/leads.module';
 
 @Module({
   providers: [
@@ -32,13 +36,26 @@ import { AccountsModule } from './accounts/accounts.module';
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+        transport: process.env.NODE_ENV !== 'production'
+          ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
+          : undefined,
+        redact: ['req.headers.authorization'],
+        autoLogging: { ignore: (req) => (req as any).url?.includes('/health') },
+      },
+    }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
+    VisibilityModule,
     TimelineModule,
     NumberSequenceModule,
     AuthModule,
+    NotificationsModule,
     CustomersModule,
     DealsModule,
+    LeadsModule,
     UsersModule,
     RolesModule,
     ProductsModule,

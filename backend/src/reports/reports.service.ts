@@ -154,4 +154,15 @@ export class ReportsService {
     );
     return rows.map((r) => ({ month: toMonthLabel(r.year, r.month), customers: r.count }));
   }
+
+  async getLeadsFunnel() {
+    const counts = await this.prisma.lead.groupBy({
+      by: ['status'],
+      where: { deletedAt: null },
+      _count: { id: true },
+    });
+    const result: Record<string, number> = { new: 0, contacted: 0, qualified: 0, unqualified: 0, converted: 0 };
+    counts.forEach(({ status, _count }) => { result[status] = _count.id; });
+    return result;
+  }
 }

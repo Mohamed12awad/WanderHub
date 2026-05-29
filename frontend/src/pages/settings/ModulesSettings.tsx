@@ -3,7 +3,7 @@ import { useModules, ModuleKey } from "@/contexts/ModulesContext";
 import { cn } from "@/lib/utils";
 import {
   Users2, Handshake, KanbanSquare, CalendarDays,
-  CheckSquare, Package, Banknote, WalletCards, Receipt,
+  CheckSquare, Package, Banknote, WalletCards, Receipt, UserSearch,
 } from "lucide-react";
 
 interface ModuleInfo {
@@ -17,6 +17,11 @@ const MODULE_INFO: Record<ModuleKey, ModuleInfo> = {
     icon: Users2,
     label: (tr) => tr.nav.contacts,
     description: "Track your contacts, relationships and interaction history.",
+  },
+  leads: {
+    icon: UserSearch,
+    label: (tr) => tr.nav.leads,
+    description: "Capture and qualify inbound leads before converting them to contacts.",
   },
   deals: {
     icon: Handshake,

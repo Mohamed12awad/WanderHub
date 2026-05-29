@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
@@ -9,30 +10,11 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
+import { calcTotals, deriveInvoiceStatus } from './finance.math';
 
-interface RawLineItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  discount?: number;
-}
-
-function calcTotals(items: RawLineItem[], taxRate = 0) {
-  const computed = items.map((i) => {
-    const disc = (i.discount ?? 0) / 100;
-    return { ...i, discount: i.discount ?? 0, total: i.quantity * i.unitPrice * (1 - disc) };
-  });
-  const subtotal = computed.reduce((s, i) => s + i.total, 0);
-  const tax = subtotal * (taxRate / 100);
-  return { items: computed, subtotal, tax, total: subtotal + tax };
-}
-
-function deriveInvoiceStatus(total: number, totalPaid: number, dueDate?: Date | null): string {
-  if (totalPaid <= 0) return 'sent';
-  if (totalPaid >= total) return 'paid';
-  if (dueDate && dueDate < new Date() && totalPaid < total) return 'overdue';
-  return 'partially_paid';
-}
+// Sentinel used to roll back the conversion transaction when a concurrent
+// request won the race to convert the same quote.
+class AlreadyConvertedError extends Error {}
 
 const QUOTE_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
@@ -66,6 +48,44 @@ export class FinanceService {
     if (['admin', 'super admin'].includes(userRole)) return true;
     if (!approverRoles.length) return true;
     return approverRoles.includes(userRole);
+  }
+
+  /**
+   * Recomputes an invoice's totalPaid as the authoritative SUM of its payments
+   * and derives its status — inside the given transaction. Avoids read-modify-
+   * write races where concurrent payments could clobber each other's totals.
+   */
+  private async recalcInvoiceTotals(tx: Prisma.TransactionClient, invoiceId: string) {
+    const invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) return null;
+    const agg = await tx.invoicePayment.aggregate({
+      where: { invoiceId },
+      _sum: { amount: true },
+    });
+    const totalPaid = agg._sum.amount ?? 0;
+    const status = deriveInvoiceStatus(invoice.total, totalPaid, invoice.dueDate) as any;
+    return tx.invoice.update({ where: { id: invoiceId }, data: { totalPaid, status } });
+  }
+
+  /**
+   * Moves an account's balance by `delta` (positive = money in) atomically.
+   * Blocks cross-currency moves rather than silently corrupting the balance.
+   */
+  private async applyAccountDelta(
+    tx: Prisma.TransactionClient,
+    accountId: string | null | undefined,
+    paymentCurrency: string,
+    delta: number,
+  ) {
+    if (!accountId || !delta) return;
+    const account = await tx.account.findFirst({ where: { id: accountId, deletedAt: null } });
+    if (!account) throw new BadRequestException('Account not found');
+    if (account.currency !== paymentCurrency) {
+      throw new BadRequestException(
+        `Payment currency (${paymentCurrency}) must match the account currency (${account.currency})`,
+      );
+    }
+    await tx.account.update({ where: { id: accountId }, data: { balance: { increment: delta } } });
   }
 
   // ── Quotes ──────────────────────────────────────────────────────────────────
@@ -118,27 +138,33 @@ export class FinanceService {
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (quote.approvalStatus === 'rejected') data.approvalStatus = 'pending';
-    if (items) {
-      const tr = taxRate !== undefined ? taxRate : quote.taxRate;
-      const totals = calcTotals(items, tr);
-      await this.prisma.quoteLineItem.deleteMany({ where: { quoteId: id } });
-      data.taxRate = tr;
-      data.subtotal = totals.subtotal;
-      data.tax = totals.tax;
-      data.total = totals.total;
-      data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
-    } else if (taxRate !== undefined) {
-      data.taxRate = taxRate;
-    }
-    const updated = await this.prisma.quote.update({ where: { id }, data, include: QUOTE_INCLUDE });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (items) {
+        const tr = taxRate !== undefined ? taxRate : quote.taxRate;
+        const totals = calcTotals(items, tr);
+        // Replace line items atomically with the recomputed totals.
+        await tx.quoteLineItem.deleteMany({ where: { quoteId: id } });
+        data.taxRate = tr;
+        data.subtotal = totals.subtotal;
+        data.tax = totals.tax;
+        data.total = totals.total;
+        data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
+      } else if (taxRate !== undefined) {
+        data.taxRate = taxRate;
+      }
+      return tx.quote.update({ where: { id }, data, include: QUOTE_INCLUDE });
+    });
     return toClient(updated);
   }
 
   async approveQuote(id: string, userId: string, userRole: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) return null;
     const { approverRoles } = await this.getApprovalConfig('quotes');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    // Separation of duties: the creator cannot approve their own quote.
+    if (quote.createdById === userId) return { selfApproval: true };
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -148,10 +174,11 @@ export class FinanceService {
   }
 
   async rejectQuote(id: string, userId: string, reason: string, userRole: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) return null;
     const { approverRoles } = await this.getApprovalConfig('quotes');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (quote.createdById === userId) return { selfApproval: true };
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -168,47 +195,65 @@ export class FinanceService {
   }
 
   async convertQuoteToInvoice(id: string, userId: string) {
-    const quote = await this.prisma.quote.findUnique({ where: { id }, include: { items: true } });
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, deletedAt: null },
+      include: { items: true },
+    });
     if (!quote) return null;
     if (quote.convertedToInvoiceId) return { alreadyConverted: true };
 
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        title: quote.title,
-        customerId: quote.customerId,
-        dealId: quote.dealId,
-        status: 'draft',
-        subtotal: quote.subtotal,
-        taxRate: quote.taxRate,
-        tax: quote.tax,
-        total: quote.total,
-        currency: quote.currency,
-        notes: quote.notes,
-        terms: quote.terms,
-        issueDate: new Date(),
-        createdById: userId,
-        items: {
-          create: quote.items.map((it) => ({
-            description: it.description,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            discount: it.discount,
-            total: it.total,
-            order: it.order,
-          })),
-        },
-      },
-      include: INVOICE_INCLUDE,
-    });
 
-    await this.prisma.quote.update({
-      where: { id },
-      data: { convertedToInvoiceId: invoice.id, status: 'accepted' },
-    });
+    try {
+      const invoice = await this.prisma.$transaction(async (tx) => {
+        // Atomically claim the quote: only the first converter flips
+        // convertedToInvoiceId from null. A concurrent request updating 0 rows
+        // means it was already converted — bail out.
+        const created = await tx.invoice.create({
+          data: {
+            invoiceNumber,
+            title: quote.title,
+            customerId: quote.customerId,
+            dealId: quote.dealId,
+            status: 'draft',
+            subtotal: quote.subtotal,
+            taxRate: quote.taxRate,
+            tax: quote.tax,
+            total: quote.total,
+            currency: quote.currency,
+            notes: quote.notes,
+            terms: quote.terms,
+            issueDate: new Date(),
+            createdById: userId,
+            items: {
+              create: quote.items.map((it) => ({
+                description: it.description,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                discount: it.discount,
+                total: it.total,
+                order: it.order,
+              })),
+            },
+          },
+          include: INVOICE_INCLUDE,
+        });
 
-    return toClient(invoice);
+        const claim = await tx.quote.updateMany({
+          where: { id, convertedToInvoiceId: null },
+          data: { convertedToInvoiceId: created.id, status: 'accepted' },
+        });
+        if (claim.count === 0) {
+          // Lost the race; abort so the just-created invoice is rolled back.
+          throw new AlreadyConvertedError();
+        }
+        return created;
+      });
+      return toClient(invoice);
+    } catch (e) {
+      if (e instanceof AlreadyConvertedError) return { alreadyConverted: true };
+      throw e;
+    }
   }
 
   // ── Invoices ─────────────────────────────────────────────────────────────────
@@ -277,17 +322,24 @@ export class FinanceService {
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (invoice.approvalStatus === 'rejected') data.approvalStatus = 'pending';
-    if (items) {
-      const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
-      const totals = calcTotals(items, tr);
-      await this.prisma.invoiceLineItem.deleteMany({ where: { invoiceId: id } });
-      data.taxRate = tr;
-      data.subtotal = totals.subtotal;
-      data.tax = totals.tax;
-      data.total = totals.total;
-      data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
-    }
-    const updated = await this.prisma.invoice.update({ where: { id }, data, include: INVOICE_INCLUDE });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (items) {
+        const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
+        const totals = calcTotals(items, tr);
+        // Replace line items atomically with the recomputed totals.
+        await tx.invoiceLineItem.deleteMany({ where: { invoiceId: id } });
+        data.taxRate = tr;
+        data.subtotal = totals.subtotal;
+        data.tax = totals.tax;
+        data.total = totals.total;
+        data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
+      }
+      await tx.invoice.update({ where: { id }, data });
+      // Totals changed → re-derive paid status from the existing payments.
+      if (items) await this.recalcInvoiceTotals(tx, id);
+      return tx.invoice.findUnique({ where: { id }, include: INVOICE_INCLUDE });
+    });
     return toClient(updated);
   }
 
@@ -301,10 +353,11 @@ export class FinanceService {
   }
 
   async approveInvoice(id: string, userId: string, userRole: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) return null;
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (invoice.createdById === userId) return { selfApproval: true };
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -314,10 +367,11 @@ export class FinanceService {
   }
 
   async rejectInvoice(id: string, userId: string, reason: string, userRole: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) return null;
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (invoice.createdById === userId) return { selfApproval: true };
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -327,41 +381,46 @@ export class FinanceService {
   }
 
   async recordPayment(invoiceId: string, body: RecordPaymentDto, userId: string) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
     if (!invoice) return null;
 
-    const payment = await this.prisma.invoicePayment.create({
-      data: { ...body, amount: Number(body.amount), date: new Date(body.date), invoiceId, createdById: userId } as any,
-      include: { createdBy: { select: { id: true, name: true } } },
+    const amount = Number(body.amount);
+    const currency = body.currency ?? invoice.currency;
+
+    const { payment, updatedInvoice } = await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.invoicePayment.create({
+        data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as any,
+        include: { createdBy: { select: { id: true, name: true } } },
+      });
+
+      // Money in: increment the linked account's balance (currency-checked).
+      await this.applyAccountDelta(tx, body.accountId, currency, amount);
+
+      const updatedInvoice = await this.recalcInvoiceTotals(tx, invoiceId);
+
+      // Mark the deal won once the invoice is fully paid.
+      if (invoice.dealId && updatedInvoice && updatedInvoice.totalPaid >= updatedInvoice.total) {
+        await tx.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
+      }
+      return { payment, updatedInvoice };
     });
 
-    const newTotalPaid = (invoice.totalPaid ?? 0) + Number(body.amount);
-    const newStatus = deriveInvoiceStatus(invoice.total, newTotalPaid, invoice.dueDate) as any;
-    const updatedInvoice = await this.prisma.invoice.update({
-      where: { id: invoiceId },
-      data: { totalPaid: newTotalPaid, status: newStatus },
-      include: INVOICE_INCLUDE,
-    });
+    await this.timeline.log('payment.received', `Payment of ${amount} ${currency} recorded`, invoiceId, 'Invoice', { amount, currency, method: payment.method }, userId);
 
-    if (invoice.dealId && newTotalPaid >= invoice.total) {
-      await this.prisma.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
-    }
-
-    await this.timeline.log('payment.received', `Payment of ${payment.amount} ${payment.currency ?? invoice.currency} recorded`, invoiceId, 'Invoice', { amount: payment.amount, currency: payment.currency ?? invoice.currency, method: payment.method }, userId);
-    return { payment: toClient(payment), invoice: toClient(updatedInvoice) };
+    const full = await this.prisma.invoice.findUnique({ where: { id: invoiceId }, include: INVOICE_INCLUDE });
+    return { payment: toClient(payment), invoice: toClient(full) };
   }
 
   async deleteInvoicePayment(invoiceId: string, paymentId: string) {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
     if (!payment) return null;
-    await this.prisma.invoicePayment.delete({ where: { id: paymentId } });
 
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
-    if (invoice) {
-      const newTotalPaid = Math.max(0, (invoice.totalPaid ?? 0) - payment.amount);
-      const newStatus = deriveInvoiceStatus(invoice.total, newTotalPaid, invoice.dueDate) as any;
-      await this.prisma.invoice.update({ where: { id: invoiceId }, data: { totalPaid: newTotalPaid, status: newStatus } });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.invoicePayment.delete({ where: { id: paymentId } });
+      // Money out: reverse the balance move this payment had applied.
+      await this.applyAccountDelta(tx, payment.accountId, payment.currency, -payment.amount);
+      await this.recalcInvoiceTotals(tx, invoiceId);
+    });
     return true;
   }
 
@@ -369,18 +428,25 @@ export class FinanceService {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
     if (!payment) return null;
 
-    const oldAmount = payment.amount;
-    const updated = await this.prisma.invoicePayment.update({
-      where: { id: paymentId },
-      data: { ...body, amount: Number(body.amount), date: body.date ? new Date(body.date) : payment.date } as any,
-    });
+    const newAmount = Number(body.amount);
+    const newCurrency = body.currency ?? payment.currency;
+    const newAccountId = body.accountId !== undefined ? body.accountId : payment.accountId;
 
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
-    if (invoice) {
-      const newTotalPaid = Math.max(0, (invoice.totalPaid ?? 0) - oldAmount + updated.amount);
-      const newStatus = deriveInvoiceStatus(invoice.total, newTotalPaid, invoice.dueDate) as any;
-      await this.prisma.invoice.update({ where: { id: invoiceId }, data: { totalPaid: newTotalPaid, status: newStatus } });
-    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Reverse the old payment's effect on its account, then apply the new one.
+      // Handles amount, currency, and account changes (including moving between
+      // accounts) without double-counting.
+      await this.applyAccountDelta(tx, payment.accountId, payment.currency, -payment.amount);
+
+      const updated = await tx.invoicePayment.update({
+        where: { id: paymentId },
+        data: { ...body, amount: newAmount, currency: newCurrency, date: body.date ? new Date(body.date) : payment.date } as any,
+      });
+
+      await this.applyAccountDelta(tx, newAccountId, newCurrency, newAmount);
+      await this.recalcInvoiceTotals(tx, invoiceId);
+      return updated;
+    });
 
     return toClient(updated);
   }

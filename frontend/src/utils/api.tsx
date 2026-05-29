@@ -30,18 +30,56 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle token expiration
+// Single-flight refresh: many requests may 401 at once, but only one refresh
+// call should run; the rest await its result.
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) return null;
+  try {
+    // Bare axios (no interceptors) so a 401 here can't recurse.
+    const resp = await axios.post(`${import.meta.env.VITE_API_URL}auth/refresh`, { refreshToken });
+    const { token, refreshToken: rotated, user } = resp.data;
+    localStorage.setItem("token", token);
+    if (rotated) localStorage.setItem("refreshToken", rotated);
+    if (user) localStorage.setItem("user", JSON.stringify(user));
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function clearSessionAndRedirect() {
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  delete axios.defaults.headers.common["Authorization"];
+  window.location.href = "/login";
+}
+
+// Response interceptor: on a 401, transparently try to refresh the short-lived
+// access token once and replay the original request; if refresh fails, end the
+// session.
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      // Redirect to login page if token is expired
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      delete axios.defaults.headers.common["Authorization"];
-      window.location.href = "/login";
+  (response) => response,
+  async (error) => {
+    const original = error.config as (typeof error.config & { _retry?: boolean });
+    if (error.response?.status === 401 && original && !original._retry) {
+      original._retry = true;
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+      const newToken = await refreshPromise;
+      if (newToken) {
+        original.headers = original.headers ?? {};
+        original.headers["Authorization"] = `Bearer ${newToken}`;
+        return api(original);
+      }
+      clearSessionAndRedirect();
     }
     return Promise.reject(error);
   }
@@ -271,3 +309,23 @@ export const updateWorkspaceSettings = (data: {
 export const getOrgSettings = () => api.get("/settings/organization");
 export const updateOrgSettings = (data: { baseCurrency?: string; locale?: string }) =>
   api.put("/settings/organization", data);
+
+// Leads
+export const getLeads = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
+  api.get("/leads", { params });
+export const getLeadById = (id: string) => api.get(`/leads/${id}`);
+export const createLead = (data: Record<string, unknown>) => api.post("/leads", data);
+export const updateLead = (id: string, data: Record<string, unknown>) => api.put(`/leads/${id}`, data);
+export const deleteLead = (id: string): Promise<void> => api.delete(`/leads/${id}`);
+export const convertLead = (id: string) => api.post(`/leads/${id}/convert`);
+
+// Leads report
+export const getLeadsFunnelReport = () => api.get("/reports/leads");
+
+// Notifications
+export const getNotifications = (params?: { unread?: boolean; page?: number }) =>
+  api.get("/notifications", { params });
+export const getUnreadCount = () => api.get("/notifications/unread-count");
+export const markNotificationRead = (id: string) => api.put(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => api.put("/notifications/read-all");
+export const deleteNotification = (id: string): Promise<void> => api.delete(`/notifications/${id}`);

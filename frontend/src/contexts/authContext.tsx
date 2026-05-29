@@ -16,6 +16,8 @@ interface User {
   permissions: string[];
 }
 
+export type AuthError = "network" | "credentials" | "blocked";
+
 interface AuthContextProps {
   user: User | null;
   isLoggedIn: boolean;
@@ -23,7 +25,7 @@ interface AuthContextProps {
   logout: () => void;
   updateCurrentUser: (updates: Partial<User>) => void;
   loading: boolean;
-  error: string | null;
+  error: AuthError | null;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -34,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // Initially true to indicate loading
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
 
   const navigate = useNavigate();
 
@@ -51,14 +53,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setUser(response.data.user);
         localStorage.setItem("user", JSON.stringify(response.data.user));
         localStorage.setItem("token", response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refreshToken", response.data.refreshToken);
+        }
         axios.defaults.headers.common[
           "Authorization"
         ] = `Bearer ${response.data.token}`;
         navigate("/dashboard");
       }
-    } catch (error) {
-      setError("Login failed. Please check your credentials and try again.");
-      console.error("Login failed", error);
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          setError("network");
+        } else if (err.response.status === 403) {
+          setError("blocked");
+        } else {
+          setError("credentials");
+        }
+      } else {
+        setError("network");
+      }
+      console.error("Login failed", err);
     } finally {
       setLoading(false);
     }
@@ -74,10 +89,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = () => {
+    // Revoke the refresh token server-side (best effort), then clear locally.
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      axios
+        .post(`${import.meta.env.VITE_API_URL}auth/logout`, { refreshToken })
+        .catch(() => undefined);
+    }
     setIsLoggedIn(false);
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     delete axios.defaults.headers.common["Authorization"];
     navigate("/login");
   };

@@ -114,10 +114,12 @@ export class ExpensesService {
   }
 
   async approve(id: string, userId: string, userRole: string) {
-    const report = await this.prisma.expenseReport.findUnique({ where: { id } });
+    const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!report) return null;
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    // Separation of duties: the report owner cannot approve their own report.
+    if (report.userId === userId) return { selfApproval: true };
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'approved', approved: true, approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -128,10 +130,11 @@ export class ExpensesService {
   }
 
   async reject(id: string, userId: string, reason: string, userRole: string) {
-    const report = await this.prisma.expenseReport.findUnique({ where: { id } });
+    const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!report) return null;
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (report.userId === userId) return { selfApproval: true };
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'rejected', approved: false, approvedById: userId, approvedAt: new Date(), rejectionReason: reason },

@@ -71,7 +71,7 @@ const initialFormData = {
 const AddCustomer = () => {
   const location = useLocation();
   const cloneData = (location.state as any)?.clone;
-  const [formData, setFormData] = useState(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
+  const [formData, setFormData] = useState<typeof initialFormData>(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 

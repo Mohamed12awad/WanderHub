@@ -2,14 +2,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { getWorkspaceSettings, updateWorkspaceSettings } from "@/utils/api";
 
 export const MODULE_KEYS = [
-  "customers", "deals", "pipeline", "calendar", "tasks", "products", "expenses", "finance", "reports",
+  "customers", "leads", "deals", "pipeline", "calendar", "tasks", "products", "expenses", "finance", "reports",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 type ModulesState = Record<ModuleKey, boolean>;
 
 const DEFAULT: ModulesState = {
-  customers: true, deals: true, pipeline: true, calendar: true,
+  customers: true, leads: true, deals: true, pipeline: true, calendar: true,
   tasks: true, products: true, expenses: true, finance: true, reports: true,
 };
 

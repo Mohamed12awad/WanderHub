@@ -122,6 +122,7 @@ export interface LogEntry {
   endpoint: string;
   recordId?: string;
   recordName?: string;
+  success?: boolean;
   timestamp: string;
 }
 
