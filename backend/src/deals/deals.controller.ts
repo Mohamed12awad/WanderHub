@@ -17,16 +17,16 @@ export class DealsController {
 
   @Get()
   @RequirePermission('deals:view')
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
-    try { return res.json(await this.deals.findAll(query)); }
+  async findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser, @Res() res: Response) {
+    try { return res.json(await this.deals.findAll(query, user)); }
     catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
 
   @Get(':id')
   @RequirePermission('deals:view')
-  async findOne(@Param('id') id: string, @Query('includePayments') includePayments: string, @Res() res: Response) {
+  async findOne(@Param('id') id: string, @Query('includePayments') includePayments: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      const data = await this.deals.findOne(id, includePayments === 'true');
+      const data = await this.deals.findOne(id, includePayments === 'true', user);
       if (!data) return res.status(404).json({ message: 'Deal not found' });
       return res.json(data);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }

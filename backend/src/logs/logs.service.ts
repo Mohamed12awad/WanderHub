@@ -29,10 +29,11 @@ export class LogsService {
     endpoint: string,
     recordId?: string,
     recordName?: string,
+    success = true,
   ): Promise<void> {
     try {
       await this.prisma.log.create({
-        data: { userId, action, method, endpoint, recordId, recordName },
+        data: { userId, action, method, endpoint, recordId, recordName, success },
       });
     } catch (e) {
       this.logger.error(`Failed to write audit log: ${(e as Error).message}`);

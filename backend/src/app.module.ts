@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { LoggingInterceptor } from './common/logging.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { VisibilityModule } from './common/visibility.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
 import { NumberSequenceModule } from './number-sequence/number-sequence.module';
@@ -34,6 +35,7 @@ import { AccountsModule } from './accounts/accounts.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
+    VisibilityModule,
     TimelineModule,
     NumberSequenceModule,
     AuthModule,

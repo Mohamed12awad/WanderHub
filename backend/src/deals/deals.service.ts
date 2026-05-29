@@ -6,6 +6,8 @@ import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
+import { VisibilityService } from '../common/visibility.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 @Injectable()
 export class DealsService {
@@ -13,6 +15,7 @@ export class DealsService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly numberSequence: NumberSequenceService,
+    private readonly visibility: VisibilityService,
   ) {}
 
   /** Maps frontend deal payload (customer/owner as strings) to Prisma data. */
@@ -49,14 +52,15 @@ export class DealsService {
     return toClient(deal);
   }
 
-  async findAll(query: Record<string, string>) {
+  async findAll(query: Record<string, string>, user: AuthUser) {
     const { page, limit: limitRaw, q, status, source, currency, customerId, priority, ownerId, closeDate_from, closeDate_to, createdAt_from, createdAt_to, price_min, price_max } = query;
     const customerSelect = { select: { id: true, name: true } };
     const ownerSelect = { select: { id: true, name: true } };
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'deals', 'ownerId');
 
     if (!page) {
       const deals = await this.prisma.deal.findMany({
-        where: { deletedAt: null },
+        where: { deletedAt: null, ...scopeWhere },
         include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
       });
@@ -65,7 +69,7 @@ export class DealsService {
 
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = { deletedAt: null };
+    const where: any = { deletedAt: null, ...scopeWhere };
     if (customerId) where.customerId = customerId;
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (status) where.status = status;
@@ -103,9 +107,10 @@ export class DealsService {
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string, includePayments: boolean) {
+  async findOne(id: string, includePayments: boolean, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'deals', 'ownerId');
     const deal = await this.prisma.deal.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...scopeWhere },
       include: {
         customer: {
           select: {

@@ -511,6 +511,7 @@ model Log {
   endpoint   String
   recordId   String?
   recordName String?
+  success    Boolean  @default(true)
   timestamp  DateTime @default(now())
 
   @@index([userId, timestamp])

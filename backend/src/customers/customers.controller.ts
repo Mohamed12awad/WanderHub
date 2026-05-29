@@ -27,9 +27,9 @@ export class CustomersController {
 
   @Get()
   @RequirePermission('contacts:view')
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
+  async findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      return res.json(await this.customers.findAll(query));
+      return res.json(await this.customers.findAll(query, user));
     } catch (error) {
       return res.status(500).json({ message: (error as Error).message });
     }
@@ -37,9 +37,9 @@ export class CustomersController {
 
   @Get(':id')
   @RequirePermission('contacts:view')
-  async findOne(@Param('id') id: string, @Res() res: Response) {
+  async findOne(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
     try {
-      const customer = await this.customers.findOne(id);
+      const customer = await this.customers.findOne(id, user);
       if (!customer) return res.status(404).json({ message: 'Customer not found' });
       return res.json(customer);
     } catch (error) {

@@ -82,14 +82,21 @@ export class LoggingInterceptor implements NestInterceptor {
 
     if (!MUTATING.has(method) || !user?.id) return next.handle();
 
+    // req.params.id covers updates/deletes; req.params.invoiceId covers nested
+    // payment routes. POST creates have no ID in params.
+    const recordId: string | undefined = req.params?.id ?? req.params?.invoiceId ?? undefined;
+    const cleanPath = stripPrefix(originalUrl);
+    const action = deriveAction(method, originalUrl);
+
     return next.handle().pipe(
-      tap((body) => {
-        // req.params.id covers updates/deletes; req.params.invoiceId covers nested payment routes.
-        // POST creates have no ID in params — recordId stays undefined for them.
-        const recordId: string | undefined = req.params?.id ?? req.params?.invoiceId ?? undefined;
-        const cleanPath = stripPrefix(originalUrl);
-        const recordName = extractRecordName(body);
-        this.logs.write(user.id, deriveAction(method, originalUrl), method, cleanPath, recordId, recordName);
+      tap({
+        next: (body) => {
+          this.logs.write(user.id, action, method, cleanPath, recordId, extractRecordName(body), true);
+        },
+        // Record failed mutations too — rejected writes are security-relevant.
+        error: () => {
+          this.logs.write(user.id, action, method, cleanPath, recordId, undefined, false);
+        },
       }),
     );
   }

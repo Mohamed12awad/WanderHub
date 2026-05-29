@@ -22,7 +22,10 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const permissions: string[] = request.user?.permissions ?? [];
 
-    if (permissions.includes('*') || permissions.includes(required)) {
+    // A scoped permission (e.g. "deals:view:own") satisfies the broader
+    // requirement ("deals:view"); the service then narrows the result set.
+    const satisfies = (p: string) => p === required || p.startsWith(`${required}:`);
+    if (permissions.includes('*') || permissions.some(satisfies)) {
       return true;
     }
     throw new ForbiddenException(`Permission denied: ${required}`);
