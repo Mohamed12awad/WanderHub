@@ -278,8 +278,8 @@ const ViewExpense = () => {
                 <TableRow>
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead className="hidden md:table-cell">Date</TableHead>
-                  <TableHead className="hidden md:table-cell">Category</TableHead>
+                  <TableHead className="">Date</TableHead>
+                  <TableHead className="">Category</TableHead>
                   <TableHead>Beneficiary</TableHead>
                   {canDeleteItem && <TableHead><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
@@ -289,10 +289,10 @@ const ViewExpense = () => {
                   <TableRow key={expense._id}>
                     <TableCell>{expense.description}</TableCell>
                     <TableCell className="tabular-nums">{expense.amount.toLocaleString()}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
+                    <TableCell className="text-muted-foreground text-xs">
                       {new Date(expense.date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell capitalize">{expense.category}</TableCell>
+                    <TableCell className="capitalize">{expense.category}</TableCell>
                     <TableCell>{expense.beneficiary}</TableCell>
                     {canDeleteItem && (
                       <TableCell>

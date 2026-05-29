@@ -31,12 +31,12 @@ const ProductRow: React.FC<ProductRowProps> = ({
   return (
     <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/products/${id}`)}>
       <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="hidden md:table-cell">
+      <TableCell className="">
         <Badge variant="outline">{type}</Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell font-medium tabular-nums">{capacity}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{location}</TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="font-medium tabular-nums">{capacity}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{location}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

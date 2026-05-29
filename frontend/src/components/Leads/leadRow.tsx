@@ -47,10 +47,10 @@ const LeadRow: React.FC<LeadRowProps> = ({ id, name, status, phone, source, owne
           {statusLabel}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70">{phone}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{source}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70">{owner?.name}</TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="text-foreground/70">{phone}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{source}</TableCell>
+      <TableCell className="text-foreground/70">{owner?.name}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

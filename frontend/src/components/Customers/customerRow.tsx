@@ -42,9 +42,9 @@ const CustomerRow: React.FC<CustomerRowProps> = ({ id, name, status, phone, loca
           {status}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70">{phone}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{location}</TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="text-foreground/70">{phone}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{location}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

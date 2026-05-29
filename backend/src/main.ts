@@ -1,8 +1,13 @@
 import 'reflect-metadata';
+import * as Sentry from '@sentry/node';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV ?? 'development' });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: true, bufferLogs: true });

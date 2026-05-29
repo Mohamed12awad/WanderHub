@@ -37,8 +37,8 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => onEdit(id)}>
       <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70">{email}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{role}</TableCell>
+      <TableCell className="text-foreground/70">{email}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{role}</TableCell>
       <TableCell>
         <Badge
           variant="outline"
@@ -50,7 +50,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
           {active ? "Active" : "Inactive"}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

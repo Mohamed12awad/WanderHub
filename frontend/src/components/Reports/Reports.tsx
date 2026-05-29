@@ -296,11 +296,11 @@ const Reports: React.FC = () => {
                       <TableRow>
                         <TableHead>Invoice</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead className="hidden md:table-cell">Deal</TableHead>
+                        <TableHead className="">Deal</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Paid</TableHead>
                         <TableHead className="text-right">Outstanding</TableHead>
-                        <TableHead className="hidden md:table-cell">Due Date</TableHead>
+                        <TableHead className="">Due Date</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -319,7 +319,7 @@ const Reports: React.FC = () => {
                               </Link>
                             ) : "—"}
                           </TableCell>
-                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                          <TableCell className="text-sm text-muted-foreground">
                             {inv.deal ? (
                               <Link to={`/deals/${inv.deal._id}`} className="text-blue-500 hover:underline">
                                 {inv.deal.title}
@@ -331,7 +331,7 @@ const Reports: React.FC = () => {
                           <TableCell className="text-right font-semibold text-red-600">
                             {inv.outstanding.toLocaleString()} {inv.currency}
                           </TableCell>
-                          <TableCell className={`hidden md:table-cell text-sm ${inv.status === "overdue" ? "text-red-500" : "text-muted-foreground"}`}>
+                          <TableCell className={`text-sm ${inv.status === "overdue" ? "text-red-500" : "text-muted-foreground"}`}>
                             {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
                           </TableCell>
                           <TableCell>

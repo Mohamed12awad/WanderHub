@@ -85,10 +85,10 @@ const PaymentRow: React.FC<{
           {METHOD_LABELS[p.method] ?? p.method}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+      <TableCell className="text-sm text-muted-foreground">
         {p.reference ?? "—"}
       </TableCell>
-      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+      <TableCell className="text-sm text-muted-foreground">
         {p.createdBy?.name ?? "—"}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>

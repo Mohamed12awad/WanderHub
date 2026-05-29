@@ -18,7 +18,7 @@ function buildPrisma() {
 }
 
 const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
-const notifMock    = { create: jest.fn().mockResolvedValue(undefined) } as any;
+const notifMock    = { dispatch: jest.fn().mockResolvedValue(undefined) } as any;
 const visibilityMock = {
   ownershipWhere: jest.fn().mockResolvedValue({}),
 } as any;
@@ -81,17 +81,17 @@ describe('LeadsService.create', () => {
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
 
     await svc.create({ name: 'Jane', owner: 'owner-99' }, 'creator-1');
-    expect(notifMock.create).toHaveBeenCalledWith(expect.objectContaining({ type: 'lead_assigned', userId: 'owner-99' }));
+    expect(notifMock.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'lead_assigned', userId: 'owner-99' }));
   });
 
   it('does NOT fire a notification when the creator is also the owner', async () => {
     const prisma = buildPrisma();
     prisma.lead.create.mockResolvedValue({ ...sampleLead, ownerId: 'user-1' });
-    notifMock.create.mockClear();
+    notifMock.dispatch.mockClear();
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
 
     await svc.create({ name: 'Jane', owner: 'user-1' }, 'user-1');
-    expect(notifMock.create).not.toHaveBeenCalled();
+    expect(notifMock.dispatch).not.toHaveBeenCalled();
   });
 });
 

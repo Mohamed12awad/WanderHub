@@ -34,10 +34,10 @@ const PaymentRow: React.FC<PaymentRowProps> = ({ id, reference, amount, date, me
 
   return (
     <TableRow>
-      <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">{reference ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{reference ?? "—"}</TableCell>
       <TableCell className="font-medium tabular-nums">{amount}</TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
-      <TableCell className="hidden md:table-cell text-foreground/70 capitalize">{method}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{method}</TableCell>
       <TableCell>
         <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ""} capitalize w-fit`}>
           {status}

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { VisibilityService } from '../common/visibility.service';
 import { toClient } from '../common/serialize';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -13,7 +13,7 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
-    private readonly notifications: NotificationsService,
+    private readonly dispatcher: NotificationDispatcher,
     private readonly visibility: VisibilityService,
   ) {}
 
@@ -58,7 +58,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.create({ data: data as any });
 
     if (lead.ownerId && lead.ownerId !== userId) {
-      await this.notifications.create({
+      await this.dispatcher.dispatch({
         userId: lead.ownerId,
         type: 'lead_assigned',
         title: `Lead assigned: ${lead.name}`,
@@ -131,7 +131,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.update({ where: { id }, data: cleaned });
 
     if (cleaned.ownerId && cleaned.ownerId !== oldOwnerId && cleaned.ownerId !== userId) {
-      await this.notifications.create({
+      await this.dispatcher.dispatch({
         userId: cleaned.ownerId,
         type: 'lead_assigned',
         title: `Lead assigned: ${lead.name}`,

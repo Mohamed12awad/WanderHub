@@ -342,9 +342,9 @@ const InvoiceDetail: React.FC = () => {
                 <TableRow>
                   <TableHead>{f.paymentDate}</TableHead>
                   <TableHead className="text-right">{f.amount}</TableHead>
-                  <TableHead className="hidden md:table-cell">{f.paymentMethod}</TableHead>
-                  <TableHead className="hidden md:table-cell">{f.paymentReference}</TableHead>
-                  <TableHead className="hidden md:table-cell">Created By</TableHead>
+                  <TableHead className="">{f.paymentMethod}</TableHead>
+                  <TableHead className="">{f.paymentReference}</TableHead>
+                  <TableHead className="">Created By</TableHead>
                   <TableHead className="w-20"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
@@ -353,11 +353,11 @@ const InvoiceDetail: React.FC = () => {
                   <TableRow key={p._id}>
                     <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{p.amount.toLocaleString()} {p.currency}</TableCell>
-                    <TableCell className="hidden md:table-cell capitalize">
+                    <TableCell className="capitalize">
                       {f.paymentMethods[p.method] ?? p.method}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{p.reference ?? "—"}</TableCell>
-                    <TableCell className="hidden md:table-cell">{p.createdBy?.name}</TableCell>
+                    <TableCell className="">{p.reference ?? "—"}</TableCell>
+                    <TableCell className="">{p.createdBy?.name}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPayment(p)}>

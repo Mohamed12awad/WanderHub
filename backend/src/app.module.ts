@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { SentryExceptionFilter } from './common/sentry.filter';
 import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -31,8 +32,9 @@ import { LeadsModule } from './leads/leads.module';
 
 @Module({
   providers: [
+    { provide: APP_FILTER,      useClass: SentryExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD,       useClass: ThrottlerGuard },
   ],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),

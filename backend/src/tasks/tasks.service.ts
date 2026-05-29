@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { toClient } from '../common/serialize';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -11,7 +11,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
-    private readonly notifications: NotificationsService,
+    private readonly dispatcher: NotificationDispatcher,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -83,7 +83,7 @@ export class TasksService {
     }
 
     if (task.assignedToId && task.assignedToId !== userId) {
-      await this.notifications.create({
+      await this.dispatcher.dispatch({
         userId: task.assignedToId,
         type: 'task_assigned',
         title: `Task assigned: ${task.title}`,
@@ -108,7 +108,7 @@ export class TasksService {
     });
 
     if (data.assignedToId && data.assignedToId !== existing.assignedToId && data.assignedToId !== userId) {
-      await this.notifications.create({
+      await this.dispatcher.dispatch({
         userId: data.assignedToId,
         type: 'task_assigned',
         title: `Task assigned: ${task.title}`,

@@ -478,7 +478,7 @@ export function GenericTable<T extends DataItem>({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/30 border-b-2 border-border/60">
-              {headers.map((header, i) => {
+              {headers.map((header) => {
                 const isSortable = sortableHeaders?.includes(header);
                 const isActive   = sortBy === header;
                 const SortIcon   = isActive ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
@@ -496,7 +496,6 @@ export function GenericTable<T extends DataItem>({
                     }
                     className={cn(
                       "h-9 text-[11px] font-semibold uppercase tracking-wider text-foreground/50 whitespace-nowrap",
-                      i > 1 ? "hidden md:table-cell" : "",
                       isSortable && "cursor-pointer select-none hover:text-foreground/80 transition-colors",
                     )}
                     onClick={isSortable ? () => toggleSort(header) : undefined}
@@ -521,7 +520,7 @@ export function GenericTable<T extends DataItem>({
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i} className="hover:bg-transparent animate-pulse">
                   {headers.map((h, hi) => (
-                    <TableCell key={h} className={hi > 1 ? "hidden md:table-cell" : ""}>
+                    <TableCell key={h}>
                       <Skeleton className={cn("h-4", SKELETON_WIDTHS[(i + hi) % SKELETON_WIDTHS.length])} />
                     </TableCell>
                   ))}

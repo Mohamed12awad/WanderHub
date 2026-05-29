@@ -140,7 +140,7 @@ const QuotesTable: React.FC<{ quotes: Quote[]; navigate: (p: string) => void; f:
         <TableHead>Title</TableHead>
         <TableHead>{f.status}</TableHead>
         <TableHead className="text-right">{f.total}</TableHead>
-        <TableHead className="hidden md:table-cell">{f.validUntil}</TableHead>
+        <TableHead className="">{f.validUntil}</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -150,7 +150,7 @@ const QuotesTable: React.FC<{ quotes: Quote[]; navigate: (p: string) => void; f:
           <TableCell>{q.title}</TableCell>
           <TableCell><FinanceStatusBadge status={q.status} type="quote" /></TableCell>
           <TableCell className="text-right font-medium">{q.total.toLocaleString()} {q.currency}</TableCell>
-          <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+          <TableCell className="text-muted-foreground text-sm">
             {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
           </TableCell>
         </TableRow>
@@ -167,8 +167,8 @@ const InvoicesTable: React.FC<{ invoices: Invoice[]; navigate: (p: string) => vo
         <TableHead>Title</TableHead>
         <TableHead>{f.status}</TableHead>
         <TableHead className="text-right">{f.total}</TableHead>
-        <TableHead className="text-right hidden md:table-cell">{f.outstanding}</TableHead>
-        <TableHead className="hidden md:table-cell">{f.dueDate}</TableHead>
+        <TableHead className="text-right">{f.outstanding}</TableHead>
+        <TableHead className="">{f.dueDate}</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -180,10 +180,10 @@ const InvoicesTable: React.FC<{ invoices: Invoice[]; navigate: (p: string) => vo
             <TableCell>{inv.title}</TableCell>
             <TableCell><FinanceStatusBadge status={inv.status} type="invoice" /></TableCell>
             <TableCell className="text-right font-medium">{inv.total.toLocaleString()} {inv.currency}</TableCell>
-            <TableCell className={`text-right hidden md:table-cell font-medium ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
+            <TableCell className={`text-right font-medium ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
               {outstanding.toLocaleString()} {inv.currency}
             </TableCell>
-            <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
+            <TableCell className="text-muted-foreground text-sm">
               {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
             </TableCell>
           </TableRow>

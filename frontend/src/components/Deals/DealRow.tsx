@@ -54,7 +54,7 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority
           {status}
         </Badge>
       </TableCell>
-      <TableCell className="hidden md:table-cell">
+      <TableCell className="">
         {priority ? (
           <Badge className={`${PRIORITY_COLORS[priority] ?? ""} capitalize w-fit text-xs`} variant="outline">
             {priority}
@@ -62,8 +62,8 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority
         ) : <span className="text-muted-foreground">—</span>}
       </TableCell>
       <TableCell className="hidden lg:table-cell text-foreground/70 text-sm">{owner ?? "—"}</TableCell>
-      <TableCell className="hidden md:table-cell font-medium tabular-nums">{value}</TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">{date}</TableCell>
+      <TableCell className="font-medium tabular-nums">{value}</TableCell>
+      <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

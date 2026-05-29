@@ -36,7 +36,7 @@ const QuoteRow: React.FC<{
       <TableCell>
         <FinanceStatusBadge status={q.status} type="quote" />
       </TableCell>
-      <TableCell className="hidden md:table-cell">
+      <TableCell className="">
         {q.convertedToInvoice ? (
           <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
             Converted
@@ -49,10 +49,10 @@ const QuoteRow: React.FC<{
         {q.total.toLocaleString()}{" "}
         <span className="text-xs text-muted-foreground">{q.currency}</span>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">
+      <TableCell className="text-muted-foreground text-xs tabular-nums">
         {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
       </TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">
+      <TableCell className="text-muted-foreground text-xs tabular-nums">
         {new Date(q.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>

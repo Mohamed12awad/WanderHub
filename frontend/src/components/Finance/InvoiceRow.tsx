@@ -40,11 +40,11 @@ const InvoiceRow: React.FC<{
         {inv.total.toLocaleString()}{" "}
         <span className="text-xs text-muted-foreground">{inv.currency}</span>
       </TableCell>
-      <TableCell className={`text-right hidden md:table-cell font-medium tabular-nums ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
+      <TableCell className={`text-right font-medium tabular-nums ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
         {outstanding.toLocaleString()}{" "}
         <span className="text-xs opacity-70">{inv.currency}</span>
       </TableCell>
-      <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular-nums">
+      <TableCell className="text-muted-foreground text-xs tabular-nums">
         {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
