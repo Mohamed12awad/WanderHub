@@ -65,6 +65,7 @@ export class QuotesController {
       const q = await this.finance.approveQuote(id, user.id, user.role);
       if (!q) return res.status(404).json({ message: 'Quote not found' });
       if ((q as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve quotes' });
+      if ((q as any).selfApproval) return res.status(403).json({ message: 'You cannot approve a quote you created' });
       return res.json(q);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -77,6 +78,7 @@ export class QuotesController {
       const q = await this.finance.rejectQuote(id, user.id, body.reason.trim(), user.role);
       if (!q) return res.status(404).json({ message: 'Quote not found' });
       if ((q as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject quotes' });
+      if ((q as any).selfApproval) return res.status(403).json({ message: 'You cannot reject a quote you created' });
       return res.json(q);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }

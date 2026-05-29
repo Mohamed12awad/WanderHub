@@ -74,6 +74,7 @@ export class InvoicesController {
       const inv = await this.finance.approveInvoice(id, user.id, user.role);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
       if ((inv as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve invoices' });
+      if ((inv as any).selfApproval) return res.status(403).json({ message: 'You cannot approve an invoice you created' });
       return res.json(inv);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -86,6 +87,7 @@ export class InvoicesController {
       const inv = await this.finance.rejectInvoice(id, user.id, body.reason.trim(), user.role);
       if (!inv) return res.status(404).json({ message: 'Invoice not found' });
       if ((inv as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject invoices' });
+      if ((inv as any).selfApproval) return res.status(403).json({ message: 'You cannot reject an invoice you created' });
       return res.json(inv);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -97,7 +99,7 @@ export class InvoicesController {
       const result = await this.finance.recordPayment(id, body, user.id);
       if (!result) return res.status(404).json({ message: 'Invoice not found' });
       return res.status(201).json(result);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+    } catch (e) { return res.status((e as any)?.getStatus?.() ?? 500).json({ message: (e as Error).message }); }
   }
 
   @Patch('invoices/:invoiceId/payments/:paymentId')
@@ -107,7 +109,7 @@ export class InvoicesController {
       const result = await this.finance.editPayment(invoiceId, paymentId, body);
       if (!result) return res.status(404).json({ message: 'Payment not found' });
       return res.json(result);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+    } catch (e) { return res.status((e as any)?.getStatus?.() ?? 500).json({ message: (e as Error).message }); }
   }
 
   @Delete('invoices/:invoiceId/payments/:paymentId')
@@ -117,6 +119,6 @@ export class InvoicesController {
       const ok = await this.finance.deleteInvoicePayment(invoiceId, paymentId);
       if (!ok) return res.status(404).json({ message: 'Payment not found' });
       return res.json({ message: 'Payment deleted' });
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+    } catch (e) { return res.status((e as any)?.getStatus?.() ?? 500).json({ message: (e as Error).message }); }
   }
 }

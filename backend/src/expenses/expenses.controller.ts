@@ -54,6 +54,7 @@ export class ExpensesController {
       const r = await this.expenses.approve(id, user.id, user.role);
       if (!r) return res.status(404).json({ message: 'Expense report not found' });
       if ((r as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve expense reports' });
+      if ((r as any).selfApproval) return res.status(403).json({ message: 'You cannot approve an expense report you created' });
       return res.json(r);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
@@ -66,6 +67,7 @@ export class ExpensesController {
       const r = await this.expenses.reject(id, user.id, body.reason.trim(), user.role);
       if (!r) return res.status(404).json({ message: 'Expense report not found' });
       if ((r as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject expense reports' });
+      if ((r as any).selfApproval) return res.status(403).json({ message: 'You cannot reject an expense report you created' });
       return res.json(r);
     } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
   }
