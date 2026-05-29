@@ -10,34 +10,11 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
+import { calcTotals, deriveInvoiceStatus } from './finance.math';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
 class AlreadyConvertedError extends Error {}
-
-interface RawLineItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  discount?: number;
-}
-
-function calcTotals(items: RawLineItem[], taxRate = 0) {
-  const computed = items.map((i) => {
-    const disc = (i.discount ?? 0) / 100;
-    return { ...i, discount: i.discount ?? 0, total: i.quantity * i.unitPrice * (1 - disc) };
-  });
-  const subtotal = computed.reduce((s, i) => s + i.total, 0);
-  const tax = subtotal * (taxRate / 100);
-  return { items: computed, subtotal, tax, total: subtotal + tax };
-}
-
-function deriveInvoiceStatus(total: number, totalPaid: number, dueDate?: Date | null): string {
-  if (totalPaid <= 0) return 'sent';
-  if (totalPaid >= total) return 'paid';
-  if (dueDate && dueDate < new Date() && totalPaid < total) return 'overdue';
-  return 'partially_paid';
-}
 
 const QUOTE_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
