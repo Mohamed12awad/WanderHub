@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function hashToken(raw: string): string {
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
 
 @Injectable()
 export class AuthService {
@@ -10,15 +18,39 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  generateToken(user: { id: string; role: { name: string; permissions: string[] } }) {
+  /**
+   * Short-lived access token. Carries only the user id — role, permissions and
+   * the active flag are re-read from the DB on every request by the JWT
+   * strategy, so changes take effect immediately rather than at token expiry.
+   */
+  private signAccessToken(userId: string): string {
     return this.jwt.sign(
-      {
-        id: user.id,
-        role: user.role.name,
-        permissions: user.role.permissions ?? [],
-      },
-      { secret: process.env.JWT_SECRET, expiresIn: '8h' },
+      { sub: userId, type: 'access' },
+      { secret: process.env.JWT_SECRET, expiresIn: ACCESS_TOKEN_TTL },
     );
+  }
+
+  /** Issues a new opaque refresh token and stores only its hash. */
+  private async issueRefreshToken(userId: string): Promise<string> {
+    const raw = crypto.randomBytes(48).toString('base64url');
+    await this.prisma.refreshToken.create({
+      data: {
+        userId,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      },
+    });
+    return raw;
+  }
+
+  private publicUser(user: { id: string; email: string; name: string; role: { name: string; permissions: string[] } }) {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role.name,
+      permissions: user.role.permissions ?? [],
+    };
   }
 
   async signin(email: string, password: string) {
@@ -42,20 +74,50 @@ export class AuthService {
       return { status: 403, body: { message: 'This account has been blocked' } };
     }
 
-    const token = this.generateToken(user as any);
+    const token = this.signAccessToken(user.id);
+    const refreshToken = await this.issueRefreshToken(user.id);
 
     return {
       status: 200,
-      body: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role.name,
-          permissions: user.role.permissions ?? [],
-        },
-      },
+      body: { token, refreshToken, user: this.publicUser(user as any) },
     };
+  }
+
+  /**
+   * Validates a refresh token, rotates it (revoke old + issue new), and returns
+   * a fresh access token. Returns null on any failure so the caller can answer
+   * with a generic 401.
+   */
+  async refresh(rawToken: string | undefined) {
+    if (!rawToken) return null;
+    const existing = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: hashToken(rawToken) },
+      include: { user: { include: { role: true } } },
+    });
+
+    if (!existing || existing.revokedAt || existing.expiresAt < new Date()) return null;
+    if (!existing.user || existing.user.active === false) {
+      // Account gone or blocked — burn the token.
+      await this.prisma.refreshToken.update({ where: { id: existing.id }, data: { revokedAt: new Date() } });
+      return null;
+    }
+
+    // Rotate: revoke the presented token and mint a new pair.
+    const [, refreshToken] = await Promise.all([
+      this.prisma.refreshToken.update({ where: { id: existing.id }, data: { revokedAt: new Date() } }),
+      this.issueRefreshToken(existing.userId),
+    ]);
+    const token = this.signAccessToken(existing.userId);
+
+    return { token, refreshToken, user: this.publicUser(existing.user as any) };
+  }
+
+  /** Revokes the presented refresh token (idempotent). */
+  async logout(rawToken: string | undefined) {
+    if (!rawToken) return;
+    await this.prisma.refreshToken.updateMany({
+      where: { tokenHash: hashToken(rawToken), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 }

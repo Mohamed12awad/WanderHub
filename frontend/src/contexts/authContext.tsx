@@ -51,6 +51,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setUser(response.data.user);
         localStorage.setItem("user", JSON.stringify(response.data.user));
         localStorage.setItem("token", response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refreshToken", response.data.refreshToken);
+        }
         axios.defaults.headers.common[
           "Authorization"
         ] = `Bearer ${response.data.token}`;
@@ -74,10 +77,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = () => {
+    // Revoke the refresh token server-side (best effort), then clear locally.
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (refreshToken) {
+      axios
+        .post(`${import.meta.env.VITE_API_URL}auth/logout`, { refreshToken })
+        .catch(() => undefined);
+    }
     setIsLoggedIn(false);
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     delete axios.defaults.headers.common["Authorization"];
     navigate("/login");
   };

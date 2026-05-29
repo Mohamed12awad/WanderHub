@@ -113,6 +113,7 @@ model User {
   createdTasks        Task[]           @relation("TaskCreatedBy")
   triggeredTimelines  TimelineEvent[]
   logs                Log[]
+  refreshTokens       RefreshToken[]
 }
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
@@ -514,6 +515,21 @@ model Log {
 
   @@index([userId, timestamp])
   @@index([timestamp])
+}
+
+// Rotating refresh tokens. Only the SHA-256 hash of the opaque token is
+// stored, never the token itself. Rotation revokes the old row and issues a
+// new one; logout / deactivation revoke without deleting (audit trail).
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Purchase {
