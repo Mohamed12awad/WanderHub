@@ -152,17 +152,21 @@ async function seedData() {
   ]);
   console.log('    ✓ products');
 
-  // Workspace
-  await prisma.workspace.upsert({
-    where: { id: 'workspace-001' }, update: {},
-    create: {
-      id: 'workspace-001', name: 'WanderHub HQ', currency: 'EGP',
-      approvalConfig: {
-        expense: { enabled: true, threshold: 5000, approverRoleId: null },
-        finance: { enabled: true, threshold: 10000, approverRoleId: null },
+  // Workspace config (single row — upsert the first found or create)
+  const existingWs = await prisma.workspaceConfig.findFirst();
+  if (!existingWs) {
+    await prisma.workspaceConfig.create({
+      data: {
+        baseCurrency: 'EGP',
+        locale: 'en-US',
+        approvals: [
+          { module: 'expenses', enabled: true, approverRoles: ['admin', 'manager'] },
+          { module: 'quotes',   enabled: true, approverRoles: ['admin'] },
+          { module: 'invoices', enabled: true, approverRoles: ['admin'] },
+        ],
       },
-    },
-  });
+    });
+  }
   console.log('    ✓ workspace');
 
   // Customers
@@ -171,21 +175,21 @@ async function seedData() {
       where: { id: 'cust-001' }, update: {},
       create: {
         id: 'cust-001', name: 'Layla Hassan', email: 'layla@example.com', phone: '+201111111111',
-        type: 'individual', status: 'active', address: 'Cairo, Egypt', createdById: admin.id,
+        status: 'active', location: 'Cairo, Egypt',
       },
     }),
     prisma.customer.upsert({
       where: { id: 'cust-002' }, update: {},
       create: {
         id: 'cust-002', name: 'Nile Corp Events', email: 'events@nilecorp.com', phone: '+201222222222',
-        type: 'company', status: 'active', address: 'Giza, Egypt', createdById: admin.id,
+        status: 'active', location: 'Giza, Egypt',
       },
     }),
     prisma.customer.upsert({
       where: { id: 'cust-003' }, update: {},
       create: {
         id: 'cust-003', name: 'Omar Khalil', email: 'omar@example.com', phone: '+201333333333',
-        type: 'individual', status: 'active', address: 'Alexandria, Egypt', createdById: manager.id,
+        status: 'active', location: 'Alexandria, Egypt',
       },
     }),
   ]);
@@ -212,86 +216,94 @@ async function seedData() {
   ]);
   console.log('    ✓ leads');
 
-  // Deals
+  // Deals  (Deal has: customerId, ownerId, title, price, currency, status)
   const [d1, d2] = await Promise.all([
     prisma.deal.upsert({
       where: { id: 'deal-001' }, update: {},
       create: {
         id: 'deal-001', title: 'Layla Wedding — June 2026',
-        customerId: c1.id, productId: products[0].id, ownerId: manager.id,
-        status: DealStatus.proposal, value: 85000,
-        startDate: daysFromNow(30), endDate: daysFromNow(31),
-        currency: 'EGP', createdById: admin.id,
+        customerId: c1.id, ownerId: manager.id,
+        status: DealStatus.proposal, price: 85000,
+        expectedCloseDate: daysFromNow(30),
+        currency: 'EGP', source: 'direct',
       },
     }),
     prisma.deal.upsert({
       where: { id: 'deal-002' }, update: {},
       create: {
         id: 'deal-002', title: 'Nile Corp Q3 Retreat',
-        customerId: c2.id, productId: products[2].id, ownerId: sales?.id ?? manager.id,
-        status: DealStatus.won, value: 42000,
-        startDate: daysAgo(10), endDate: daysAgo(8),
-        currency: 'EGP', createdById: admin.id,
+        customerId: c2.id, ownerId: sales?.id ?? manager.id,
+        status: DealStatus.won, price: 42000,
+        expectedCloseDate: daysAgo(8),
+        currency: 'EGP', source: 'referral',
       },
     }),
   ]);
   console.log('    ✓ deals');
 
-  // Invoices
+  // Invoice  (invoiceNumber, title, customerId required)
   const inv1 = await prisma.invoice.upsert({
     where: { id: 'inv-001' }, update: {},
     create: {
-      id: 'inv-001', number: 'INV-0001', dealId: d2.id,
+      id: 'inv-001', invoiceNumber: 'INV-0001',
+      title: 'Nile Corp Q3 Retreat Invoice',
+      customerId: c2.id, dealId: d2.id,
       status: InvoiceStatus.paid, currency: 'EGP',
+      subtotal: 42000, total: 42000,
       issueDate: daysAgo(15), dueDate: daysAgo(5),
-      approvalStatus: ApprovalStatus.approved, createdById: admin.id,
+      approvalStatus: ApprovalStatus.approved,
+      createdById: admin.id,
       items: {
         create: [
           { description: 'Catering Package (80 guests)', quantity: 1, unitPrice: 35000, total: 35000 },
-          { description: 'AV Equipment & Setup', quantity: 1, unitPrice: 7000, total: 7000 },
+          { description: 'AV Equipment & Setup',         quantity: 1, unitPrice: 7000,  total: 7000  },
         ],
       },
     },
   });
 
-  // Payment for the invoice
+  // Payment  (date field, not paidAt)
   await prisma.invoicePayment.upsert({
     where: { id: 'pay-001' }, update: {},
     create: {
       id: 'pay-001', invoiceId: inv1.id, amount: 42000,
       method: 'bank_transfer', accountId: bankAcc.id,
-      paidAt: daysAgo(4), createdById: admin.id,
+      date: daysAgo(4), createdById: admin.id,
     },
   });
   console.log('    ✓ invoices & payments');
 
-  // Quote
+  // Quote  (quoteNumber, title, customerId required; validUntil not expiryDate)
   await prisma.quote.upsert({
     where: { id: 'qt-001' }, update: {},
     create: {
-      id: 'qt-001', number: 'QT-0001', dealId: d1.id,
+      id: 'qt-001', quoteNumber: 'QT-0001',
+      title: 'Layla Wedding Proposal',
+      customerId: c1.id, dealId: d1.id,
       status: QuoteStatus.sent, currency: 'EGP',
-      issueDate: daysAgo(5), expiryDate: daysFromNow(25),
+      subtotal: 85000, total: 85000,
+      validUntil: daysFromNow(25),
       createdById: admin.id,
       items: {
         create: [
           { description: 'Standard Hall (full day)', quantity: 1, unitPrice: 60000, total: 60000 },
-          { description: 'Catering (200 guests)', quantity: 1, unitPrice: 25000, total: 25000 },
+          { description: 'Catering (200 guests)',    quantity: 1, unitPrice: 25000, total: 25000 },
         ],
       },
     },
   });
   console.log('    ✓ quotes');
 
-  // Tasks
+  // Tasks  (linkedModel not linkedToType)
   await Promise.all([
     prisma.task.upsert({
       where: { id: 'task-001' }, update: {},
       create: {
         id: 'task-001', title: 'Send venue contract to Layla',
         status: TaskStatus.todo, priority: TaskPriority.high,
-        dueDate: daysFromNow(3), assignedToId: manager.id, createdById: admin.id,
-        linkedToType: 'Deal', linkedToId: d1.id,
+        dueDate: daysFromNow(3),
+        assignedToId: manager.id, createdById: admin.id,
+        linkedModel: 'Deal', linkedToId: d1.id,
       },
     }),
     prisma.task.upsert({
@@ -299,66 +311,70 @@ async function seedData() {
       create: {
         id: 'task-002', title: 'Follow up on Pyramid Tech inquiry',
         status: TaskStatus.in_progress, priority: TaskPriority.medium,
-        dueDate: daysFromNow(7), assignedToId: sales?.id ?? manager.id, createdById: manager.id,
-        linkedToType: 'Lead', linkedToId: 'lead-002',
+        dueDate: daysFromNow(7),
+        assignedToId: sales?.id ?? manager.id, createdById: manager.id,
+        linkedModel: 'Lead', linkedToId: 'lead-002',
       },
     }),
   ]);
   console.log('    ✓ tasks');
 
-  // Activities
+  // Activities  (title not subject, description not notes, date required, linkedModel not linkedToType)
   await Promise.all([
     prisma.activity.upsert({
       where: { id: 'act-001' }, update: {},
       create: {
         id: 'act-001', type: ActivityType.call, status: ActivityStatus.completed,
-        subject: 'Initial call with Layla', notes: 'Discussed hall options and pricing.',
-        dueDate: daysAgo(7), completedAt: daysAgo(7),
-        ownerId: manager.id, createdById: admin.id,
-        linkedToType: 'Deal', linkedToId: d1.id,
+        title: 'Initial call with Layla',
+        description: 'Discussed hall options and pricing.',
+        date: daysAgo(7),
+        assignedToId: manager.id, createdById: admin.id,
+        linkedModel: 'Deal', linkedToId: d1.id,
       },
     }),
     prisma.activity.upsert({
       where: { id: 'act-002' }, update: {},
       create: {
         id: 'act-002', type: ActivityType.meeting, status: ActivityStatus.pending,
-        subject: 'Site visit — Nile Corp retreat prep', notes: 'Tour the venue before Q4 event.',
-        dueDate: daysFromNow(14),
-        ownerId: sales?.id ?? manager.id, createdById: manager.id,
-        linkedToType: 'Customer', linkedToId: c2.id,
+        title: 'Site visit — Nile Corp retreat prep',
+        description: 'Tour the venue before Q4 event.',
+        date: daysFromNow(14),
+        assignedToId: sales?.id ?? manager.id, createdById: manager.id,
+        linkedModel: 'Customer', linkedToId: c2.id,
       },
     }),
   ]);
   console.log('    ✓ activities');
 
-  // Expense report
-  const exp = await prisma.expenseReport.upsert({
+  // Expense report  (userId not submittedById; no status field; expenses→ExpenseItem)
+  await prisma.expenseReport.upsert({
     where: { id: 'exp-001' }, update: {},
     create: {
       id: 'exp-001', title: 'May Office Expenses',
-      status: 'pending', approvalStatus: ApprovalStatus.pending,
-      submittedById: sales?.id ?? manager.id, createdById: sales?.id ?? manager.id,
+      approvalStatus: ApprovalStatus.pending,
+      userId: sales?.id ?? manager.id,
       expenses: {
         create: [
-          { description: 'Printing & stationary', amount: 450, currency: 'EGP', date: daysAgo(10) },
-          { description: 'Client hospitality', amount: 1200, currency: 'EGP', date: daysAgo(5) },
+          { description: 'Printing & stationary', amount: 450,  category: 'office',        beneficiary: 'Stationery Shop', date: daysAgo(10) },
+          { description: 'Client hospitality',    amount: 1200, category: 'entertainment', beneficiary: 'Client Dinner',   date: daysAgo(5)  },
         ],
       },
     },
   });
   console.log('    ✓ expense reports');
 
-  // Notes
+  // Notes  (linkedToId and linkedModel; no createdById on Note)
   await prisma.note.upsert({
     where: { id: 'note-001' }, update: {},
     create: {
       id: 'note-001', content: 'Client prefers ivory décor and outdoor ceremony area.',
-      linkedToType: 'Deal', linkedToId: d1.id, createdById: manager.id,
+      linkedModel: 'Deal', linkedToId: d1.id, dealId: d1.id,
+      createdById: manager.id,
     },
   });
   console.log('    ✓ notes');
 
-  void cashAcc; void exp; // suppress unused-var warnings
+  void cashAcc; void c3; void products; // suppress unused-var warnings
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
