@@ -135,11 +135,10 @@ export const deleteProduct = (id: string): Promise<void> =>
 
 // Summery API Requests
 export const getSummery = (period?: string) =>
-  api.get("/summery", {
-    params: {
-      timePeriod: period,
-    },
-  });
+  api.get("/summery", { params: { timePeriod: period } });
+
+export const getPendingApprovals = () => api.get("/summery/pending-approvals");
+export const getLeadsReport = () => api.get("/reports/leads");
 
 // Reports API Requests
 export const getReport = (params: ReportParams) =>

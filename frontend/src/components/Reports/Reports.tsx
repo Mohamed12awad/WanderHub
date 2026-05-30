@@ -16,8 +16,9 @@ import {
 import {
   getRevenueReport, getPipelineReport, getExpensesCategoryReport,
   getOutstandingReport, getCustomerAcquisitionReport,
-  getBookingReport, getReport,
+  getBookingReport, getReport, getAccounts, getLeadsReport,
 } from "@/utils/api";
+import { Landmark, Wallet, Lock } from "lucide-react";
 import LoadingSpinner from "@/components/common/spinner";
 import { useAuth } from "@/contexts/authContext";
 import DateForm from "./DateForm";
@@ -115,6 +116,8 @@ const Reports: React.FC = () => {
     () => getCustomerAcquisitionReport({ startDate: dateRange.start, endDate: dateRange.end }),
     { keepPreviousData: true }
   );
+  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
+  const { data: leadsReportData } = useQuery("leads-report", getLeadsReport, { staleTime: 60000 });
 
   const revenue: { month: string; revenue: number; count: number }[] = revenueData?.data ?? [];
   const pipeline: { stage: string; count: number; value: number }[] = pipelineData?.data ?? [];
@@ -126,6 +129,17 @@ const Reports: React.FC = () => {
     dueDate?: string; status: string; currency: string;
   }[] = outstandingData?.data ?? [];
   const customers: { month: string; customers: number }[] = custData?.data ?? [];
+  const accounts: any[] = accountsData?.data ?? [];
+  const leadStats: { status: string; count: number }[] = leadsReportData?.data
+    ? Object.entries(leadsReportData.data).map(([status, count]) => ({ status, count: count as number }))
+    : [];
+  const LEAD_COLORS: Record<string, string> = {
+    new: "#3b82f6", contacted: "#8b5cf6", qualified: "#22c55e", unqualified: "#94a3b8", converted: "#f59e0b",
+  };
+  const STAGE_PIE_COLORS: Record<string, string> = {
+    lead: "#3b82f6", qualified: "#8b5cf6", proposal: "#eab308",
+    negotiation: "#f97316", won: "#22c55e", lost: "#ef4444", cancelled: "#9ca3af",
+  };
 
   // Legacy report state
   const [reportData, setReportData] = useState(null);
@@ -155,15 +169,153 @@ const Reports: React.FC = () => {
       <Tabs defaultValue="revenue">
         <TabsList className="flex-wrap h-auto gap-0.5 print:hidden">
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="deals">Deals Report</TabsTrigger>
           {isAdmin && <TabsTrigger value="full">Full Report</TabsTrigger>}
         </TabsList>
 
         {/* ── Revenue ──────────────────────────────────────────────────── */}
+        {/* ── Sales tab ─────────────────────────────────── */}
+        <TabsContent value="sales" className="space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Leads by Status</CardTitle>
+                <CardDescription className="text-xs">Current lead funnel snapshot</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {leadStats.length === 0 ? <ChartEmpty /> : (
+                  <div className="flex items-center gap-6">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie data={leadStats} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={80} innerRadius={45} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
+                          {leadStats.map((entry) => <Cell key={entry.status} fill={LEAD_COLORS[entry.status] ?? "#94a3b8"} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2.5 shrink-0">
+                      {leadStats.map((s) => (
+                        <div key={s.status} className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: LEAD_COLORS[s.status] ?? "#94a3b8" }} />
+                          <span className="text-xs capitalize text-muted-foreground w-20">{s.status}</span>
+                          <span className="text-xs font-bold">{s.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Deal Pipeline</CardTitle>
+                <CardDescription className="text-xs">Deals count and value by stage</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {fetchingPipe ? <LoadingSpinner loading /> : pipeline.length === 0 ? <ChartEmpty /> : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={pipeline} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
+                        {pipeline.map((entry) => <Cell key={entry.stage} fill={STAGE_PIE_COLORS[entry.stage] ?? "#94a3b8"} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Win rate summary */}
+          {pipeline.length > 0 && (() => {
+            const won = pipeline.find((s) => s.stage === "won")?.count ?? 0;
+            const total = pipeline.filter((s) => !["lead"].includes(s.stage)).reduce((a, s) => a + s.count, 0);
+            const rate = total ? Math.round((won / total) * 100) : 0;
+            const wonVal = pipeline.find((s) => s.stage === "won")?.value ?? 0;
+            const lostVal = pipeline.find((s) => s.stage === "lost")?.value ?? 0;
+            return (
+              <div className="grid sm:grid-cols-4 gap-4">
+                {[
+                  { label: "Win Rate", value: `${rate}%`, color: "text-emerald-600" },
+                  { label: "Won Deals", value: String(won), color: "" },
+                  { label: "Won Value", value: wonVal.toLocaleString(), color: "text-emerald-600" },
+                  { label: "Lost Value", value: lostVal.toLocaleString(), color: "text-destructive" },
+                ].map(({ label, value, color }) => (
+                  <Card key={label}>
+                    <CardContent className="pt-4 pb-3">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            );
+          })()}
+        </TabsContent>
+
+        {/* ── Accounts tab ──────────────────────────────── */}
+        <TabsContent value="accounts" className="space-y-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {accounts.map((acc) => {
+              const Icon = acc.type === "bank" ? Landmark : acc.type === "safe" ? Lock : Wallet;
+              return (
+                <Card key={acc._id}>
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-lg bg-primary/10 p-2"><Icon className="h-4 w-4 text-primary" /></div>
+                      <div>
+                        <p className="text-sm font-semibold">{acc.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{acc.type}</p>
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums">{acc.balance.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{acc.currency}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {accounts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Balance Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={accounts} dataKey="balance" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={50}
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                      {accounts.map((_: any, i: number) => (
+                        <Cell key={i} fill={["#3b82f6", "#8b5cf6", "#22c55e", "#f97316", "#eab308"][i % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => (Number(v)).toLocaleString()} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {accounts.length === 0 && (
+            <Card><CardContent className="py-16 text-center text-sm text-muted-foreground">
+              No accounts configured. <Link to="/settings/accounts" className="text-primary hover:underline">Add an account</Link>
+            </CardContent></Card>
+          )}
+        </TabsContent>
+
+        {/* ── Revenue tab ───────────────────────────────── */}
         <TabsContent value="revenue">
           <DateRangeBar value={dateRange} onChange={setDateRange} />
           <Card>

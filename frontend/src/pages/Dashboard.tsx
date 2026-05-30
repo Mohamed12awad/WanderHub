@@ -1,21 +1,35 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  ResponsiveContainer, Legend, PieChart, Pie, Cell,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Users, DollarSign, CreditCard,
   Activity, PlusCircle, Rocket, Landmark, Wallet, Lock,
+  Clock, CheckCircle2, FileText, Receipt,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getSummery, getDeals, getAccounts } from "@/utils/api";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  getSummery, getDeals, getAccounts,
+  getPendingApprovals, getOutstandingReport, getLeadsReport, getPipelineReport,
+} from "@/utils/api";
 import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Account } from "@/types/types";
+
+const LEAD_COLORS: Record<string, string> = {
+  new: "#3b82f6", contacted: "#8b5cf6", qualified: "#22c55e",
+  unqualified: "#94a3b8", converted: "#f59e0b",
+};
+const STAGE_COLORS: Record<string, string> = {
+  lead: "#3b82f6", qualified: "#8b5cf6", proposal: "#eab308",
+  negotiation: "#f97316", won: "#22c55e", lost: "#ef4444", cancelled: "#9ca3af",
+};
 
 function pct(current: number, previous: number) {
   if (!previous) return current ? 100 : 0;
@@ -94,7 +108,15 @@ export function Dashboard() {
   const { data: summeryData, isLoading: summeryLoading } = useQuery("summery", () => getSummery("month"));
   const { data: dealsData, isLoading: dealsLoading } = useQuery("deals", () => getDeals());
   const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
+  const { data: pendingData } = useQuery("pending-approvals", getPendingApprovals, { staleTime: 30000 });
+  const { data: outstandingData } = useQuery("outstanding", getOutstandingReport, { staleTime: 60000 });
+  const { data: leadsData } = useQuery("leads-report", getLeadsReport, { staleTime: 60000 });
+  const { data: pipelineData } = useQuery("pipeline-report", getPipelineReport, { staleTime: 60000 });
   const accounts: Account[] = accountsData?.data ?? [];
+  const pending = pendingData?.data ?? { total: 0, quotes: [], invoices: [], expenses: [] };
+  const outstanding: { _id: string; invoiceNumber: string; dealTitle: string; total: number; totalPaid: number; currency: string; dueDate: string; status: string }[] = outstandingData?.data ?? [];
+  const leadStats: { status: string; count: number }[] = leadsData?.data ? Object.entries(leadsData.data).map(([status, count]) => ({ status, count: count as number })) : [];
+  const pipeline: { stage: string; count: number; value: number }[] = pipelineData?.data ?? [];
 
   const cur = summeryData?.data?.currentPeriod ?? {};
   const prev = summeryData?.data?.previousPeriod ?? {};
@@ -150,6 +172,218 @@ export function Dashboard() {
           </Link>
         </div>
       </div>
+
+      <Tabs defaultValue="overview">
+        <TabsList className="h-9">
+          <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+          <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
+          <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
+        </TabsList>
+
+        {/* ── Finance tab ── */}
+        <TabsContent value="finance" className="mt-5 space-y-5">
+          {/* Pending approvals */}
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-500" />
+                  Pending Approvals
+                  {pending.total > 0 && (
+                    <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                      {pending.total}
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-xs">Items waiting for your review</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pending.total === 0 ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  All caught up — no pending approvals.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {[
+                    ...pending.quotes.map((q: any) => ({ ...q, href: `/finance/quotes/${q.id}`, icon: FileText, color: "text-blue-600" })),
+                    ...pending.invoices.map((i: any) => ({ ...i, href: `/finance/invoices/${i.id}`, icon: Receipt, color: "text-violet-600" })),
+                    ...pending.expenses.map((e: any) => ({ ...e, href: `/expenses/${e.id}`, icon: CreditCard, color: "text-amber-600" })),
+                  ].map((item: any) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link key={item.id} to={item.href} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 hover:bg-muted/40 transition-colors group">
+                        <Icon className={`h-4 w-4 shrink-0 ${item.color}`} />
+                        <span className="text-sm font-medium flex-1 truncate group-hover:text-primary transition-colors">{item.label}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{format(new Date(item.createdAt), "dd MMM")}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Accounts */}
+          {accounts.length > 0 && (
+            <Card className="shadow-sm border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Account Balances</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {accounts.map((acc) => {
+                    const Icon = acc.type === "bank" ? Landmark : acc.type === "safe" ? Lock : Wallet;
+                    return (
+                      <div key={acc._id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                        <div className="rounded-lg bg-primary/10 p-2 shrink-0"><Icon className="h-3.5 w-3.5 text-primary" /></div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{acc.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{acc.type}</p>
+                        </div>
+                        <p className="text-sm font-bold tabular-nums">{acc.balance.toLocaleString()} {acc.currency}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Outstanding invoices */}
+          {outstanding.length > 0 && (
+            <Card className="shadow-sm border-border/60">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Outstanding Invoices</CardTitle>
+                  <CardDescription className="text-xs">{outstanding.length} invoice{outstanding.length !== 1 ? "s" : ""} awaiting payment</CardDescription>
+                </div>
+                <Link to="/finance/invoices"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">View all</Button></Link>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {outstanding.slice(0, 8).map((inv) => {
+                    const owed = inv.total - inv.totalPaid;
+                    const isOverdue = inv.status === "overdue";
+                    return (
+                      <Link key={inv._id} to={`/finance/invoices/${inv._id}`} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-muted/40 border border-border/40 transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold">{inv.invoiceNumber}</p>
+                          <p className="text-xs text-muted-foreground truncate">{inv.dealTitle}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isOverdue && <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 h-4 px-1.5">Overdue</Badge>}
+                          <span className="text-sm font-bold tabular-nums text-destructive">{owed.toLocaleString()} {inv.currency}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── Sales tab ── */}
+        <TabsContent value="sales" className="mt-5 space-y-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* Leads by status */}
+            <Card className="shadow-sm border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Leads by Status</CardTitle>
+                <CardDescription className="text-xs">Current lead pipeline breakdown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {leadStats.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">No lead data available.</p>
+                ) : (
+                  <div className="flex items-center gap-6">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={leadStats} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={70} innerRadius={40}>
+                          {leadStats.map((entry) => (
+                            <Cell key={entry.status} fill={LEAD_COLORS[entry.status] ?? "#94a3b8"} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2 shrink-0">
+                      {leadStats.map((s) => (
+                        <div key={s.status} className="flex items-center gap-2">
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: LEAD_COLORS[s.status] ?? "#94a3b8" }} />
+                          <span className="text-xs capitalize text-muted-foreground">{s.status}</span>
+                          <span className="text-xs font-semibold ms-auto ps-3">{s.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pipeline by stage */}
+            <Card className="shadow-sm border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Pipeline Stages</CardTitle>
+                <CardDescription className="text-xs">Deal count and value per stage</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pipeline.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">No pipeline data available.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={pipeline} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
+                      />
+                      <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
+                        {pipeline.map((entry) => (
+                          <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage] ?? "#94a3b8"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Win rate */}
+          {pipeline.length > 0 && (() => {
+            const won = pipeline.find((s) => s.stage === "won")?.count ?? 0;
+            const total = pipeline.filter((s) => !["lead"].includes(s.stage)).reduce((a, s) => a + s.count, 0);
+            const rate = total ? Math.round((won / total) * 100) : 0;
+            const wonValue = pipeline.find((s) => s.stage === "won")?.value ?? 0;
+            const currency = "EGP";
+            return (
+              <div className="grid sm:grid-cols-3 gap-4">
+                {[
+                  { label: "Win Rate", value: `${rate}%`, sub: `${won} won of ${total} qualified` },
+                  { label: "Won Value", value: `${wonValue.toLocaleString()} ${currency}`, sub: "Total closed revenue" },
+                  { label: "Active Deals", value: String(pipeline.filter((s) => !["won", "lost", "cancelled"].includes(s.stage)).reduce((a, s) => a + s.count, 0)), sub: "In pipeline right now" },
+                ].map(({ label, value, sub }) => (
+                  <Card key={label} className="shadow-sm border-border/60">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="text-2xl font-bold mt-1">{value}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            );
+          })()}
+        </TabsContent>
+
+        {/* ── Overview tab ── */}
+        <TabsContent value="overview" className="mt-5 space-y-5">
 
       {/* Onboarding guide */}
       {isOnboarding && (
@@ -373,6 +607,8 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

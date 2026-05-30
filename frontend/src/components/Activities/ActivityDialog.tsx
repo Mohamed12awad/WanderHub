@@ -131,18 +131,6 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
                 className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="desc" className="text-right pt-2">
-                Notes
-              </Label>
-              <textarea
-                id="desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="col-span-3 border rounded-md p-2 text-sm min-h-[72px] resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Optional notes..."
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isLoading}>

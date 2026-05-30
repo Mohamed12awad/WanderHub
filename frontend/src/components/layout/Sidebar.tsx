@@ -11,11 +11,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Globe, Check, LogOut, Settings, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useOrgLogo } from "@/hooks/useOrgLogo";
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const { lang, setLang } = useLanguage();
   const { collapsed, toggle } = useSidebar();
+  const { logo } = useOrgLogo();
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
@@ -26,8 +28,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className={`flex h-[60px] items-center shrink-0 ${collapsed ? "justify-center px-2" : "gap-3 px-5"}`}>
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/40">
-            <img src="/logo.png" className="h-5 w-5" alt="NawaHub" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/40 overflow-hidden">
+            {logo
+              ? <img src={logo} className="h-full w-full object-contain p-0.5" alt="Logo" />
+              : <img src="/logo.png" className="h-5 w-5" alt="NawaHub" />}
           </div>
           {!collapsed && (
             <span className="text-sm font-semibold tracking-tight text-white truncate">

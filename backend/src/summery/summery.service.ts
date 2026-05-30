@@ -102,4 +102,33 @@ export class SummeryService {
       previousPeriod: { startDate: previousStart, endDate: previousEnd, revenue: previousRevenue, newCustomers: previousNewCustomers, underCollection: previousUnderCollection, expenses: previousExpenses },
     };
   }
+
+  async getPendingApprovals() {
+    const [quotes, invoices, expenses] = await Promise.all([
+      this.prisma.quote.findMany({
+        where: { approvalStatus: 'pending', deletedAt: null },
+        select: { id: true, number: true, createdAt: true, deal: { select: { title: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+      }),
+      this.prisma.invoice.findMany({
+        where: { approvalStatus: 'pending', deletedAt: null },
+        select: { id: true, number: true, createdAt: true, deal: { select: { title: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+      }),
+      this.prisma.expenseReport.findMany({
+        where: { approvalStatus: 'pending', deletedAt: null },
+        select: { id: true, title: true, createdAt: true, user: { select: { name: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+      }),
+    ]);
+    return {
+      total: quotes.length + invoices.length + expenses.length,
+      quotes: quotes.map((q) => ({ id: q.id, label: `${q.number} — ${q.deal?.title ?? ''}`, createdAt: q.createdAt, type: 'quote' as const })),
+      invoices: invoices.map((i) => ({ id: i.id, label: `${i.number} — ${i.deal?.title ?? ''}`, createdAt: i.createdAt, type: 'invoice' as const })),
+      expenses: expenses.map((e) => ({ id: e.id, label: e.title, createdAt: e.createdAt, submittedBy: e.user?.name ?? null, type: 'expense' as const })),
+    };
+  }
 }

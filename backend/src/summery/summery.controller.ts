@@ -13,4 +13,10 @@ export class SummeryController {
     try { return res.json(await this.summery.getSummery(timePeriod)); }
     catch (e) { return res.status(500).json({ error: (e as Error).message }); }
   }
+
+  @Get('pending-approvals')
+  async pendingApprovals(@Res() res: Response) {
+    try { return res.json(await this.summery.getPendingApprovals()); }
+    catch (e) { return res.status(500).json({ error: (e as Error).message }); }
+  }
 }
