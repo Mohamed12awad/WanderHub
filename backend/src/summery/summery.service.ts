@@ -22,13 +22,19 @@ export class SummeryService {
   }
 
   private async getUnderCollection(start: Date, end: Date) {
-    const rows = await this.prisma.deal.groupBy({
+    // "Under collection" = total outstanding on invoices created in the period.
+    // Deal has no totalPaid field; invoice.totalPaid tracks payments correctly.
+    const rows = await this.prisma.invoice.groupBy({
       by: ['currency'],
-      where: { deletedAt: null, createdAt: { gte: start, lte: end }, NOT: { status: 'cancelled' } },
-      _sum: { price: true, totalPaid: true },
+      where: {
+        deletedAt: null,
+        createdAt: { gte: start, lte: end },
+        status: { notIn: ['paid', 'cancelled'] },
+      },
+      _sum: { total: true, totalPaid: true },
     });
     return rows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.currency] = (r._sum.price ?? 0) - (r._sum.totalPaid ?? 0);
+      acc[r.currency] = (r._sum.total ?? 0) - (r._sum.totalPaid ?? 0);
       return acc;
     }, {});
   }
@@ -107,13 +113,13 @@ export class SummeryService {
     const [quotes, invoices, expenses] = await Promise.all([
       this.prisma.quote.findMany({
         where: { approvalStatus: 'pending', deletedAt: null },
-        select: { id: true, number: true, createdAt: true, deal: { select: { title: true } } },
+        select: { id: true, quoteNumber: true, title: true, createdAt: true, deal: { select: { title: true } } },
         orderBy: { createdAt: 'asc' },
         take: 20,
       }),
       this.prisma.invoice.findMany({
         where: { approvalStatus: 'pending', deletedAt: null },
-        select: { id: true, number: true, createdAt: true, deal: { select: { title: true } } },
+        select: { id: true, invoiceNumber: true, title: true, createdAt: true, deal: { select: { title: true } } },
         orderBy: { createdAt: 'asc' },
         take: 20,
       }),
@@ -126,8 +132,8 @@ export class SummeryService {
     ]);
     return {
       total: quotes.length + invoices.length + expenses.length,
-      quotes: quotes.map((q) => ({ id: q.id, label: `${q.number} — ${q.deal?.title ?? ''}`, createdAt: q.createdAt, type: 'quote' as const })),
-      invoices: invoices.map((i) => ({ id: i.id, label: `${i.number} — ${i.deal?.title ?? ''}`, createdAt: i.createdAt, type: 'invoice' as const })),
+      quotes: quotes.map((q) => ({ id: q.id, label: `${q.quoteNumber} — ${q.title ?? q.deal?.title ?? ''}`, createdAt: q.createdAt, type: 'quote' as const })),
+      invoices: invoices.map((i) => ({ id: i.id, label: `${i.invoiceNumber} — ${i.title ?? i.deal?.title ?? ''}`, createdAt: i.createdAt, type: 'invoice' as const })),
       expenses: expenses.map((e) => ({ id: e.id, label: e.title, createdAt: e.createdAt, submittedBy: e.user?.name ?? null, type: 'expense' as const })),
     };
   }
