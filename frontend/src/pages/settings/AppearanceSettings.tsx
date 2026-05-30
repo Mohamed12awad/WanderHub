@@ -1,21 +1,33 @@
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme } from "@/contexts/ThemeProvider";
+import { useTheme, AccentColor, ColorMode } from "@/contexts/ThemeProvider";
 import { LANGUAGES, Lang } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Monitor, Check } from "lucide-react";
 
-type Theme = "light" | "dark" | "system";
+const THEMES: { value: ColorMode; icon: React.ElementType; label: string }[] = [
+  { value: "light",  icon: Sun,     label: "Light"  },
+  { value: "dark",   icon: Moon,    label: "Dark"   },
+  { value: "system", icon: Monitor, label: "System" },
+];
 
-const THEMES: { value: Theme; icon: React.ElementType; label: (s: any) => string }[] = [
-  { value: "light", icon: Sun, label: (s) => s.light },
-  { value: "dark", icon: Moon, label: (s) => s.dark },
-  { value: "system", icon: Monitor, label: (s) => s.system },
+const ACCENTS: { value: AccentColor; label: string; color: string; dark: string }[] = [
+  { value: "blue",   label: "Blue",   color: "#3b6fd4", dark: "#5b8fee" },
+  { value: "green",  label: "Green",  color: "#1e8a4a", dark: "#27c26b" },
+  { value: "red",    label: "Red",    color: "#e01e1e", dark: "#f05050" },
+  { value: "purple", label: "Purple", color: "#7c3aed", dark: "#9f6ef5" },
+  { value: "orange", label: "Orange", color: "#e06010", dark: "#f5853a" },
+  { value: "teal",   label: "Teal",   color: "#0f8a78", dark: "#14c4ad" },
+  { value: "rose",   label: "Rose",   color: "#d41645", dark: "#e84c7a" },
 ];
 
 export default function AppearanceSettings() {
   const { tr, lang, setLang } = useLanguage();
-  const { theme, setTheme } = useTheme();
+  const { theme, accent, setTheme, setAccent } = useTheme();
   const s = tr.settings;
+
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
@@ -24,7 +36,7 @@ export default function AppearanceSettings() {
         <p className="text-sm text-muted-foreground mt-0.5">Customize the look and feel of your workspace.</p>
       </div>
 
-      {/* Theme */}
+      {/* Color mode */}
       <section className="space-y-3">
         <div>
           <h3 className="text-sm font-semibold">{s.themeLabel}</h3>
@@ -47,11 +59,10 @@ export default function AppearanceSettings() {
                   <Check className="h-3.5 w-3.5 text-primary" />
                 </span>
               )}
-              {/* Mini preview */}
               <div className={cn(
                 "w-full h-16 rounded-lg border overflow-hidden",
-                value === "light" && "bg-white",
-                value === "dark" && "bg-zinc-900",
+                value === "light"  && "bg-white",
+                value === "dark"   && "bg-zinc-900",
                 value === "system" && "bg-gradient-to-br from-white to-zinc-900"
               )}>
                 <div className={cn(
@@ -65,10 +76,49 @@ export default function AppearanceSettings() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Icon className="h-3.5 w-3.5" />
-                {label(s)}
+                {label}
               </div>
             </button>
           ))}
+        </div>
+      </section>
+
+      <div className="border-t" />
+
+      {/* Accent color */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Accent Color</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Sets the brand color used for buttons, links, and highlights.</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {ACCENTS.map(({ value, label, color, dark }) => {
+            const bg = isDark ? dark : color;
+            const active = accent === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setAccent(value)}
+                title={label}
+                className={cn(
+                  "relative flex items-center gap-2.5 rounded-xl border-2 px-3.5 py-2.5 text-sm font-medium transition-all",
+                  active ? "border-primary shadow-md" : "border-border hover:border-muted-foreground/40"
+                )}
+              >
+                <span
+                  className="h-4 w-4 rounded-full ring-1 ring-black/10 shrink-0"
+                  style={{ background: bg }}
+                />
+                <span className={active ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+                {active && (
+                  <span className="absolute -top-1.5 -end-1.5 flex h-4 w-4 items-center justify-center rounded-full"
+                    style={{ background: bg }}>
+                    <Check className="h-2.5 w-2.5 text-white" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </section>
 

@@ -19,7 +19,7 @@ const App: React.FC = () => {
       <Router>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
-            <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+            <ThemeProvider>
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route
