@@ -1,5 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -14,45 +13,33 @@ export class ProductsController {
 
   @Get()
   @RequirePermission('products:view')
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
-    try { return res.json(await this.products.findAll(query)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findAll(@Query() query: Record<string, string>) {
+    return this.products.findAll(query);
   }
 
   @Get(':id')
   @RequirePermission('products:view')
-  async findOne(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const p = await this.products.findOne(id);
-      if (!p) return res.status(404).json({ message: 'Product not found' });
-      return res.json(p);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findOne(@Param('id') id: string) {
+    return this.products.findOne(id);
   }
 
   @Post()
+  @HttpCode(201)
   @RequirePermission('products:create')
-  async create(@Body() body: CreateProductDto, @Res() res: Response) {
-    try { return res.status(201).json(await this.products.create(body)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  create(@Body() body: CreateProductDto) {
+    return this.products.create(body);
   }
 
   @Put(':id')
   @RequirePermission('products:edit')
-  async update(@Param('id') id: string, @Body() body: UpdateProductDto, @Res() res: Response) {
-    try {
-      const p = await this.products.update(id, body);
-      if (!p) return res.status(404).json({ message: 'Product not found' });
-      return res.json(p);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  update(@Param('id') id: string, @Body() body: UpdateProductDto) {
+    return this.products.update(id, body);
   }
 
   @Delete(':id')
+  @HttpCode(204)
   @RequirePermission('products:delete')
-  async remove(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const ok = await this.products.remove(id);
-      if (!ok) return res.status(404).json({ message: 'Product not found' });
-      return res.status(204).end();
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  remove(@Param('id') id: string) {
+    return this.products.remove(id);
   }
 }

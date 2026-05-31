@@ -1,7 +1,4 @@
-import {
-  Body, Controller, Delete, Get, Param, Post, Put, Query, Res, UseGuards,
-} from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -17,55 +14,40 @@ export class LeadsController {
 
   @Get()
   @RequirePermission('leads:view')
-  async findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try { return res.json(await this.leads.findAll(query, user)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser) {
+    return this.leads.findAll(query, user);
   }
 
   @Get(':id')
   @RequirePermission('leads:view')
-  async findOne(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try {
-      const lead = await this.leads.findOne(id, user);
-      if (!lead) return res.status(404).json({ message: 'Lead not found' });
-      return res.json(lead);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.leads.findOne(id, user);
   }
 
   @Post()
+  @HttpCode(201)
   @RequirePermission('leads:create')
-  async create(@Body() body: CreateLeadDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try { return res.status(201).json(await this.leads.create(body, user.id)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  create(@Body() body: CreateLeadDto, @CurrentUser() user: AuthUser) {
+    return this.leads.create(body, user.id);
   }
 
   @Put(':id')
   @RequirePermission('leads:edit')
-  async update(@Param('id') id: string, @Body() body: UpdateLeadDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try {
-      const lead = await this.leads.update(id, body, user.id);
-      if (!lead) return res.status(404).json({ message: 'Lead not found' });
-      return res.json(lead);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  update(@Param('id') id: string, @Body() body: UpdateLeadDto, @CurrentUser() user: AuthUser) {
+    return this.leads.update(id, body, user.id);
   }
 
   @Delete(':id')
+  @HttpCode(204)
   @RequirePermission('leads:delete')
-  async remove(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const ok = await this.leads.remove(id);
-      if (!ok) return res.status(404).json({ message: 'Lead not found' });
-      return res.json({ message: 'Lead deleted' });
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  remove(@Param('id') id: string) {
+    return this.leads.remove(id);
   }
 
   @Post(':id/convert')
+  @HttpCode(201)
   @RequirePermission('leads:edit')
-  async convert(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try {
-      const customer = await this.leads.convertToCustomer(id, user.id);
-      if (!customer) return res.status(404).json({ message: 'Lead not found' });
-      return res.status(201).json(customer);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  convert(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.leads.convertToCustomer(id, user.id);
   }
 }

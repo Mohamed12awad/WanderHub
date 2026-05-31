@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -20,51 +21,62 @@ const STATUS_COLORS: Record<string, string> = {
   prospect: "bg-violet-500  text-white border-violet-500  dark:bg-violet-600  dark:border-violet-600",
 };
 
-interface CustomerRowProps {
-  id: string;
+interface CustomerItem {
+  _id: string;
   name: string;
   status: string;
   phone: string;
   location: string;
-  date: string;
+  createdAt: string;
+}
+
+interface CustomerRowProps {
+  item: CustomerItem;
   handleDelete: (id: string) => void;
 }
 
-const CustomerRow: React.FC<CustomerRowProps> = ({ id, name, status, phone, location, date, handleDelete }) => {
+const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete }) => {
   const { user } = useAuth();
+  const { tr } = useLanguage();
   const navigate = useNavigate();
+  const date = new Date(item.createdAt).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 
   return (
-    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/customers/${id}`)}>
-      <TableCell className="font-medium">{name}</TableCell>
+    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/customers/${item._id}`)}>
+      <TableCell className="font-medium">{item.name}</TableCell>
       <TableCell>
-        <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ""} capitalize w-fit`}>
-          {status}
+        <Badge variant="outline" className={`${STATUS_COLORS[item.status] ?? ""} capitalize w-fit`}>
+          {tr.contacts.statuses?.[item.status] ?? item.status}
         </Badge>
       </TableCell>
-      <TableCell className="text-foreground/70">{phone}</TableCell>
-      <TableCell className="text-foreground/70 capitalize">{location}</TableCell>
+      <TableCell className="text-foreground/70">{item.phone}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{item.location}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Toggle menu</span>
+              <span className="sr-only">{tr.common.actions}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <Link to={`/customers/${id}`}>
-              <DropdownMenuItem>View</DropdownMenuItem>
+            <Link to={`/customers/${item._id}`}>
+              <DropdownMenuItem>{tr.common.view}</DropdownMenuItem>
             </Link>
-            <Link to={`/customers/${id}/edit`}>
-              <DropdownMenuItem>Edit</DropdownMenuItem>
+            <Link to={`/customers/${item._id}/edit`}>
+              <DropdownMenuItem>{tr.common.edit}</DropdownMenuItem>
             </Link>
             {["admin", "super admin"].includes(user!.role) && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>
-                  Delete
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => handleDelete(item._id)}
+                >
+                  {tr.common.delete}
                 </DropdownMenuItem>
               </>
             )}

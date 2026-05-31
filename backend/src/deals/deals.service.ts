@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
@@ -124,7 +124,7 @@ export class DealsService {
         owner: { select: { id: true, name: true } },
       },
     });
-    if (!deal) return null;
+    if (!deal) throw new NotFoundException('deal not found');
 
     // Payments are unified on invoices: pull the payments recorded against
     // this deal's invoices rather than the removed PartialPayment table.
@@ -142,7 +142,7 @@ export class DealsService {
 
   async update(id: string, body: UpdateDealDto, userId: string) {
     const oldDeal = await this.prisma.deal.findUnique({ where: { id } });
-    if (!oldDeal) return null;
+    if (!oldDeal) throw new NotFoundException('deal not found');
 
     const cleaned = this.cleanData(body);
     const newStatus = body.status as string | undefined;
@@ -184,7 +184,7 @@ export class DealsService {
       where: { id },
       include: { customer: { select: { id: true, name: true } } },
     });
-    if (!deal) return null;
+    if (!deal) throw new NotFoundException('deal not found');
 
     const items = [
       {
@@ -221,8 +221,13 @@ export class DealsService {
 
   async remove(id: string) {
     const deal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null } });
-    if (!deal) return null;
+    if (!deal) throw new NotFoundException('deal not found');
     await this.prisma.deal.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
+  }
+
+  /** Soft-deletes all deals for a customer — called by CustomersService.remove(). */
+  async softDeleteByCustomer(customerId: string, deletedAt: Date) {
+    await this.prisma.deal.updateMany({ where: { customerId }, data: { deletedAt } });
   }
 }

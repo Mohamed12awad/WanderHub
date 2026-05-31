@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { ModulesProvider } from "@/contexts/ModulesContext";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 
@@ -48,6 +48,27 @@ const AddLead          = lazy(() => import("@/components/Leads/AddLead").then((m
 const EditLead         = lazy(() => import("@/components/Leads/EditLead").then((m) => ({ default: m.EditLead })));
 const ViewLead         = lazy(() => import("@/components/Leads/ViewLead").then((m) => ({ default: m.ViewLead })));
 
+// ── Procurement ───────────────────────────────────────────────────────────────
+const SuppliersPage      = lazy(() => import("@/components/Procurement/Suppliers/Suppliers"));
+const AddSupplier        = lazy(() => import("@/components/Procurement/Suppliers/SupplierForm").then((m) => ({ default: () => m.default({ mode: "add" }) })));
+const EditSupplier       = lazy(() => import("@/components/Procurement/Suppliers/SupplierForm").then((m) => ({ default: () => m.default({ mode: "edit" }) })));
+const ViewSupplier       = lazy(() => import("@/components/Procurement/Suppliers/ViewSupplier"));
+const PurchaseOrdersPage = lazy(() => import("@/components/Procurement/PurchaseOrders/PurchaseOrders"));
+const AddPurchaseOrder   = lazy(() => import("@/components/Procurement/PurchaseOrders/PurchaseOrderForm").then((m) => ({ default: () => m.default({ mode: "add" }) })));
+const EditPurchaseOrder  = lazy(() => import("@/components/Procurement/PurchaseOrders/PurchaseOrderForm").then((m) => ({ default: () => m.default({ mode: "edit" }) })));
+const ViewPurchaseOrder  = lazy(() => import("@/components/Procurement/PurchaseOrders/ViewPurchaseOrder"));
+const VendorBillsPage    = lazy(() => import("@/components/Procurement/VendorBills/VendorBills").then((m) => ({ default: m.VendorBills })));
+const AddVendorBill      = lazy(() => import("@/components/Procurement/VendorBills/VendorBillForm").then((m) => ({ default: () => m.default({ mode: "add" }) })));
+const EditVendorBill     = lazy(() => import("@/components/Procurement/VendorBills/VendorBillForm").then((m) => ({ default: () => m.default({ mode: "edit" }) })));
+const ViewVendorBill     = lazy(() => import("@/components/Procurement/VendorBills/ViewVendorBill"));
+const VendorPaymentsPage = lazy(() => import("@/components/Procurement/VendorPayments/VendorPayments").then((m) => ({ default: m.VendorPayments })));
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+const ProjectsPage  = lazy(() => import("@/components/Projects/Projects").then((m) => ({ default: m.Projects })));
+const AddProject    = lazy(() => import("@/components/Projects/ProjectForm").then((m) => ({ default: () => m.default({ mode: "add" }) })));
+const EditProject   = lazy(() => import("@/components/Projects/ProjectForm").then((m) => ({ default: () => m.default({ mode: "edit" }) })));
+const ViewProject   = lazy(() => import("@/components/Projects/ViewProject"));
+
 const PageLoader = () => (
   <div className="flex h-full items-center justify-center">
     <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -57,6 +78,7 @@ const PageLoader = () => (
 const AppRoutes = () => (
   <Suspense fallback={<PageLoader />}>
     <Routes>
+      <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard"                    element={<Dashboard />} />
       <Route path="/customers"                    element={<Customers />} />
       <Route path="/customers/add"                element={<AddCustomer />} />
@@ -97,6 +119,28 @@ const AppRoutes = () => (
       <Route path="/leads/add"                    element={<AddLead />} />
       <Route path="/leads/:id"                    element={<ViewLead />} />
       <Route path="/leads/:id/edit"               element={<EditLead />} />
+
+      {/* Procurement */}
+      <Route path="/procurement/suppliers"               element={<SuppliersPage />} />
+      <Route path="/procurement/suppliers/add"            element={<AddSupplier />} />
+      <Route path="/procurement/suppliers/:id"            element={<ViewSupplier />} />
+      <Route path="/procurement/suppliers/:id/edit"       element={<EditSupplier />} />
+      <Route path="/procurement/purchase-orders"          element={<PurchaseOrdersPage />} />
+      <Route path="/procurement/purchase-orders/new"      element={<AddPurchaseOrder />} />
+      <Route path="/procurement/purchase-orders/:id"      element={<ViewPurchaseOrder />} />
+      <Route path="/procurement/purchase-orders/:id/edit" element={<EditPurchaseOrder />} />
+      <Route path="/procurement/bills"                    element={<VendorBillsPage />} />
+      <Route path="/procurement/bills/new"                element={<AddVendorBill />} />
+      <Route path="/procurement/bills/:id"                element={<ViewVendorBill />} />
+      <Route path="/procurement/bills/:id/edit"           element={<EditVendorBill />} />
+      <Route path="/procurement/vendor-payments"          element={<VendorPaymentsPage />} />
+
+      {/* Projects */}
+      <Route path="/projects"          element={<ProjectsPage />} />
+      <Route path="/projects/new"      element={<AddProject />} />
+      <Route path="/projects/:id"      element={<ViewProject />} />
+      <Route path="/projects/:id/edit" element={<EditProject />} />
+
       <Route path="*"                             element={<NotFound />} />
     </Routes>
   </Suspense>

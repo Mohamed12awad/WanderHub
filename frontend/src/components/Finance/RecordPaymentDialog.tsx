@@ -20,6 +20,7 @@ interface CreateProps {
   mode?: "create";
   invoiceId: string;
   currency: string;
+  outstanding?: number;
   onSuccess: () => void;
   disabled?: boolean;
   disabledTitle?: string;
@@ -67,6 +68,10 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
       setReference(p.reference ?? "");
       setNotes(p.notes ?? "");
       setAccountId(p.accountId ?? "");
+    }
+    if (open && !isEdit) {
+      const outstanding = (props as CreateProps).outstanding;
+      if (outstanding && outstanding > 0) setAmount(String(outstanding));
     }
     if (!open && !isEdit) reset();
   }, [open]);

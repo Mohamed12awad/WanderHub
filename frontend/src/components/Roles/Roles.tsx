@@ -23,6 +23,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   expenses: "Expenses", tasks: "Tasks", finance: "Finance",
   reports: "Reports", users: "Users", roles: "Roles",
   settings: "Settings", logs: "Logs",
+  procurement: "Procurement", projects: "Projects",
 };
 
 const ACTION_LABELS: Record<string, string> = {

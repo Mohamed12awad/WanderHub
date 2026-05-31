@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Schema conventions ───────────────────────────────────────────────────────
+//
+// Aggregate-root models (Customer, Deal, Lead, Invoice, Quote, ExpenseReport,
+// PurchaseOrder, VendorBill, Project, Task, …) carry:
+//   createdAt  DateTime  @default(now())
+//   updatedAt  DateTime  @updatedAt
+//   deletedAt  DateTime? — soft-delete; all services filter `deletedAt: null`
+//
+// Child / line-item models (*LineItem, ProjectMember, InvoicePayment, …) carry
+// only what they need; omitting updatedAt/deletedAt is intentional.
+//
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum DealStatus {
@@ -73,9 +84,16 @@ enum TaskStatus {
 enum LeadStatus {
   new
   contacted
+  nurturing
   qualified
   unqualified
   converted
+}
+
+enum LeadRating {
+  cold
+  warm
+  hot
 }
 
 enum NotificationType {
@@ -86,6 +104,38 @@ enum NotificationType {
   approval_approved
   approval_rejected
   invoice_overdue
+  bill_overdue
+}
+
+enum PurchaseOrderStatus {
+  draft
+  sent
+  confirmed
+  received
+  cancelled
+}
+
+enum BillStatus {
+  draft
+  received
+  partially_paid
+  paid
+  overdue
+  cancelled
+}
+
+enum ProjectStatus {
+  planning
+  active
+  on_hold
+  completed
+  cancelled
+}
+
+enum MilestoneStatus {
+  pending
+  in_progress
+  completed
 }
 
 // ─── Auth & Config ────────────────────────────────────────────────────────────
@@ -115,26 +165,34 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  ownedCustomers      Customer[]       @relation("CustomerOwner")
-  ownedDeals          Deal[]           @relation("DealOwner")
-  createdQuotes       Quote[]          @relation("QuoteCreatedBy")
-  approvedQuotes      Quote[]          @relation("QuoteApprovedBy")
-  createdInvoices     Invoice[]        @relation("InvoiceCreatedBy")
-  approvedInvoices    Invoice[]        @relation("InvoiceApprovedBy")
-  invoicePayments     InvoicePayment[]
-  expenseReports      ExpenseReport[]  @relation("ExpenseUser")
-  approvedExpenses    ExpenseReport[]  @relation("ExpenseApprovedBy")
-  assignedActivities  Activity[]       @relation("ActivityAssignedTo")
-  createdActivities   Activity[]       @relation("ActivityCreatedBy")
-  notes               Note[]
-  assignedTasks       Task[]           @relation("TaskAssignedTo")
-  createdTasks        Task[]           @relation("TaskCreatedBy")
-  triggeredTimelines  TimelineEvent[]
-  logs                Log[]
-  refreshTokens       RefreshToken[]
-  ownedLeads          Lead[]          @relation("LeadOwner")
-  createdLeads        Lead[]          @relation("LeadCreator")
-  notifications       Notification[]
+  ownedCustomers         Customer[]         @relation("CustomerOwner")
+  ownedDeals             Deal[]             @relation("DealOwner")
+  createdQuotes          Quote[]            @relation("QuoteCreatedBy")
+  approvedQuotes         Quote[]            @relation("QuoteApprovedBy")
+  createdInvoices        Invoice[]          @relation("InvoiceCreatedBy")
+  approvedInvoices       Invoice[]          @relation("InvoiceApprovedBy")
+  invoicePayments        InvoicePayment[]
+  expenseReports         ExpenseReport[]    @relation("ExpenseUser")
+  approvedExpenses       ExpenseReport[]    @relation("ExpenseApprovedBy")
+  assignedActivities     Activity[]         @relation("ActivityAssignedTo")
+  createdActivities      Activity[]         @relation("ActivityCreatedBy")
+  notes                  Note[]
+  assignedTasks          Task[]             @relation("TaskAssignedTo")
+  createdTasks           Task[]             @relation("TaskCreatedBy")
+  triggeredTimelines     TimelineEvent[]
+  logs                   Log[]
+  refreshTokens          RefreshToken[]
+  ownedLeads             Lead[]             @relation("LeadOwner")
+  createdLeads           Lead[]             @relation("LeadCreator")
+  notifications          Notification[]
+  createdPurchaseOrders  PurchaseOrder[]    @relation("POCreatedBy")
+  approvedPurchaseOrders PurchaseOrder[]    @relation("POApprovedBy")
+  createdVendorBills     VendorBill[]       @relation("BillCreatedBy")
+  approvedVendorBills    VendorBill[]       @relation("BillApprovedBy")
+  vendorBillPayments     VendorBillPayment[]
+  managedProjects        Project[]          @relation("ProjectManager")
+  createdProjects        Project[]          @relation("ProjectCreatedBy")
+  projectMemberships     ProjectMember[]
 }
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
@@ -172,6 +230,7 @@ model Customer {
   customerNotes Note[]
   timelines     TimelineEvent[]
   fromLead      Lead?           @relation("LeadConversion")
+  projects      Project[]
 
   @@index([ownerId])
   @@index([status])
@@ -207,6 +266,7 @@ model Deal {
   dealNotes       Note[]
   timelines       TimelineEvent[]
   tasks           Task[]
+  project         Project?
 
   @@index([customerId])
   @@index([ownerId])
@@ -215,27 +275,39 @@ model Deal {
 }
 
 model Lead {
-  id            String     @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
-  mobile        String?
-  source        String?
-  status        LeadStatus @default(new)
-  notes         String?
-  ownerId       String?
-  owner         User?      @relation("LeadOwner", fields: [ownerId], references: [id])
-  createdById   String?
-  createdBy     User?      @relation("LeadCreator", fields: [createdById], references: [id])
-  convertedAt   DateTime?
-  convertedToId String?    @unique
-  convertedTo   Customer?  @relation("LeadConversion", fields: [convertedToId], references: [id])
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  deletedAt     DateTime?
+  id                 String      @id @default(cuid())
+  name               String
+  company            String?
+  jobTitle           String?
+  phone              String?
+  email              String?
+  mobile             String?
+  website            String?
+  city               String?
+  country            String?
+  source             String?
+  campaign           String?
+  status             LeadStatus  @default(new)
+  rating             LeadRating?
+  budget             Float?
+  currency           String?     @default("EGP")
+  expectedCloseDate  DateTime?
+  lostReason         String?
+  notes              String?
+  ownerId            String?
+  owner              User?       @relation("LeadOwner", fields: [ownerId], references: [id])
+  createdById        String?
+  createdBy          User?       @relation("LeadCreator", fields: [createdById], references: [id])
+  convertedAt        DateTime?
+  convertedToId      String?     @unique
+  convertedTo        Customer?   @relation("LeadConversion", fields: [convertedToId], references: [id])
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
 
   @@index([ownerId])
   @@index([status])
+  @@index([rating])
   @@index([deletedAt])
 }
 
@@ -297,7 +369,7 @@ model Quote {
   createdBy            User           @relation("QuoteCreatedBy", fields: [createdById], references: [id])
   approvalStatus       ApprovalStatus @default(pending)
   approvedById         String?
-  approvedBy           User?          @relation("QuoteApprovedBy", fields: [approvedById], references: [id])
+  approvedBy           User?          @relation("QuoteApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt           DateTime?
   rejectionReason      String?
   createdAt            DateTime       @default(now())
@@ -334,6 +406,8 @@ model Invoice {
   customer        Customer       @relation(fields: [customerId], references: [id])
   dealId          String?
   deal            Deal?          @relation(fields: [dealId], references: [id])
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   fromQuote       Quote?         @relation("QuoteToInvoice")
   status          InvoiceStatus  @default(draft)
   subtotal        Float          @default(0)
@@ -351,7 +425,7 @@ model Invoice {
   createdBy       User           @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   approvalStatus  ApprovalStatus @default(pending)
   approvedById    String?
-  approvedBy      User?          @relation("InvoiceApprovedBy", fields: [approvedById], references: [id])
+  approvedBy      User?          @relation("InvoiceApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
   rejectionReason String?
   createdAt       DateTime       @default(now())
@@ -363,6 +437,7 @@ model Invoice {
 
   @@index([customerId])
   @@index([dealId])
+  @@index([projectId])
   @@index([status])
   @@index([deletedAt])
 }
@@ -410,16 +485,17 @@ enum AccountType {
 }
 
 model Account {
-  id              String           @id @default(cuid())
-  name            String
-  type            AccountType      @default(cash)
-  currency        String           @default("EGP")
-  balance         Float            @default(0)
-  notes           String?
-  invoicePayments InvoicePayment[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime?
+  id                 String              @id @default(cuid())
+  name               String
+  type               AccountType         @default(cash)
+  currency           String              @default("EGP")
+  balance            Float               @default(0)
+  notes              String?
+  invoicePayments    InvoicePayment[]
+  vendorBillPayments VendorBillPayment[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
 }
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
@@ -429,10 +505,11 @@ model ExpenseReport {
   title           String
   userId          String
   user            User           @relation("ExpenseUser", fields: [userId], references: [id])
-  approved        Boolean        @default(false)
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   approvalStatus  ApprovalStatus @default(pending)
   approvedById    String?
-  approvedBy      User?          @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  approvedBy      User?          @relation("ExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
   rejectionReason String?
   createdAt       DateTime       @default(now())
@@ -443,6 +520,7 @@ model ExpenseReport {
   expenseNotes Note[]
 
   @@index([userId])
+  @@index([projectId])
   @@index([approvalStatus])
   @@index([deletedAt])
 }
@@ -474,8 +552,10 @@ model Activity {
   customer     Customer?      @relation(fields: [customerId], references: [id])
   dealId       String?
   deal         Deal?          @relation(fields: [dealId], references: [id])
+  projectId    String?
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   assignedToId String?
-  assignedTo   User?          @relation("ActivityAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo   User?          @relation("ActivityAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdById  String
   createdBy    User           @relation("ActivityCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime       @default(now())
@@ -484,6 +564,7 @@ model Activity {
   @@index([linkedToId, linkedModel])
   @@index([customerId])
   @@index([dealId])
+  @@index([projectId])
   @@index([assignedToId])
 }
 
@@ -500,14 +581,17 @@ model Note {
   product         Product?       @relation(fields: [productId], references: [id])
   expenseReportId String?
   expenseReport   ExpenseReport? @relation(fields: [expenseReportId], references: [id])
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdById     String
-  createdBy       User           @relation(fields: [createdById], references: [id])
+  createdBy       User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   @@index([linkedToId, linkedModel])
   @@index([customerId])
   @@index([dealId])
+  @@index([projectId])
 }
 
 // ─── Tasks ───────────────────────────────────────────────────────────────────
@@ -520,11 +604,13 @@ model Task {
   status       TaskStatus   @default(todo)
   dueDate      DateTime?
   assignedToId String?
-  assignedTo   User?        @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo   User?        @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   linkedToId   String?
   linkedModel  String?
   dealId       String?
   deal         Deal?        @relation(fields: [dealId], references: [id])
+  projectId    String?
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   completedAt  DateTime?
   tags         String[]
   createdById  String
@@ -535,6 +621,7 @@ model Task {
 
   @@index([assignedToId])
   @@index([status])
+  @@index([projectId])
   @@index([linkedToId, linkedModel])
   @@index([deletedAt])
 }
@@ -552,6 +639,8 @@ model TimelineEvent {
   customer      Customer? @relation(fields: [customerId], references: [id])
   dealId        String?
   deal          Deal?     @relation(fields: [dealId], references: [id])
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   triggeredById String?
   triggeredBy   User?     @relation(fields: [triggeredById], references: [id])
   isSystem      Boolean   @default(false)
@@ -560,6 +649,7 @@ model TimelineEvent {
   @@index([linkedToId, linkedModel])
   @@index([customerId])
   @@index([dealId])
+  @@index([projectId])
 }
 
 // ─── System ──────────────────────────────────────────────────────────────────
@@ -595,22 +685,6 @@ model RefreshToken {
   @@index([userId])
 }
 
-model Purchase {
-  id           String   @id @default(cuid())
-  itemName     String
-  quantity     Float
-  price        Float
-  date         DateTime
-  supplier     String
-  shippingCost Float    @default(0)
-  tax          Float    @default(0)
-  insurance    Float    @default(0)
-  otherCosts   Float    @default(0)
-  landedCost   Float    @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
 model NumberSequence {
   id         String @id @default(cuid())
   key        String @unique
@@ -629,4 +703,223 @@ model WorkspaceConfig {
   locale         String   @default("en-US")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ─── Procurement — Suppliers ──────────────────────────────────────────────────
+
+model Supplier {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   Json?
+  taxId     String?
+  currency  String    @default("EGP")
+  notes     String?
+  status    String    @default("active")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  purchaseOrders PurchaseOrder[]
+  bills          VendorBill[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// ─── Procurement — Purchase Orders ───────────────────────────────────────────
+
+model PurchaseOrder {
+  id              String              @id @default(cuid())
+  poNumber        String              @unique
+  title           String
+  supplierId      String
+  supplier        Supplier            @relation(fields: [supplierId], references: [id])
+  status          PurchaseOrderStatus @default(draft)
+  currency        String              @default("EGP")
+  subtotal        Float               @default(0)
+  taxRate         Float               @default(0)
+  tax             Float               @default(0)
+  total           Float               @default(0)
+  expectedDate    DateTime?
+  notes           String?
+  terms           String?
+  approvalStatus  ApprovalStatus      @default(pending)
+  approvedById    String?
+  approvedBy      User?               @relation("POApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdById     String
+  createdBy       User                @relation("POCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  items PurchaseOrderItem[]
+  bills VendorBill[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([approvalStatus])
+  @@index([deletedAt])
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  description     String
+  quantity        Float
+  unitPrice       Float
+  discount        Float         @default(0)
+  total           Float
+  order           Int           @default(0)
+}
+
+// ─── Procurement — Vendor Bills ───────────────────────────────────────────────
+
+model VendorBill {
+  id              String         @id @default(cuid())
+  billNumber      String         @unique
+  title           String
+  supplierId      String
+  supplier        Supplier       @relation(fields: [supplierId], references: [id])
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  status          BillStatus     @default(draft)
+  currency        String         @default("EGP")
+  subtotal        Float          @default(0)
+  taxRate         Float          @default(0)
+  tax             Float          @default(0)
+  total           Float          @default(0)
+  totalPaid       Float          @default(0)
+  issueDate       DateTime       @default(now())
+  dueDate         DateTime?
+  notes           String?
+  terms           String?
+  approvalStatus  ApprovalStatus @default(pending)
+  approvedById    String?
+  approvedBy      User?          @relation("BillApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdById     String
+  createdBy       User           @relation("BillCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  items    VendorBillItem[]
+  payments VendorBillPayment[]
+
+  @@index([supplierId])
+  @@index([purchaseOrderId])
+  @@index([status])
+  @@index([approvalStatus])
+  @@index([deletedAt])
+}
+
+model VendorBillItem {
+  id          String     @id @default(cuid())
+  billId      String
+  bill        VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  discount    Float      @default(0)
+  total       Float
+  order       Int        @default(0)
+}
+
+model VendorBillPayment {
+  id          String     @id @default(cuid())
+  billId      String
+  bill        VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String     @default("EGP")
+  date        DateTime
+  method      String     @default("cash")
+  reference   String?
+  notes       String?
+  accountId   String?
+  account     Account?   @relation(fields: [accountId], references: [id])
+  createdById String
+  createdBy   User       @relation(fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([billId])
+  @@index([accountId])
+  @@index([date])
+}
+
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(planning)
+  priority    String        @default("medium")
+  budget      Float?
+  currency    String        @default("EGP")
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  customerId  String?
+  customer    Customer?     @relation(fields: [customerId], references: [id])
+  dealId      String?       @unique
+  deal        Deal?         @relation(fields: [dealId], references: [id])
+  managerId   String?
+  manager     User?         @relation("ProjectManager", fields: [managerId], references: [id])
+  createdById String
+  createdBy   User          @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  milestones  ProjectMilestone[]
+  members     ProjectMember[]
+  tasks       Task[]
+  invoices    Invoice[]
+  expenses    ExpenseReport[]
+  activities  Activity[]
+  notes       Note[]
+  timelines   TimelineEvent[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([managerId])
+  @@index([deletedAt])
+}
+
+model ProjectMilestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      MilestoneStatus @default(pending)
+  dueDate     DateTime?
+  completedAt DateTime?
+  order       Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   @default("member")
+  joinedAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
 }

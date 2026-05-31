@@ -22,48 +22,74 @@ const STATUS_COLORS: Record<string, string> = {
   converted:   "bg-amber-500   text-white border-amber-500",
 };
 
-interface LeadRowProps {
-  id: string;
+const RATING_DOT: Record<string, string> = {
+  cold: "bg-sky-400",
+  warm: "bg-amber-400",
+  hot:  "bg-red-500",
+};
+
+interface LeadItem {
+  _id: string;
   name: string;
+  company?: string;
   status: string;
+  rating?: string;
   phone?: string;
   source?: string;
   owner?: { _id: string; name: string } | null;
-  date: string;
+  createdAt: string;
+}
+
+interface LeadRowProps {
+  item: LeadItem;
   handleDelete: (id: string) => void;
 }
 
-const LeadRow: React.FC<LeadRowProps> = ({ id, name, status, phone, source, owner, date, handleDelete }) => {
+const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete }) => {
   const { user } = useAuth();
   const { tr } = useLanguage();
   const navigate = useNavigate();
-  const statusLabel = tr.leads.statuses[status] ?? status;
+  const statusLabel = tr.leads.statuses[item.status] ?? item.status;
+  const date = new Date(item.createdAt).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+  });
 
   return (
-    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/leads/${id}`)}>
-      <TableCell className="font-medium">{name}</TableCell>
+    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/leads/${item._id}`)}>
       <TableCell>
-        <Badge variant="outline" className={`${STATUS_COLORS[status] ?? ""} capitalize w-fit`}>
+        <div className="font-medium">{item.name}</div>
+        {item.company && <div className="text-xs text-muted-foreground">{item.company}</div>}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className={`${STATUS_COLORS[item.status] ?? ""} capitalize w-fit`}>
           {statusLabel}
         </Badge>
       </TableCell>
-      <TableCell className="text-foreground/70">{phone}</TableCell>
-      <TableCell className="text-foreground/70 capitalize">{source}</TableCell>
-      <TableCell className="text-foreground/70">{owner?.name}</TableCell>
+      <TableCell>
+        {item.rating && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground capitalize">
+            <span className={`h-2 w-2 rounded-full ${RATING_DOT[item.rating] ?? "bg-muted"}`} />
+            {tr.leads.ratings?.[item.rating] ?? item.rating}
+          </span>
+        )}
+      </TableCell>
+      <TableCell className="text-foreground/70">{item.phone}</TableCell>
+      <TableCell className="text-foreground/70 capitalize">{item.source}</TableCell>
+      <TableCell className="text-foreground/70">{item.owner?.name}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-haspopup="true" size="icon" variant="ghost" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Toggle menu</span>
+              <span className="sr-only">{tr.common.actions}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <Link to={`/leads/${id}`}>
-              <DropdownMenuItem>{tr.common.actions}</DropdownMenuItem>
+            <Link to={`/leads/${item._id}`}>
+              <DropdownMenuItem>{tr.common.view}</DropdownMenuItem>
             </Link>
-            <Link to={`/leads/${id}/edit`}>
+            <Link to={`/leads/${item._id}/edit`}>
               <DropdownMenuItem>{tr.common.edit}</DropdownMenuItem>
             </Link>
             {["admin", "super admin"].includes(user!.role) && (
@@ -71,7 +97,7 @@ const LeadRow: React.FC<LeadRowProps> = ({ id, name, status, phone, source, owne
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={() => handleDelete(id)}
+                  onClick={() => handleDelete(item._id)}
                 >
                   {tr.common.delete}
                 </DropdownMenuItem>

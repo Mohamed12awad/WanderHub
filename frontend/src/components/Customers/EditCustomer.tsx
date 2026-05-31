@@ -95,6 +95,11 @@ const EditCustomer = () => {
         const loaded = {
           ...initialFormData,
           ...data,
+          address: { ...initialFormData.address, ...(data.address ?? {}) },
+          identification: { ...initialFormData.identification, ...(data.identification ?? {}) },
+          paymentInformation: { ...initialFormData.paymentInformation, ...(data.paymentInformation ?? {}) },
+          loyaltyProgram: { ...initialFormData.loyaltyProgram, ...(data.loyaltyProgram ?? {}) },
+          emergencyContact: { ...initialFormData.emergencyContact, ...(data.emergencyContact ?? {}) },
           dateOfBirth: toDateInputValue(data.dateOfBirth),
           owner: data.owner?._id || "",
           source: data.source ?? "",

@@ -42,7 +42,7 @@ const AddExpenseReport: React.FC = () => {
     if (!validate()) return;
     try {
       setIsLoading(true);
-      await createExpense({ title: title.trim(), userId: "", expenses: lines, approved: false });
+      await createExpense({ title: title.trim(), userId: "", expenses: lines });
       navigate("/expenses");
     } catch (error) {
       setIsLoading(false);

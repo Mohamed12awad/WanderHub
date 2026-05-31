@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { VisibilityService } from '../common/visibility.service';
 import { toClient } from '../common/serialize';
+import { cleanData } from '../common/clean-data';
+import { paginate, dateRange } from '../common/paginate';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
@@ -17,17 +19,11 @@ export class LeadsService {
     private readonly visibility: VisibilityService,
   ) {}
 
-  private cleanData(body: Record<string, any>) {
-    const { _id, id, owner, createdAt, updatedAt, convertedTo, ...rest } = body;
-    const data: Record<string, any> = { ...rest };
-    if (owner !== undefined) {
-      data.ownerId = owner === '' || owner === null ? null : (typeof owner === 'object' ? owner?._id : owner);
-    }
-    return data;
-  }
-
   async create(body: CreateLeadDto, userId: string) {
-    const data = this.cleanData(body as any);
+    const data = cleanData(body as any, {
+      emptyToNull: ['expectedCloseDate', 'rating'],
+      numeric: ['budget'],
+    });
 
     // Dedup: warn if phone/email matches an existing Lead or Customer
     if (data.phone || data.email) {
@@ -70,43 +66,33 @@ export class LeadsService {
   }
 
   async findAll(query: Record<string, string>, user: AuthUser) {
-    const { page, limit: limitRaw, q, status, ownerId, source, createdAt_from, createdAt_to } = query;
+    const { page, limit, q, status, rating, ownerId, source, createdAt_from, createdAt_to } = query;
     const ownerSelect = { select: { id: true, name: true } };
     const scopeWhere = await this.visibility.ownershipWhere(user, 'leads', 'ownerId');
 
-    if (!page) {
-      const leads = await this.prisma.lead.findMany({
-        where: { deletedAt: null, ...scopeWhere },
-        include: { owner: ownerSelect },
-        orderBy: { createdAt: 'desc' },
-      });
-      return toClient(leads);
-    }
-
-    const p = Math.max(1, parseInt(page) || 1);
-    const limit = Math.min(100, parseInt(limitRaw) || 25);
     const where: any = { deletedAt: null, ...scopeWhere };
-    if (q) where.name = { contains: q, mode: 'insensitive' };
+    if (q) {
+      where.OR = [
+        { name:    { contains: q, mode: 'insensitive' } },
+        { company: { contains: q, mode: 'insensitive' } },
+        { email:   { contains: q, mode: 'insensitive' } },
+        { phone:   { contains: q, mode: 'insensitive' } },
+      ];
+    }
     if (status) where.status = status;
+    if (rating) where.rating = rating;
     if (ownerId) where.ownerId = ownerId;
     if (source) where.source = source;
-    if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
-    }
+    const dr = dateRange(createdAt_from, createdAt_to);
+    if (dr) where.createdAt = dr;
 
-    const [data, total] = await Promise.all([
-      this.prisma.lead.findMany({
-        where,
-        include: { owner: ownerSelect },
-        orderBy: { createdAt: 'desc' },
-        skip: (p - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.lead.count({ where }),
-    ]);
-    return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+    return paginate(this.prisma.lead, {
+      where,
+      include: { owner: ownerSelect },
+      orderBy: { createdAt: 'desc' },
+      page,
+      limit,
+    });
   }
 
   async findOne(id: string, user: AuthUser) {
@@ -119,14 +105,18 @@ export class LeadsService {
         convertedTo: { select: { id: true, name: true } },
       },
     });
-    return lead ? toClient(lead) : null;
+    if (!lead) throw new NotFoundException('Lead not found');
+    return toClient(lead);
   }
 
   async update(id: string, body: UpdateLeadDto, userId: string) {
     const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('Lead not found');
 
-    const cleaned = this.cleanData(body as any);
+    const cleaned = cleanData(body as any, {
+      emptyToNull: ['expectedCloseDate', 'rating'],
+      numeric: ['budget'],
+    });
     const oldOwnerId = existing.ownerId;
     const lead = await this.prisma.lead.update({ where: { id }, data: cleaned });
 
@@ -144,31 +134,62 @@ export class LeadsService {
 
   async remove(id: string) {
     const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('Lead not found');
     await this.prisma.lead.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
   async convertToCustomer(id: string, userId: string) {
     const lead = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
-    if (!lead) return null;
-    if (lead.status === 'converted') throw new BadRequestException('Lead is already converted');
+    if (!lead) throw new NotFoundException('Lead not found');
 
-    const customer = await this.prisma.customer.create({
-      data: {
-        name: lead.name,
-        phone: lead.phone ?? undefined,
-        email: lead.email ?? undefined,
-        mobile: lead.mobile ?? undefined,
-        source: lead.source ?? undefined,
-        notes: lead.notes ?? undefined,
-        ownerId: lead.ownerId ?? undefined,
-      },
-    });
+    // Idempotent: if it's already converted, return the linked contact instead of erroring.
+    if (lead.status === 'converted') {
+      if (lead.convertedToId) {
+        const existing = await this.prisma.customer.findUnique({ where: { id: lead.convertedToId } });
+        if (existing) return toClient(existing);
+      }
+      throw new BadRequestException('Lead is already converted');
+    }
 
-    await this.prisma.lead.update({
-      where: { id },
-      data: { status: 'converted', convertedAt: new Date(), convertedToId: customer.id },
+    // Customer.phone is required + unique — fall back to mobile, otherwise block with a clear message.
+    const phone = lead.phone ?? lead.mobile;
+    if (!phone) {
+      throw new BadRequestException('Add a phone or mobile number to this lead before converting it to a contact');
+    }
+
+    // Preserve the richer lead fields that have no dedicated Customer column.
+    const extra: Record<string, unknown> = {};
+    if (lead.company) extra.company = lead.company;
+    if (lead.jobTitle) extra.jobTitle = lead.jobTitle;
+    if (lead.website) extra.website = lead.website;
+    if (lead.rating) extra.rating = lead.rating;
+    if (lead.budget != null) extra.budget = lead.budget;
+    if (lead.currency) extra.currency = lead.currency;
+    if (lead.campaign) extra.campaign = lead.campaign;
+    if (lead.expectedCloseDate) extra.expectedCloseDate = lead.expectedCloseDate;
+
+    // Create the contact and flip the lead atomically so the link can never be lost.
+    const customer = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.customer.create({
+        data: {
+          name: lead.name,
+          phone,
+          email: lead.email ?? undefined,
+          mobile: lead.mobile ?? undefined,
+          source: lead.source ?? undefined,
+          status: 'In Progress',
+          notes: lead.notes ?? undefined,
+          ownerId: lead.ownerId ?? undefined,
+          ...((lead.city || lead.country) ? { location: [lead.city, lead.country].filter(Boolean).join(', ') } : {}),
+          ...(Object.keys(extra).length ? { customFields: extra } : {}),
+        } as any,
+      });
+      await tx.lead.update({
+        where: { id },
+        data: { status: 'converted', convertedAt: new Date(), convertedToId: created.id },
+      });
+      return created;
     });
 
     await this.timeline.log(

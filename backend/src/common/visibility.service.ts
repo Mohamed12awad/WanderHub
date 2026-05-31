@@ -27,22 +27,20 @@ export class VisibilityService {
 
   /**
    * Returns the set of user ids visible to a manager: themselves plus everyone
-   * below them in the reportsTo tree (transitively).
+   * below them in the reportsTo tree (transitively). Uses a single recursive
+   * CTE instead of N+1 queries — O(1) round trips regardless of org depth.
    */
   async getSubtreeUserIds(userId: string): Promise<string[]> {
-    const ids = new Set<string>([userId]);
-    let frontier = [userId];
-    while (frontier.length) {
-      const children = await this.prisma.user.findMany({
-        where: { reportsToId: { in: frontier } },
-        select: { id: true },
-      });
-      const next = children.map((c) => c.id).filter((id) => !ids.has(id));
-      if (!next.length) break;
-      next.forEach((id) => ids.add(id));
-      frontier = next;
-    }
-    return [...ids];
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE subtree AS (
+        SELECT id FROM "User" WHERE id = ${userId}
+        UNION ALL
+        SELECT u.id FROM "User" u
+        INNER JOIN subtree s ON u."reportsToId" = s.id
+      )
+      SELECT id FROM subtree
+    `;
+    return rows.map((r) => r.id);
   }
 
   /**

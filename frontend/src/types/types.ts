@@ -161,7 +161,7 @@ export interface ExpenseReportData {
   title: string;
   userId: string;
   expenses: ExpenseItem[];
-  approved: boolean;
+  approvalStatus?: ApprovalStatus;
   createdAt?: string;
 }
 
@@ -372,3 +372,144 @@ export interface InvoiceFormData {
   notes?: string;
   terms?: string;
 }
+
+// ── Procurement ───────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  _id: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
+  taxId?: string;
+  notes?: string;
+  status: "active" | "inactive";
+  createdAt: string;
+}
+
+export type PurchaseOrderStatus = "draft" | "sent" | "confirmed" | "received" | "cancelled";
+
+export interface PurchaseOrder {
+  _id: string;
+  poNumber: string;
+  supplier: { _id: string; name: string };
+  status: PurchaseOrderStatus;
+  items: LineItem[];
+  subtotal: number;
+  taxRate: number;
+  tax: number;
+  total: number;
+  currency: string;
+  issueDate: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: { _id: string; name: string };
+  approvedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+}
+
+export type BillStatus = "draft" | "received" | "partially_paid" | "paid" | "overdue" | "cancelled";
+
+export interface VendorBill {
+  _id: string;
+  billNumber: string;
+  supplier: { _id: string; name: string };
+  purchaseOrder?: { _id: string; poNumber: string };
+  status: BillStatus;
+  items: LineItem[];
+  subtotal: number;
+  taxRate: number;
+  tax: number;
+  total: number;
+  totalPaid: number;
+  currency: string;
+  issueDate: string;
+  dueDate?: string;
+  notes?: string;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: { _id: string; name: string };
+  approvedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+}
+
+export interface VendorBillPayment {
+  _id: string;
+  billId: string;
+  amount: number;
+  currency: string;
+  date: string;
+  method: PaymentMethod;
+  reference?: string;
+  notes?: string;
+  accountId?: string;
+  account?: { _id: string; name: string };
+  createdBy: { _id: string; name: string };
+  createdAt: string;
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export type ProjectStatus = "planning" | "active" | "on_hold" | "completed" | "cancelled";
+export type MilestoneStatus = "pending" | "in_progress" | "completed";
+
+export interface ProjectMilestone {
+  _id: string;
+  title: string;
+  description?: string;
+  dueDate?: string;
+  status: MilestoneStatus;
+  order: number;
+}
+
+export interface ProjectMember {
+  _id: string;
+  userId: string;
+  user?: { _id: string; name: string; email: string };
+  role: string;
+  addedAt: string;
+}
+
+export interface Project {
+  _id: string;
+  title: string;
+  description?: string;
+  customer: { _id: string; name: string };
+  deal?: { _id: string; title: string };
+  manager?: { _id: string; name: string };
+  status: ProjectStatus;
+  startDate?: string;
+  endDate?: string;
+  budget: number;
+  currency: string;
+  milestones: ProjectMilestone[];
+  members: ProjectMember[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectFinancials {
+  budget: number;
+  billed: number;
+  collected: number;
+  costs: number;
+  profit: number;
+  budgetUsed: number;
+}
+
+export interface ProjectFormData {
+  title: string;
+  description?: string;
+  customer: string;
+  deal?: string;
+  managerId?: string;
+  status: ProjectStatus;
+  startDate?: string;
+  endDate?: string;
+  budget: number;
+  currency: string;
+}
+

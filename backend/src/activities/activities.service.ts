@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -59,7 +59,7 @@ export class ActivitiesService {
 
   async update(id: string, body: UpdateActivityDto) {
     const existing = await this.prisma.activity.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('activity not found');
     const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } = body as any;
     const data: any = { ...rest };
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
@@ -69,7 +69,7 @@ export class ActivitiesService {
 
   async remove(id: string) {
     const existing = await this.prisma.activity.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('activity not found');
     await this.prisma.activity.delete({ where: { id } });
     return true;
   }

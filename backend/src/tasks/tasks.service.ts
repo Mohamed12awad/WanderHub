@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
@@ -96,7 +96,7 @@ export class TasksService {
 
   async update(id: string, body: UpdateTaskDto, userId?: string) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('task not found');
     const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, ...rest } = body as any;
     const data: any = { ...rest };
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
@@ -121,14 +121,14 @@ export class TasksService {
 
   async remove(id: string) {
     const existing = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('task not found');
     await this.prisma.task.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
   async complete(id: string, userId: string) {
     const task = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
-    if (!task) return null;
+    if (!task) throw new NotFoundException('task not found');
     const wasDone = task.status === 'done';
     const updated = await this.prisma.task.update({
       where: { id },

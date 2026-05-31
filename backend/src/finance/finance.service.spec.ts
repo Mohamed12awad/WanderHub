@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FinanceService } from './finance.service';
 
 // Builds a fake interactive-transaction client and a prisma mock whose
@@ -27,26 +27,22 @@ function makeService(prisma: any) {
 }
 
 describe('FinanceService — approval separation of duties', () => {
-  it('blocks the creator from approving their own invoice', async () => {
+  it('throws ForbiddenException when the creator tries to approve their own invoice', async () => {
     const { prisma } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'user1', deletedAt: null });
     const svc = makeService(prisma);
 
-    const res = await svc.approveInvoice('inv1', 'user1', 'admin');
-
-    expect(res).toEqual({ selfApproval: true });
+    await expect(svc.approveInvoice('inv1', 'user1', 'admin')).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
-  it('blocks an unauthorized role from approving', async () => {
+  it('throws ForbiddenException when an unauthorized role tries to approve', async () => {
     const { prisma } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'other', deletedAt: null });
     prisma.workspaceConfig.findFirst.mockResolvedValue({ approvals: [{ module: 'invoices', enabled: true, approverRoles: ['manager'] }] });
     const svc = makeService(prisma);
 
-    const res = await svc.approveInvoice('inv1', 'user1', 'sales');
-
-    expect(res).toEqual({ forbidden: true });
+    await expect(svc.approveInvoice('inv1', 'user1', 'sales')).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
@@ -70,7 +66,7 @@ describe('FinanceService — approval separation of duties', () => {
 describe('FinanceService — recordPayment', () => {
   it('recomputes totalPaid as the SUM of payments inside the transaction', async () => {
     const { prisma, tx } = buildMocks();
-    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', dealId: null, dueDate: null, deletedAt: null });
+    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', approvalStatus: 'approved', dealId: null, dueDate: null, deletedAt: null });
     tx.invoicePayment.create.mockResolvedValue({ id: 'p2', amount: 60, currency: 'EGP', method: 'cash' });
     // recalcInvoiceTotals internals:
     tx.invoice.findUnique.mockResolvedValue({ id: 'inv1', total: 100, dueDate: null });
@@ -90,7 +86,7 @@ describe('FinanceService — recordPayment', () => {
 
   it('blocks a payment whose currency differs from the account currency', async () => {
     const { prisma, tx } = buildMocks();
-    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', dealId: null, dueDate: null, deletedAt: null });
+    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', approvalStatus: 'approved', dealId: null, dueDate: null, deletedAt: null });
     tx.invoicePayment.create.mockResolvedValue({ id: 'p1', amount: 50, currency: 'EGP', method: 'cash' });
     tx.account.findFirst.mockResolvedValue({ id: 'acc1', currency: 'USD', deletedAt: null });
 
@@ -104,7 +100,7 @@ describe('FinanceService — recordPayment', () => {
 
   it('moves the account balance by the payment amount when currencies match', async () => {
     const { prisma, tx } = buildMocks();
-    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', dealId: null, dueDate: null, deletedAt: null });
+    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', approvalStatus: 'approved', dealId: null, dueDate: null, deletedAt: null });
     tx.invoicePayment.create.mockResolvedValue({ id: 'p1', amount: 50, currency: 'EGP', method: 'cash' });
     tx.account.findFirst.mockResolvedValue({ id: 'acc1', currency: 'EGP', deletedAt: null });
     tx.invoice.findUnique.mockResolvedValue({ id: 'inv1', total: 100, dueDate: null });

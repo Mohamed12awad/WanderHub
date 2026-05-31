@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
@@ -131,13 +131,15 @@ export class FinanceService {
 
   async updateQuote(id: string, body: UpdateQuoteDto) {
     const quote = await this.prisma.quote.findUnique({ where: { id } });
-    if (!quote) return null;
+    if (!quote) throw new NotFoundException('Quote not found');
     // customer/deal are extracted to keep them out of `rest`; the update path
     // intentionally does not reassign them. The DTO has already stripped any
     // server-controlled fields, so `rest` is safe to spread.
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (quote.approvalStatus === 'rejected') data.approvalStatus = 'pending';
+    // Post-approval edits reset the document back to pending for re-review.
+    if (items && quote.approvalStatus === 'approved') data.approvalStatus = 'pending';
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (items) {
@@ -160,11 +162,12 @@ export class FinanceService {
 
   async approveQuote(id: string, userId: string, userRole: string) {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
-    if (!quote) return null;
+    if (!quote) throw new NotFoundException('Quote not found');
+    if (quote.approvalStatus === 'approved') return toClient(quote);
     const { approverRoles } = await this.getApprovalConfig('quotes');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve quotes');
     // Separation of duties: the creator cannot approve their own quote.
-    if (quote.createdById === userId) return { selfApproval: true };
+    if (quote.createdById === userId) throw new ForbiddenException('You cannot approve a quote you created');
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -175,10 +178,11 @@ export class FinanceService {
 
   async rejectQuote(id: string, userId: string, reason: string, userRole: string) {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
-    if (!quote) return null;
+    if (!quote) throw new NotFoundException('Quote not found');
+    if (quote.approvalStatus === 'rejected') return toClient(quote);
     const { approverRoles } = await this.getApprovalConfig('quotes');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
-    if (quote.createdById === userId) return { selfApproval: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject quotes');
+    if (quote.createdById === userId) throw new ForbiddenException('You cannot reject a quote you created');
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -189,7 +193,7 @@ export class FinanceService {
 
   async deleteQuote(id: string) {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
-    if (!quote) return null;
+    if (!quote) throw new NotFoundException('Quote not found');
     await this.prisma.quote.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
@@ -199,8 +203,9 @@ export class FinanceService {
       where: { id, deletedAt: null },
       include: { items: true },
     });
-    if (!quote) return null;
-    if (quote.convertedToInvoiceId) return { alreadyConverted: true };
+    if (!quote) throw new NotFoundException('Quote not found');
+    if (quote.convertedToInvoiceId) throw new BadRequestException('Quote already converted to invoice');
+    if (quote.approvalStatus !== 'approved') throw new BadRequestException('Quote must be approved before conversion to invoice');
 
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
 
@@ -251,7 +256,7 @@ export class FinanceService {
       });
       return toClient(invoice);
     } catch (e) {
-      if (e instanceof AlreadyConvertedError) return { alreadyConverted: true };
+      if (e instanceof AlreadyConvertedError) throw new BadRequestException('Quote already converted to invoice');
       throw e;
     }
   }
@@ -281,7 +286,7 @@ export class FinanceService {
 
   async getInvoiceById(id: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null }, include: INVOICE_INCLUDE });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
     const payments = await this.prisma.invoicePayment.findMany({
       where: { invoiceId: id },
       include: { createdBy: { select: { id: true, name: true } } },
@@ -318,10 +323,12 @@ export class FinanceService {
 
   async updateInvoice(id: string, body: UpdateInvoiceDto) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
     const data: any = { ...rest };
     if (invoice.approvalStatus === 'rejected') data.approvalStatus = 'pending';
+    // Post-approval edits reset the document back to pending for re-review.
+    if (items && invoice.approvalStatus === 'approved') data.approvalStatus = 'pending';
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (items) {
@@ -345,7 +352,7 @@ export class FinanceService {
 
   async deleteInvoice(id: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
     // Soft delete; payment history is preserved for audit but excluded from
     // listings (payments are filtered by invoice.deletedAt).
     await this.prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -354,10 +361,11 @@ export class FinanceService {
 
   async approveInvoice(id: string, userId: string, userRole: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.approvalStatus === 'approved') return toClient(invoice);
     const { approverRoles } = await this.getApprovalConfig('invoices');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
-    if (invoice.createdById === userId) return { selfApproval: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve invoices');
+    if (invoice.createdById === userId) throw new ForbiddenException('You cannot approve an invoice you created');
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -368,10 +376,11 @@ export class FinanceService {
 
   async rejectInvoice(id: string, userId: string, reason: string, userRole: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.approvalStatus === 'rejected') return toClient(invoice);
     const { approverRoles } = await this.getApprovalConfig('invoices');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
-    if (invoice.createdById === userId) return { selfApproval: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject invoices');
+    if (invoice.createdById === userId) throw new ForbiddenException('You cannot reject an invoice you created');
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -382,7 +391,8 @@ export class FinanceService {
 
   async recordPayment(invoiceId: string, body: RecordPaymentDto, userId: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
-    if (!invoice) return null;
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before recording payment');
 
     const amount = Number(body.amount);
     const currency = body.currency ?? invoice.currency;
@@ -413,7 +423,7 @@ export class FinanceService {
 
   async deleteInvoicePayment(invoiceId: string, paymentId: string) {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
-    if (!payment) return null;
+    if (!payment) throw new NotFoundException('Payment not found');
 
     await this.prisma.$transaction(async (tx) => {
       await tx.invoicePayment.delete({ where: { id: paymentId } });
@@ -426,7 +436,7 @@ export class FinanceService {
 
   async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto) {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
-    if (!payment) return null;
+    if (!payment) throw new NotFoundException('Payment not found');
 
     const newAmount = Number(body.amount);
     const newCurrency = body.currency ?? payment.currency;

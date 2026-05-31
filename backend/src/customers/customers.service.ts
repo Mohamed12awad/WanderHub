@@ -1,12 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { cleanData } from '../common/clean-data';
+import { paginate, dateRange } from '../common/paginate';
 import { buildCfConditions } from '../common/customFields';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { DealsService } from '../deals/deals.service';
 
 @Injectable()
 export class CustomersService {
@@ -14,27 +17,12 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly visibility: VisibilityService,
+    private readonly deals: DealsService,
   ) {}
 
-  /** Strips relation/virtual fields the frontend may echo back on writes. */
-  private cleanData(body: Record<string, any>) {
-    const { _id, id, owner, deals, createdAt, updatedAt, bookingHistory, ...rest } = body;
-    if (typeof owner === 'string') {
-      rest.ownerId = owner;
-    } else if (owner && typeof owner === 'object' && owner._id) {
-      rest.ownerId = owner._id;
-    }
-    // Prisma rejects empty strings for DateTime fields — coerce to null
-    for (const field of ['dateOfBirth'] as const) {
-      if (rest[field] === '') rest[field] = null;
-    }
-    return rest;
-  }
-
   async create(body: CreateCustomerDto, userId: string) {
-    const customer = await this.prisma.customer.create({
-      data: this.cleanData(body) as any,
-    });
+    const data = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
+    const customer = await this.prisma.customer.create({ data: data as any });
 
     await this.timeline.log(
       'contact.created',
@@ -49,21 +37,13 @@ export class CustomersService {
   }
 
   async findAll(query: Record<string, string>, user: AuthUser) {
-    const { page, limit: limitRaw, q, status, gender, phone, createdAt_from, createdAt_to } = query;
+    const { page, limit, q, status, gender, phone, createdAt_from, createdAt_to } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
-    if (!page) {
-      const customers = await this.prisma.customer.findMany({
-        where: { deletedAt: null, ...scopeWhere },
-        orderBy: { createdAt: 'desc' },
-      });
-      return toClient(customers);
-    }
-    const p = Math.max(1, parseInt(page) || 1);
-    const limit = Math.min(100, parseInt(limitRaw) || 25);
+
     const where: any = { deletedAt: null, ...scopeWhere };
     if (q) {
       where.OR = [
-        { name: { contains: q, mode: 'insensitive' } },
+        { name:  { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
       ];
@@ -71,24 +51,18 @@ export class CustomersService {
     if (status) where.status = status;
     if (gender) where.gender = gender;
     if (phone) where.phone = { contains: phone, mode: 'insensitive' };
-    if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
-    }
-    // Custom fields: cf_{fieldId}=value params
+    const dr = dateRange(createdAt_from, createdAt_to);
+    if (dr) where.createdAt = dr;
+
     const cfConditions = buildCfConditions(query);
     if (cfConditions.length) where.AND = [...(where.AND ?? []), ...cfConditions];
-    const [data, total] = await Promise.all([
-      this.prisma.customer.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (p - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.customer.count({ where }),
-    ]);
-    return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+
+    return paginate(this.prisma.customer, {
+      where,
+      orderBy: { createdAt: 'desc' },
+      page,
+      limit,
+    });
   }
 
   async findOne(id: string, user: AuthUser) {
@@ -97,14 +71,15 @@ export class CustomersService {
       where: { id, deletedAt: null, ...scopeWhere },
       include: { deals: { where: { deletedAt: null } }, owner: true },
     });
-    if (!customer) return null;
+    if (!customer) throw new NotFoundException('Customer not found');
     return toClient(customer);
   }
 
   async update(id: string, body: UpdateCustomerDto, userId?: string) {
     const existing = await this.prisma.customer.findUnique({ where: { id } });
-    if (!existing) return null;
-    const cleaned = this.cleanData(body);
+    if (!existing) throw new NotFoundException('Customer not found');
+
+    const cleaned = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
     const customer = await this.prisma.customer.update({ where: { id }, data: cleaned });
 
     const TRACKED_FIELDS = ['name', 'email', 'phone', 'mobile', 'location', 'status', 'gender', 'source', 'notes'];
@@ -124,12 +99,11 @@ export class CustomersService {
 
   async remove(id: string) {
     const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('Customer not found');
 
-    // Soft delete: also soft-delete the customer's deals so neither resurfaces
-    // in listings. Related quotes/invoices keep their own lifecycle.
+    // Delegate deal cascade to DealsService so deal-lifecycle side effects run.
     const now = new Date();
-    await this.prisma.deal.updateMany({ where: { customerId: id }, data: { deletedAt: now } });
+    await this.deals.softDeleteByCustomer(id, now);
     await this.prisma.customer.update({ where: { id }, data: { deletedAt: now } });
     return true;
   }

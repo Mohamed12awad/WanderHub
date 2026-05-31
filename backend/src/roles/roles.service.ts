@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 
@@ -21,7 +21,7 @@ export class RolesService {
   async update(id: string, permissions: string[]) {
     const role = await this.prisma.role.findUnique({ where: { id } });
     if (!role) return null;
-    if (PROTECTED.includes(role.name)) return { forbidden: true };
+    if (PROTECTED.includes(role.name)) throw new ForbiddenException('Cannot modify protected roles');
     const updated = await this.prisma.role.update({ where: { id }, data: { permissions } });
     return toClient(updated);
   }
@@ -29,7 +29,7 @@ export class RolesService {
   async remove(id: string) {
     const role = await this.prisma.role.findUnique({ where: { id } });
     if (!role) return null;
-    if (PROTECTED.includes(role.name)) return { forbidden: true };
+    if (PROTECTED.includes(role.name)) throw new ForbiddenException('Cannot delete protected roles');
     await this.prisma.role.delete({ where: { id } });
     return true;
   }

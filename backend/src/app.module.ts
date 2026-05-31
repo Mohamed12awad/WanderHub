@@ -20,7 +20,8 @@ import { FinanceModule } from './finance/finance.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { NotesModule } from './notes/notes.module';
 import { TasksModule } from './tasks/tasks.module';
-import { PurchasesModule } from './purchases/purchases.module';
+import { ProcurementModule } from './procurement/procurement.module';
+import { ProjectsModule } from './projects/projects.module';
 import { LogsModule } from './logs/logs.module';
 import { SearchModule } from './search/search.module';
 import { SummeryModule } from './summery/summery.module';
@@ -66,7 +67,8 @@ import { LeadsModule } from './leads/leads.module';
     ActivitiesModule,
     NotesModule,
     TasksModule,
-    PurchasesModule,
+    ProcurementModule,
+    ProjectsModule,
     LogsModule,
     SearchModule,
     SummeryModule,

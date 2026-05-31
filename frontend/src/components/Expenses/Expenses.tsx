@@ -17,7 +17,7 @@ export interface ExpenseReportData {
   title: string;
   userId: { name: string };
   expenses: ExpenseItem[];
-  approved: boolean;
+  approvalStatus: "pending" | "approved" | "rejected";
   total: number;
   createdAt: string;
 }
@@ -38,10 +38,11 @@ export function Expenses() {
       headers={e.headers}
       sortableHeaders={["Report", "Total", "Created"]}
       quickStatusFilter={{
-        field: "approved",
+        field: "approvalStatus",
         options: [
-          { value: "true",  label: "Approved" },
-          { value: "false", label: "Pending" },
+          { value: "approved", label: "Approved" },
+          { value: "pending",  label: "Pending" },
+          { value: "rejected", label: "Rejected" },
         ],
       }}
       renderRow={(item, handleDelete) => (
@@ -50,7 +51,7 @@ export function Expenses() {
           id={item._id}
           title={item.title}
           total={item.expenses.reduce((t, i) => t + i.amount, 0)}
-          approved={item.approved}
+          approvalStatus={item.approvalStatus}
           owner={item.userId?.name ?? "—"}
           date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
@@ -69,7 +70,7 @@ export function Expenses() {
         getRow: (ex) => ({
           Title: ex.title,
           Total: ex.expenses.reduce((s, i) => s + i.amount, 0),
-          Approved: ex.approved ? "Yes" : "No",
+          Status: ex.approvalStatus,
           Owner: ex.userId?.name ?? "",
           "Created At": new Date(ex.createdAt).toLocaleDateString(),
         }),

@@ -13,7 +13,7 @@ export class TimelineService {
     eventType: string,
     title: string,
     linkedTo: string,
-    linkedModel: 'Customer' | 'Deal' | 'Quote' | 'Invoice' | 'Expense' | 'Product' | 'Task',
+    linkedModel: 'Customer' | 'Deal' | 'Quote' | 'Invoice' | 'Expense' | 'Product' | 'Task' | 'PurchaseOrder' | 'VendorBill' | 'Project',
     payload?: Record<string, unknown>,
     triggeredBy?: string,
   ): Promise<void> {
@@ -27,6 +27,7 @@ export class TimelineService {
           payload: (payload ?? undefined) as any,
           ...(linkedModel === 'Customer' ? { customerId: linkedTo } : {}),
           ...(linkedModel === 'Deal' ? { dealId: linkedTo } : {}),
+          ...(linkedModel === 'Project' ? { projectId: linkedTo } : {}),
           triggeredById: triggeredBy || undefined,
           isSystem: !triggeredBy,
         },

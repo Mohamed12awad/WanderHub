@@ -328,3 +328,90 @@ export const getUnreadCount = () => api.get("/notifications/unread-count");
 export const markNotificationRead = (id: string) => api.put(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => api.put("/notifications/read-all");
 export const deleteNotification = (id: string): Promise<void> => api.delete(`/notifications/${id}`);
+
+// ── Procurement ───────────────────────────────────────────────────────────────
+
+export const getSuppliers = (params?: { page?: number; limit?: number; q?: string }) =>
+  api.get("/procurement/suppliers", { params });
+export const getSupplierById = (id: string) => api.get(`/procurement/suppliers/${id}`);
+export const createSupplier = (data: any) => api.post("/procurement/suppliers", data);
+export const updateSupplier = (id: string, data: any) =>
+  api.put(`/procurement/suppliers/${id}`, data);
+export const deleteSupplier = (id: string): Promise<void> =>
+  api.delete(`/procurement/suppliers/${id}`);
+
+export const getPurchaseOrders = (params?: { page?: number; limit?: number; status?: string; q?: string; sort?: string; dir?: string; [key: string]: unknown }) =>
+  api.get("/procurement/purchase-orders", { params });
+export const getPurchaseOrderById = (id: string) => api.get(`/procurement/purchase-orders/${id}`);
+export const createPurchaseOrder = (data: any) => api.post("/procurement/purchase-orders", data);
+export const updatePurchaseOrder = (id: string, data: any) =>
+  api.patch(`/procurement/purchase-orders/${id}`, data);
+export const deletePurchaseOrder = (id: string): Promise<void> =>
+  api.delete(`/procurement/purchase-orders/${id}`);
+export const updatePurchaseOrderStatus = (id: string, status: string) =>
+  api.patch(`/procurement/purchase-orders/${id}/status`, { status });
+export const approvePurchaseOrder = (id: string) => api.patch(`/procurement/purchase-orders/${id}/approve`);
+export const rejectPurchaseOrder = (id: string, reason: string) =>
+  api.patch(`/procurement/purchase-orders/${id}/reject`, { reason });
+
+export const getVendorBills = (params?: { page?: number; limit?: number; status?: string; q?: string; [key: string]: unknown }) =>
+  api.get("/procurement/vendor-bills", { params });
+export const getVendorBillById = (id: string) => api.get(`/procurement/vendor-bills/${id}`);
+export const createVendorBill = (data: any) => api.post("/procurement/vendor-bills", data);
+export const updateVendorBill = (id: string, data: any) =>
+  api.patch(`/procurement/vendor-bills/${id}`, data);
+export const deleteVendorBill = (id: string): Promise<void> =>
+  api.delete(`/procurement/vendor-bills/${id}`);
+export const approveVendorBill = (id: string) => api.patch(`/procurement/vendor-bills/${id}/approve`);
+export const rejectVendorBill = (id: string, reason: string) =>
+  api.patch(`/procurement/vendor-bills/${id}/reject`, { reason });
+export const recordVendorBillPayment = (id: string, data: any) =>
+  api.post(`/procurement/vendor-bills/${id}/payments`, data);
+export const deleteVendorBillPayment = (billId: string, paymentId: string): Promise<void> =>
+  api.delete(`/procurement/vendor-bills/${billId}/payments/${paymentId}`);
+export const getVendorPayments = (params?: { page?: number; limit?: number; method?: string; currency?: string; date_from?: string; date_to?: string; amount_min?: number; amount_max?: number }) =>
+  api.get("/procurement/vendor-bills/vendor-payments", { params });
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export const getProjects = (params?: { page?: number; limit?: number; status?: string; q?: string; [key: string]: unknown }) =>
+  api.get("/projects", { params });
+export const getProjectById = (id: string) => api.get(`/projects/${id}`);
+export const createProject = (data: any) => api.post("/projects", data);
+export const updateProject = (id: string, data: any) =>
+  api.patch(`/projects/${id}`, data);
+export const deleteProject = (id: string): Promise<void> =>
+  api.delete(`/projects/${id}`);
+
+export const getProjectFinancials = (id: string) => api.get(`/projects/${id}/finance`);
+
+export const getProjectMilestones = (id: string) => api.get(`/projects/${id}/milestones`);
+export const createProjectMilestone = (projectId: string, data: any) =>
+  api.post(`/projects/${projectId}/milestones`, data);
+export const updateProjectMilestone = (projectId: string, milestoneId: string, data: any) =>
+  api.patch(`/projects/${projectId}/milestones/${milestoneId}`, data);
+export const deleteProjectMilestone = (projectId: string, milestoneId: string): Promise<void> =>
+  api.delete(`/projects/${projectId}/milestones/${milestoneId}`);
+
+export const getProjectMembers = (id: string) => api.get(`/projects/${id}/members`);
+export const addProjectMember = (projectId: string, data: any) =>
+  api.post(`/projects/${projectId}/members`, data);
+export const removeProjectMember = (projectId: string, memberId: string): Promise<void> =>
+  api.delete(`/projects/${projectId}/members/${memberId}`);
+export const updateProjectMemberRole = (projectId: string, memberId: string, role: string) =>
+  api.patch(`/projects/${projectId}/members/${memberId}`, { role });
+
+// Project linked records (invoices / expenses / tasks)
+export const getProjectInvoices  = (projectId: string) => api.get(`/projects/${projectId}/invoices`);
+export const getProjectExpenses  = (projectId: string) => api.get(`/projects/${projectId}/expenses`);
+export const getProjectTasks     = (projectId: string) => api.get(`/projects/${projectId}/tasks`);
+
+// Milestone CRUD aliases (used by ViewProject)
+export const createMilestone = (projectId: string, data: any) =>
+  api.post(`/projects/${projectId}/milestones`, data);
+export const updateMilestone = (projectId: string, milestoneId: string, data: any) =>
+  api.patch(`/projects/${projectId}/milestones/${milestoneId}`, data);
+export const deleteMilestone = (projectId: string, milestoneId: string): Promise<void> =>
+  api.delete(`/projects/${projectId}/milestones/${milestoneId}`);
+
+

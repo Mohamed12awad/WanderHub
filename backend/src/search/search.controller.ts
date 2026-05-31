@@ -1,16 +1,16 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { SearchService } from './search.service';
 
 @Controller('search')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Get()
-  async search(@Query('q') q: string, @Res() res: Response) {
-    try { return res.json(await this.searchService.search(q ?? '')); }
-    catch (e) { return res.status(500).json({ error: (e as Error).message }); }
+  search(@Query('q') q: string, @CurrentUser() user: AuthUser) {
+    return this.searchService.search(q ?? '', user);
   }
 }

@@ -43,7 +43,7 @@ export class SummeryService {
     const [totalAgg, catRows] = await Promise.all([
       this.prisma.expenseItem.aggregate({
         _sum: { amount: true },
-        where: { expenseReport: { approved: true, deletedAt: null, createdAt: { gte: start, lte: end } } },
+        where: { expenseReport: { approvalStatus: 'approved', deletedAt: null, createdAt: { gte: start, lte: end } } },
       }),
       this.prisma.expenseItem.groupBy({
         by: ['category'],

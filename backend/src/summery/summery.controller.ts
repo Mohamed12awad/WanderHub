@@ -1,22 +1,22 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { SummeryService } from './summery.service';
 
 @Controller('summery')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('reports:view')
 export class SummeryController {
   constructor(private readonly summery: SummeryService) {}
 
   @Get()
-  async getSummery(@Query('timePeriod') timePeriod: string, @Res() res: Response) {
-    try { return res.json(await this.summery.getSummery(timePeriod)); }
-    catch (e) { return res.status(500).json({ error: (e as Error).message }); }
+  getSummery(@Query('timePeriod') timePeriod: string) {
+    return this.summery.getSummery(timePeriod);
   }
 
   @Get('pending-approvals')
-  async pendingApprovals(@Res() res: Response) {
-    try { return res.json(await this.summery.getPendingApprovals()); }
-    catch (e) { return res.status(500).json({ error: (e as Error).message }); }
+  pendingApprovals() {
+    return this.summery.getPendingApprovals();
   }
 }

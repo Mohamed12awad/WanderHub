@@ -29,7 +29,7 @@ export class ReportsService {
         where: { deletedAt: null, createdAt: { gte: start, lte: end } },
         include: { customer: true, product: true },
       }),
-      this.prisma.purchase.findMany({ where: { createdAt: { gte: start, lte: end } } }),
+      this.prisma.purchaseOrder.findMany({ where: { deletedAt: null, createdAt: { gte: start, lte: end } } }),
       this.prisma.expenseReport.findMany({
         where: { deletedAt: null, createdAt: { gte: start, lte: end } },
         include: { expenses: true },

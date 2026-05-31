@@ -12,26 +12,32 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { approveExpense } from "@/utils/api";
+import { approveExpenseReport } from "@/utils/api";
 import { useQueryClient } from "react-query";
 
 interface ExpenseRowProps {
   id: string;
   title: string;
   total: number;
-  approved: boolean;
+  approvalStatus: "pending" | "approved" | "rejected";
   owner: string;
   date: string;
   handleDelete: (id: string) => void;
 }
 
-const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approved, owner, date, handleDelete }) => {
+const STATUS_CLASS: Record<string, string> = {
+  approved: "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600",
+  rejected: "bg-red-500 text-white border-red-500 dark:bg-red-600 dark:border-red-600",
+  pending:  "bg-amber-500 text-white border-amber-500 dark:bg-amber-600 dark:border-amber-600",
+};
+
+const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatus, owner, date, handleDelete }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const handleApprove = async () => {
-    await approveExpense(id, true);
+    await approveExpenseReport(id);
     queryClient.invalidateQueries("expenses");
   };
 
@@ -44,12 +50,9 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approved, own
       <TableCell>
         <Badge
           variant="outline"
-          className={approved
-            ? "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
-            : "bg-amber-500  text-white border-amber-500  dark:bg-amber-600  dark:border-amber-600"
-          }
+          className={STATUS_CLASS[approvalStatus] ?? STATUS_CLASS.pending}
         >
-          {approved ? "Approved" : "Pending"}
+          {approvalStatus === "approved" ? "Approved" : approvalStatus === "rejected" ? "Rejected" : "Pending"}
         </Badge>
       </TableCell>
       <TableCell className="text-foreground/70">{owner}</TableCell>
@@ -70,7 +73,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approved, own
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
             {["admin", "manager"].includes(user!.role) && (
-              <DropdownMenuItem disabled={approved} onClick={handleApprove}>
+              <DropdownMenuItem disabled={approvalStatus === "approved"} onClick={handleApprove}>
                 Approve
               </DropdownMenuItem>
             )}

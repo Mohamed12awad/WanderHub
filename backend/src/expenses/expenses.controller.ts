@@ -1,5 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -15,70 +14,46 @@ export class ExpensesController {
 
   @Get()
   @RequirePermission('expenses:view')
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
-    try { return res.json(await this.expenses.findAll(query)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findAll(@Query() query: Record<string, string>) {
+    return this.expenses.findAll(query);
   }
 
   @Get(':id')
   @RequirePermission('expenses:view')
-  async findOne(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const r = await this.expenses.findOne(id);
-      if (!r) return res.status(404).json({ message: 'Expense report not found' });
-      return res.json(r);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findOne(@Param('id') id: string) {
+    return this.expenses.findOne(id);
   }
 
   @Post()
+  @HttpCode(201)
   @RequirePermission('expenses:create')
-  async create(@Body() body: CreateExpenseReportDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try { return res.status(201).json(await this.expenses.create(body, user.id)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  create(@Body() body: CreateExpenseReportDto, @CurrentUser() user: AuthUser) {
+    return this.expenses.create(body, user.id);
   }
 
   @Put(':id')
   @RequirePermission('expenses:edit')
-  async update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto, @Res() res: Response) {
-    try {
-      const r = await this.expenses.update(id, body);
-      if (!r) return res.status(404).json({ message: 'Expense report not found' });
-      return res.json(r);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto) {
+    return this.expenses.update(id, body);
   }
 
   @Patch(':id/approve')
   @RequirePermission('expenses:approve')
-  async approve(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try {
-      const r = await this.expenses.approve(id, user.id, user.role);
-      if (!r) return res.status(404).json({ message: 'Expense report not found' });
-      if ((r as any).forbidden) return res.status(403).json({ message: 'You are not authorized to approve expense reports' });
-      if ((r as any).selfApproval) return res.status(403).json({ message: 'You cannot approve an expense report you created' });
-      return res.json(r);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.expenses.approve(id, user.id, user.role);
   }
 
   @Patch(':id/reject')
   @RequirePermission('expenses:approve')
-  async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    if (!body.reason?.trim()) return res.status(400).json({ message: 'Rejection reason is required' });
-    try {
-      const r = await this.expenses.reject(id, user.id, body.reason.trim(), user.role);
-      if (!r) return res.status(404).json({ message: 'Expense report not found' });
-      if ((r as any).forbidden) return res.status(403).json({ message: 'You are not authorized to reject expense reports' });
-      if ((r as any).selfApproval) return res.status(403).json({ message: 'You cannot reject an expense report you created' });
-      return res.json(r);
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
+    if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
+    return this.expenses.reject(id, user.id, body.reason.trim(), user.role);
   }
 
   @Delete(':id')
+  @HttpCode(204)
   @RequirePermission('expenses:delete')
-  async remove(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const ok = await this.expenses.remove(id);
-      if (!ok) return res.status(404).json({ message: 'Expense report not found' });
-      return res.status(204).end();
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  remove(@Param('id') id: string) {
+    return this.expenses.remove(id);
   }
 }

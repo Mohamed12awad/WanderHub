@@ -1,5 +1,4 @@
-import { Body, Controller, Get, Put, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -12,43 +11,37 @@ export class SettingsController {
 
   @Get('approvals')
   @RequirePermission('settings:view')
-  async getApprovals(@Res() res: Response) {
-    try { return res.json(await this.settings.getApprovals()); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  getApprovals() {
+    return this.settings.getApprovals();
   }
 
   @Put('approvals')
   @RequirePermission('settings:manage')
-  async updateApprovals(@Body() body: { approvals: unknown }, @Res() res: Response) {
-    try { return res.json(await this.settings.updateApprovals(body.approvals)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  updateApprovals(@Body() body: { approvals: unknown }) {
+    return this.settings.updateApprovals(body.approvals);
   }
 
   @Get('workspace')
   @RequirePermission('settings:view')
-  async getWorkspace(@Res() res: Response) {
-    try { return res.json(await this.settings.getWorkspace()); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  getWorkspace() {
+    return this.settings.getWorkspace();
   }
 
   @Put('workspace')
   @RequirePermission('settings:manage')
-  async updateWorkspace(@Body() body: { fieldGroups?: unknown; moduleSettings?: unknown }, @Res() res: Response) {
-    try { return res.json(await this.settings.updateWorkspace(body)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  updateWorkspace(@Body() body: { fieldGroups?: unknown; moduleSettings?: unknown }) {
+    return this.settings.updateWorkspace(body);
   }
 
   @Get('organization')
   @RequirePermission('settings:view')
-  async getOrganization(@Res() res: Response) {
-    try { return res.json(await this.settings.getOrganization()); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  getOrganization() {
+    return this.settings.getOrganization();
   }
 
   @Put('organization')
   @RequirePermission('settings:manage')
-  async updateOrganization(@Body() body: { baseCurrency?: string; locale?: string }, @Res() res: Response) {
-    try { return res.json(await this.settings.updateOrganization(body)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  updateOrganization(@Body() body: { baseCurrency?: string; locale?: string }) {
+    return this.settings.updateOrganization(body);
   }
 }

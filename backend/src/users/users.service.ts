@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
@@ -73,10 +73,10 @@ export class UsersService {
     if (role) {
       const newRole = await this.prisma.role.findUnique({ where: { id: role } });
       if (newRole?.name === 'super admin' && requestingUserRole !== 'super admin') {
-        return { forbidden: true };
+        throw new ForbiddenException('Access denied. Super admin only.');
       }
       if (existing.role.name === 'super admin' && requestingUserRole !== 'super admin') {
-        return { forbidden: true };
+        throw new ForbiddenException('Access denied. Super admin only.');
       }
       data.roleId = role;
     }
@@ -99,7 +99,7 @@ export class UsersService {
   async remove(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!user) return null;
-    if (user.role.name === 'super admin') return { forbidden: true };
+    if (user.role.name === 'super admin') throw new ForbiddenException('Cannot delete super admin');
     await this.prisma.user.delete({ where: { id } });
     return true;
   }

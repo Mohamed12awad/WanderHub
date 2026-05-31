@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
@@ -50,14 +50,14 @@ export class ProductsService {
 
   async update(id: string, body: UpdateProductDto) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('product not found');
     const product = await this.prisma.product.update({ where: { id }, data: body as any });
     return toClient(product);
   }
 
   async remove(id: string) {
     const existing = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('product not found');
     await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }

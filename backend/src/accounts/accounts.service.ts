@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { CreateAccountDto } from './dto/create-account.dto';
@@ -21,7 +21,7 @@ export class AccountsService {
 
   async update(id: string, body: UpdateAccountDto) {
     const existing = await this.prisma.account.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('account not found');
     const { _id, id: _id2, createdAt, updatedAt, ...data } = body as any;
     const account = await this.prisma.account.update({ where: { id }, data: data as any });
     return toClient(account);
@@ -29,7 +29,7 @@ export class AccountsService {
 
   async remove(id: string) {
     const existing = await this.prisma.account.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('account not found');
     await this.prisma.account.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }

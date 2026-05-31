@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -61,26 +61,19 @@ export class AuthService {
 
     // Generic message for both unknown email and wrong password so the
     // endpoint cannot be used to enumerate valid accounts.
-    const invalid = { status: 400, body: { message: 'Invalid email or password' } };
-
-    if (!user) return invalid;
+    if (!user) throw new BadRequestException('Invalid email or password');
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return invalid;
+    if (!isMatch) throw new BadRequestException('Invalid email or password');
 
     // Only reveal the blocked state once the caller has proven they own the
     // account (correct password) — keeps it from leaking via enumeration.
-    if (user.active === false) {
-      return { status: 403, body: { message: 'This account has been blocked' } };
-    }
+    if (user.active === false) throw new ForbiddenException('This account has been blocked');
 
     const token = this.signAccessToken(user.id);
     const refreshToken = await this.issueRefreshToken(user.id);
 
-    return {
-      status: 200,
-      body: { token, refreshToken, user: this.publicUser(user as any) },
-    };
+    return { token, refreshToken, user: this.publicUser(user as any) };
   }
 
   /**

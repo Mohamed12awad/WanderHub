@@ -1,8 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { LeadsService } from './leads.service';
 
 function buildPrisma() {
-  return {
+  const prisma: any = {
     lead: {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
@@ -14,7 +14,10 @@ function buildPrisma() {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(),
     },
-  } as any;
+  };
+  // Simulate $transaction by passing the prisma client as the tx argument
+  prisma.$transaction = jest.fn().mockImplementation((fn: (tx: any) => Promise<any>) => fn(prisma));
+  return prisma;
 }
 
 const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
@@ -104,13 +107,12 @@ describe('LeadsService.convertToCustomer', () => {
     await expect(svc.convertToCustomer('lead-1', 'user-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('returns null when the lead does not exist', async () => {
+  it('throws NotFoundException when the lead does not exist', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null);
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
 
-    const result = await svc.convertToCustomer('lead-1', 'user-1');
-    expect(result).toBeNull();
+    await expect(svc.convertToCustomer('lead-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates a customer, marks the lead converted, and logs a timeline event', async () => {
@@ -130,12 +132,12 @@ describe('LeadsService.convertToCustomer', () => {
 });
 
 describe('LeadsService.remove', () => {
-  it('returns null when lead is not found', async () => {
+  it('throws NotFoundException when lead is not found', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null);
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
 
-    expect(await svc.remove('lead-missing')).toBeNull();
+    await expect(svc.remove('lead-missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('soft-deletes the lead and returns true', async () => {

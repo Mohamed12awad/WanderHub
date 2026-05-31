@@ -1,3 +1,4 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -27,35 +28,30 @@ const roleUser = {
 };
 
 describe('AuthService.signin', () => {
-  it('returns a generic 400 for an unknown email (no enumeration)', async () => {
+  it('throws BadRequestException for an unknown email (no enumeration)', async () => {
     const prisma = buildPrisma();
     prisma.user.findUnique.mockResolvedValue(null);
     const svc = new AuthService(prisma, jwtMock);
 
-    const res: any = await svc.signin('nobody@x.com', 'pw');
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Invalid email or password');
+    await expect(svc.signin('nobody@x.com', 'pw')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('returns the same generic 400 for a wrong password', async () => {
+  it('throws BadRequestException for a wrong password', async () => {
     const prisma = buildPrisma();
     prisma.user.findUnique.mockResolvedValue(roleUser);
     (bcrypt.compare as jest.Mock).mockResolvedValue(false);
     const svc = new AuthService(prisma, jwtMock);
 
-    const res: any = await svc.signin('a@b.com', 'wrong');
-    expect(res.status).toBe(400);
-    expect(res.body.message).toBe('Invalid email or password');
+    await expect(svc.signin('a@b.com', 'wrong')).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('blocks an inactive account only after the password checks out', async () => {
+  it('throws ForbiddenException for a blocked account only after the password checks out', async () => {
     const prisma = buildPrisma();
     prisma.user.findUnique.mockResolvedValue({ ...roleUser, active: false });
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
     const svc = new AuthService(prisma, jwtMock);
 
-    const res: any = await svc.signin('a@b.com', 'pw');
-    expect(res.status).toBe(403);
+    await expect(svc.signin('a@b.com', 'pw')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('issues an access token and a stored refresh token on success', async () => {
@@ -65,14 +61,13 @@ describe('AuthService.signin', () => {
     const svc = new AuthService(prisma, jwtMock);
 
     const res: any = await svc.signin('a@b.com', 'pw');
-    expect(res.status).toBe(200);
-    expect(res.body.token).toBe('access.jwt.token');
-    expect(typeof res.body.refreshToken).toBe('string');
-    expect(res.body.refreshToken.length).toBeGreaterThan(20);
-    expect(res.body.user).toMatchObject({ id: 'u1', role: 'sales' });
+    expect(res.token).toBe('access.jwt.token');
+    expect(typeof res.refreshToken).toBe('string');
+    expect(res.refreshToken.length).toBeGreaterThan(20);
+    expect(res.user).toMatchObject({ id: 'u1', role: 'sales' });
     // The raw token is never persisted — only a hash.
     expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-    expect(prisma.refreshToken.create.mock.calls[0][0].data.tokenHash).not.toBe(res.body.refreshToken);
+    expect(prisma.refreshToken.create.mock.calls[0][0].data.tokenHash).not.toBe(res.refreshToken);
   });
 });
 

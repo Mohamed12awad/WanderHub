@@ -25,14 +25,16 @@ export interface Totals {
  * applied to the line's gross; `taxRate` is a percentage applied to the
  * subtotal.
  */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function calcTotals(items: RawLineItem[], taxRate = 0): Totals {
   const computed = items.map((i) => {
     const disc = (i.discount ?? 0) / 100;
-    return { ...i, discount: i.discount ?? 0, total: i.quantity * i.unitPrice * (1 - disc) };
+    return { ...i, discount: i.discount ?? 0, total: round2(i.quantity * i.unitPrice * (1 - disc)) };
   });
-  const subtotal = computed.reduce((s, i) => s + i.total, 0);
-  const tax = subtotal * (taxRate / 100);
-  return { items: computed, subtotal, tax, total: subtotal + tax };
+  const subtotal = round2(computed.reduce((s, i) => s + i.total, 0));
+  const tax = round2(subtotal * (taxRate / 100));
+  return { items: computed, subtotal, tax, total: round2(subtotal + tax) };
 }
 
 export type InvoiceStatus =

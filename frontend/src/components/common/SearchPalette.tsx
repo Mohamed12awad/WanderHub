@@ -31,7 +31,7 @@ interface SearchResults {
   customers: { _id: string; name: string; email?: string; phone?: string }[];
   deals:     { _id: string; title: string; customer?: { name: string }; status: string }[];
   products:  { _id: string; name: string; type?: string }[];
-  expenses:  { _id: string; title: string; approved: boolean }[];
+  expenses:  { _id: string; title: string; approvalStatus: "pending" | "approved" | "rejected" }[];
   invoices:  { _id: string; invoiceNumber: string; title: string; status: string }[];
 }
 
@@ -175,7 +175,7 @@ export function SearchPalette() {
                     <CommandItem key={e._id} value={e._id} onSelect={() => go(`/expenses/${e._id}`)}>
                       <Banknote className="me-2 h-4 w-4 text-muted-foreground" />
                       <span>{e.title}</span>
-                      <span className="ms-2 text-xs text-muted-foreground">{e.approved ? "Approved" : "Pending"}</span>
+                      <span className="ms-2 text-xs text-muted-foreground">{e.approvalStatus === "approved" ? "Approved" : e.approvalStatus === "rejected" ? "Rejected" : "Pending"}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>

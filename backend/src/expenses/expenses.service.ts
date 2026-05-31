@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -27,7 +27,7 @@ export class ExpensesService {
   }
 
   async findAll(query: Record<string, string>) {
-    const { page, limit: limitRaw, q, approved, createdAt_from, createdAt_to } = query;
+    const { page, limit: limitRaw, q, approvalStatus, createdAt_from, createdAt_to } = query;
     const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
       const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' } });
@@ -37,7 +37,7 @@ export class ExpensesService {
     const limit = Math.min(100, parseInt(limitRaw) || 25);
     const where: any = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
-    if (approved !== undefined && approved !== '') where.approved = approved === 'true';
+    if (approvalStatus !== undefined && approvalStatus !== '') where.approvalStatus = approvalStatus;
     if (createdAt_from || createdAt_to) {
       where.createdAt = {};
       if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
@@ -68,7 +68,6 @@ export class ExpensesService {
         title,
         userId,
         approvalStatus: enabled ? 'pending' : 'approved',
-        approved: !enabled,
         expenses: {
           create: (expenses ?? []).map((e: any) => ({
             description: e.description,
@@ -88,11 +87,12 @@ export class ExpensesService {
 
   async update(id: string, body: UpdateExpenseReportDto) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('expense report not found');
     const { expenses, ...rest } = body;
     // Replace expense items entirely if provided
     const data: any = { ...rest };
-    if (existing.approvalStatus === 'rejected') { data.approvalStatus = 'pending'; data.approved = false; }
+    if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
+    if (expenses && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
     if (expenses) {
       await this.prisma.expenseItem.deleteMany({ where: { expenseReportId: id } });
       data.expenses = {
@@ -115,14 +115,15 @@ export class ExpensesService {
 
   async approve(id: string, userId: string, userRole: string) {
     const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
-    if (!report) return null;
+    if (!report) throw new NotFoundException('expense report not found');
+    if (report.approvalStatus === 'approved') return toClient(report);
     const { approverRoles } = await this.getApprovalConfig('expenses');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve expense reports');
     // Separation of duties: the report owner cannot approve their own report.
-    if (report.userId === userId) return { selfApproval: true };
+    if (report.userId === userId) throw new ForbiddenException('You cannot approve an expense report you created');
     const updated = await this.prisma.expenseReport.update({
       where: { id },
-      data: { approvalStatus: 'approved', approved: true, approvedById: userId, approvedAt: new Date(), rejectionReason: null },
+      data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
     await this.timeline.log('expense.approved', `Expense report "${report.title}" approved`, id, 'Expense', {}, userId);
@@ -131,13 +132,14 @@ export class ExpensesService {
 
   async reject(id: string, userId: string, reason: string, userRole: string) {
     const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
-    if (!report) return null;
+    if (!report) throw new NotFoundException('expense report not found');
+    if (report.approvalStatus === 'rejected') return toClient(report);
     const { approverRoles } = await this.getApprovalConfig('expenses');
-    if (!this.canUserApprove(approverRoles, userRole)) return { forbidden: true };
-    if (report.userId === userId) return { selfApproval: true };
+    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject expense reports');
+    if (report.userId === userId) throw new ForbiddenException('You cannot reject an expense report you created');
     const updated = await this.prisma.expenseReport.update({
       where: { id },
-      data: { approvalStatus: 'rejected', approved: false, approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+      data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
     await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
@@ -146,7 +148,7 @@ export class ExpensesService {
 
   async remove(id: string) {
     const existing = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('expense report not found');
     await this.prisma.expenseReport.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }

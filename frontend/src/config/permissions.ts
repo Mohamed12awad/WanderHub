@@ -10,6 +10,8 @@ export const PERMISSION_REGISTRY = {
   roles:    ["view", "manage"],
   settings: ["view", "manage"],
   logs:     ["view"],
+  procurement: ["view", "create", "edit", "delete", "approve"],
+  projects: ["view", "create", "edit", "delete"],
 } as const;
 
 export type Resource = keyof typeof PERMISSION_REGISTRY;

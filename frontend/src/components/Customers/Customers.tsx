@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { GenericTable } from "@/components/common/GenericTable";
 import CustomerRow from "./customerRow";
 import { deleteCustomer, getCustomers } from "@/utils/api";
@@ -13,45 +14,42 @@ type Customer = {
   createdAt: string;
 };
 
-const CUSTOMER_FILTERS = [
-  { label: "Gender", field: "gender", type: "select" as const, options: [
-    { value: "male", label: "Male" },
-    { value: "female", label: "Female" },
-    { value: "other", label: "Other" },
-  ]},
-  { label: "Phone", field: "phone", type: "text" as const },
-  { label: "Created Date", field: "createdAt", type: "date-range" as const },
-];
-
 export function Customers() {
   const { tr } = useLanguage();
   const c = tr.contacts;
 
+  const CUSTOMER_FILTERS = useMemo(() => [
+    {
+      label: c.filters.gender,
+      field: "gender",
+      type: "select" as const,
+      options: [
+        { value: "male",   label: c.filters.male },
+        { value: "female", label: c.filters.female },
+        { value: "other",  label: c.filters.other },
+      ],
+    },
+    { label: c.filters.phone,       field: "phone",     type: "text" as const },
+    { label: c.filters.createdDate, field: "createdAt", type: "date-range" as const },
+  ], [c]);
+
   return (
     <GenericTable<Customer>
       queryKey="customers"
-      fetchData={({ page, limit, q, filters, sort, dir }) => getCustomers({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
+      fetchData={({ page, limit, q, filters, sort, dir }) =>
+        getCustomers({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })
+      }
       deleteData={deleteCustomer}
       headers={c.headers}
       sortableHeaders={["Name", "Created"]}
       quickStatusFilter={{
         field: "status",
-        options: [
-          { value: "active",   label: "Active" },
-          { value: "inactive", label: "Inactive" },
-          { value: "lead",     label: "Lead" },
-          { value: "prospect", label: "Prospect" },
-        ],
+        options: Object.entries(c.statuses).map(([value, label]) => ({ value, label })),
       }}
       renderRow={(item, handleDelete) => (
         <CustomerRow
           key={item._id}
-          id={item._id}
-          name={item.name}
-          status={item.status}
-          phone={item.phone}
-          location={item.location}
-          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          item={item}
           handleDelete={handleDelete}
         />
       )}

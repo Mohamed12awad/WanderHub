@@ -1,43 +1,37 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../auth/guards/permission.guard';
+import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 
 @Controller('activities')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('activities:view')
 export class ActivitiesController {
   constructor(private readonly activities: ActivitiesService) {}
 
   @Get()
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
-    try { return res.json(await this.activities.findAll(query)); }
-    catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  findAll(@Query() query: Record<string, string>) {
+    return this.activities.findAll(query);
   }
 
   @Post()
-  async create(@Body() body: CreateActivityDto, @CurrentUser() user: AuthUser, @Res() res: Response) {
-    try { return res.status(201).json(await this.activities.create(body, user.id)); }
-    catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  @HttpCode(201)
+  create(@Body() body: CreateActivityDto, @CurrentUser() user: AuthUser) {
+    return this.activities.create(body, user.id);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() body: UpdateActivityDto, @Res() res: Response) {
-    try {
-      const a = await this.activities.update(id, body);
-      if (!a) return res.status(404).json({ message: 'Activity not found' });
-      return res.json(a);
-    } catch (e) { return res.status(400).json({ message: (e as Error).message }); }
+  update(@Param('id') id: string, @Body() body: UpdateActivityDto) {
+    return this.activities.update(id, body);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string, @Res() res: Response) {
-    try {
-      const ok = await this.activities.remove(id);
-      if (!ok) return res.status(404).json({ message: 'Activity not found' });
-      return res.json({ message: 'Activity deleted' });
-    } catch (e) { return res.status(500).json({ message: (e as Error).message }); }
+  @HttpCode(204)
+  remove(@Param('id') id: string) {
+    return this.activities.remove(id);
   }
 }

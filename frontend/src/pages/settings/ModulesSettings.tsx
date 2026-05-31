@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   Users2, Handshake, KanbanSquare, CalendarDays,
   CheckSquare, Package, Banknote, WalletCards, Receipt, UserSearch,
+  ShoppingCart, Briefcase,
 } from "lucide-react";
 
 interface ModuleInfo {
@@ -62,6 +63,16 @@ const MODULE_INFO: Record<ModuleKey, ModuleInfo> = {
     icon: WalletCards,
     label: (tr) => tr.nav.reports,
     description: "Financial and sales reports with date range filters.",
+  },
+  procurement: {
+    icon: ShoppingCart,
+    label: (tr) => tr.nav.procurement || "Procurement",
+    description: "Manage suppliers, purchase orders and vendor bills.",
+  },
+  projects: {
+    icon: Briefcase,
+    label: (tr) => tr.nav.projects || "Projects",
+    description: "Track project milestones, tasks, members, and budgets.",
   },
 };
 

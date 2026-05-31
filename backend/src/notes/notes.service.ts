@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -57,7 +57,7 @@ export class NotesService {
     const canModify = requestingUserId === note.createdById ||
       requestingPermissions.includes('*') ||
       requestingUserRole === 'admin';
-    if (!canModify) return { forbidden: true };
+    if (!canModify) throw new ForbiddenException('You can only edit your own notes');
     const updated = await this.prisma.note.update({
       where: { id },
       data: { content },
@@ -72,7 +72,7 @@ export class NotesService {
     const canModify = requestingUserId === note.createdById ||
       requestingPermissions.includes('*') ||
       requestingUserRole === 'admin';
-    if (!canModify) return { forbidden: true };
+    if (!canModify) throw new ForbiddenException('You can only delete your own notes');
     await this.prisma.note.delete({ where: { id } });
     return true;
   }

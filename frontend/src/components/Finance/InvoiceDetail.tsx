@@ -61,7 +61,8 @@ const InvoiceDetail: React.FC = () => {
   const isPending = approvalStatus === "pending";
   const isRejected = approvalStatus === "rejected";
   const canEdit = isAdmin || !approvalEnabled || isRejected;
-  const canRecordPayment = isAdmin || !approvalEnabled || approvalStatus === "approved";
+  const isPaid = outstanding <= 0;
+  const canRecordPayment = !isPaid && (isAdmin || !approvalEnabled || approvalStatus === "approved");
   const userCanApprove = canUserApprove("invoices", user!.role);
 
   const handleApprove = async () => {
@@ -164,13 +165,16 @@ const InvoiceDetail: React.FC = () => {
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
-            <RecordPaymentDialog
-              invoiceId={id!}
-              currency={invoice.currency}
-              disabled={!canRecordPayment}
-              disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
-              onSuccess={() => queryClient.invalidateQueries(["invoices", id])}
-            />
+            {!isPaid && (
+              <RecordPaymentDialog
+                invoiceId={id!}
+                currency={invoice.currency}
+                outstanding={Math.max(0, outstanding)}
+                disabled={!canRecordPayment}
+                disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
+                onSuccess={() => queryClient.invalidateQueries(["invoices", id])}
+              />
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 w-8 p-0">

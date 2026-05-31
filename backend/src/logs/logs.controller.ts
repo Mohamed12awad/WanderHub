@@ -1,5 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -12,11 +11,7 @@ export class LogsController {
 
   @Get()
   @RequirePermission('logs:view')
-  async findAll(@Query() query: Record<string, string>, @Res() res: Response) {
-    try {
-      return res.json(await this.logs.findAll(query));
-    } catch (e) {
-      return res.status(500).json({ error: (e as Error).message });
-    }
+  findAll(@Query() query: Record<string, string>) {
+    return this.logs.findAll(query);
   }
 }

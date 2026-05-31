@@ -73,7 +73,7 @@ const EditExpenseReport: React.FC = () => {
     if (!validate()) return;
     try {
       setIsLoading(true);
-      await updateExpense(expenseId!, { title: title.trim(), userId: "", expenses: lines, approved: false });
+      await updateExpense(expenseId!, { title: title.trim(), userId: "", expenses: lines });
       navigate("/expenses");
     } catch (error) {
       setIsLoading(false);
