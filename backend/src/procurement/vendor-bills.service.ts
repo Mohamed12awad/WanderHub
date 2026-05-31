@@ -43,7 +43,7 @@ export class VendorBillsService {
 
   private canApprove(approverRoles: string[], userRole: string) {
     if (['admin', 'super admin'].includes(userRole)) return true;
-    return !approverRoles.length || approverRoles.includes(userRole);
+    return approverRoles.length > 0 && approverRoles.includes(userRole);
   }
 
   private cleanData(body: Record<string, any>) {
@@ -243,6 +243,49 @@ export class VendorBillsService {
     });
 
     return true;
+  }
+
+  /** Creates a Vendor Bill pre-filled from a Purchase Order's items and totals. */
+  async createFromPO(poId: string, userId: string) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id: poId, deletedAt: null },
+      include: { items: { orderBy: { order: 'asc' } } },
+    });
+    if (!po) throw new BadRequestException('Purchase order not found');
+    if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before creating a bill');
+
+    const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
+    const { enabled } = await this.getApprovalConfig();
+
+    const bill = await this.prisma.vendorBill.create({
+      data: {
+        billNumber,
+        title: `Bill for ${po.title}`,
+        supplierId: po.supplierId,
+        purchaseOrderId: po.id,
+        currency: po.currency ?? 'EGP',
+        taxRate: po.taxRate,
+        subtotal: po.subtotal,
+        tax: po.tax,
+        total: po.total,
+        approvalStatus: enabled ? 'pending' : 'approved',
+        createdById: userId,
+        items: {
+          create: po.items.map((it, idx) => ({
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            discount: it.discount,
+            total: it.total,
+            order: idx,
+          })),
+        },
+      } as any,
+      include: BILL_INCLUDE,
+    });
+
+    await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created from PO`, bill.id, 'VendorBill', { poId }, userId);
+    return toClient(bill);
   }
 
   async remove(id: string) {

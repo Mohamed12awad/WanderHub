@@ -3,8 +3,13 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import {
   getPurchaseOrderById, approvePurchaseOrder, rejectPurchaseOrder,
-  updatePurchaseOrderStatus, deletePurchaseOrder,
+  updatePurchaseOrderStatus, deletePurchaseOrder, createBillFromPO,
+  getNotes, getActivities,
 } from "@/utils/api";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { NotesPanel } from "@/components/common/NotesPanel";
+import { ActivityList } from "@/components/Activities/ActivityList";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -39,6 +44,11 @@ export default function ViewPurchaseOrder() {
   const { data, isLoading } = useQuery(["purchase-order", id], () => getPurchaseOrderById(id!), { enabled: !!id });
   const po = data?.data;
 
+  const { data: notesData }      = useQuery(["notes", id, "PurchaseOrder"],      () => getNotes({ linkedTo: id!, linkedModel: "PurchaseOrder" }),      { enabled: !!id });
+  const { data: activitiesData } = useQuery(["activities", id],                  () => getActivities(id!, "PurchaseOrder"),                           { enabled: !!id });
+  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
+
   const refresh = () => queryClient.invalidateQueries(["purchase-order", id]);
 
   const canApprove = ["admin", "super admin", "manager"].includes(user?.role ?? "");
@@ -47,6 +57,7 @@ export default function ViewPurchaseOrder() {
 
   const statusMutation = useMutation((status: string) => updatePurchaseOrderStatus(id!, status), {
     onSuccess: () => { refresh(); toast({ title: "Status updated" }); },
+    onError: () => { toast({ title: "Failed to update status.", variant: "destructive" }); },
   });
 
   const handleApprove = async () => {
@@ -120,10 +131,19 @@ export default function ViewPurchaseOrder() {
                 {transition.label}
               </Button>
             )}
-            {po.status === "received" && (
-              <Link to={`/procurement/bills/new?po=${po._id}`}>
-                <Button size="sm" variant="outline" className="gap-1"><Receipt className="h-3.5 w-3.5" />Create Bill</Button>
-              </Link>
+            {po.status === "received" && po.approvalStatus === "approved" && (
+              <Button size="sm" variant="outline" className="gap-1" disabled={busy} onClick={async () => {
+                setBusy(true);
+                try {
+                  const res = await createBillFromPO(id!);
+                  toast({ title: "Vendor bill created from PO." });
+                  navigate(`/procurement/bills/${res.data._id}`);
+                } catch (e: any) {
+                  toast({ title: e?.response?.data?.message ?? "Failed to create bill.", variant: "destructive" });
+                } finally { setBusy(false); }
+              }}>
+                <Receipt className="h-3.5 w-3.5" />Create Bill
+              </Button>
             )}
             <Link to={`/procurement/purchase-orders/${id}/edit`}>
               <Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button>
@@ -171,6 +191,27 @@ export default function ViewPurchaseOrder() {
       </Card>
 
       {po.notes && <Card><CardContent className="pt-4 text-sm"><span className="text-muted-foreground">Notes: </span>{po.notes}</CardContent></Card>}
+
+      <Card>
+        <CardContent className="py-5">
+          <Tabs defaultValue="timeline">
+            <TabsList className="mb-4 flex-wrap h-auto">
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
+              <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="timeline">
+              <RecordTimeline linkedTo={id!} linkedModel="PurchaseOrder" />
+            </TabsContent>
+            <TabsContent value="notes">
+              <NotesPanel linkedTo={id!} linkedModel="PurchaseOrder" />
+            </TabsContent>
+            <TabsContent value="activities">
+              <ActivityList linkedTo={id!} linkedModel="PurchaseOrder" />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </main>
   );
 }

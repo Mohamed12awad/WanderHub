@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
-import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote } from "@/utils/api";
+import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote, getActivities } from "@/utils/api";
+import { ActivityList } from "@/components/Activities/ActivityList";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -48,6 +49,8 @@ const QuoteDetail: React.FC = () => {
   const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
   const { data, isLoading } = useQuery(["quotes", id], () => getQuoteById(id!));
   const quote: Quote | undefined = data?.data;
+  const { data: activitiesData } = useQuery(["activities", id], () => getActivities(id!, "Quote"), { enabled: !!id });
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <LoadingSpinner loading />;
   if (!quote) return <div className="p-4">Quote not found.</div>;
@@ -317,12 +320,16 @@ const QuoteDetail: React.FC = () => {
             <TabsList className="mb-4">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={id!} linkedModel="Quote" />
             </TabsContent>
             <TabsContent value="notes">
               <NotesPanel linkedTo={id!} linkedModel="Quote" />
+            </TabsContent>
+            <TabsContent value="activities">
+              <ActivityList linkedTo={id!} linkedModel="Quote" />
             </TabsContent>
           </Tabs>
         </CardContent>

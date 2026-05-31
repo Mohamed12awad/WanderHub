@@ -34,6 +34,7 @@ const Pipeline         = lazy(() => import("@/components/Pipeline/Pipeline").the
 const Logs             = lazy(() => import("@/components/Logs/Logs").then((m) => ({ default: m.Logs })));
 const Roles            = lazy(() => import("@/components/Roles/Roles").then((m) => ({ default: m.Roles })));
 const ActivityCalendar = lazy(() => import("@/components/Activities/ActivityCalendar").then((m) => ({ default: m.ActivityCalendar })));
+const ActivitiesPage   = lazy(() => import("@/pages/ActivitiesPage").then((m) => ({ default: m.ActivitiesPage })));
 const Tasks            = lazy(() => import("@/pages/Tasks").then((m) => ({ default: m.Tasks })));
 const Settings         = lazy(() => import("@/pages/Settings"));
 const QuotesPage       = lazy(() => import("@/pages/Finance").then((m) => ({ default: m.QuotesPage })));
@@ -102,6 +103,7 @@ const AppRoutes = () => (
       <Route path="/reports"                      element={<Reports />} />
       <Route path="/pipeline"                     element={<Pipeline />} />
       <Route path="/calendar"                     element={<ActivityCalendar />} />
+      <Route path="/activities"                   element={<ActivitiesPage />} />
       <Route path="/tasks"                        element={<Tasks />} />
       <Route path="/logs"                         element={<Logs />} />
       <Route path="/roles"                        element={<Roles />} />

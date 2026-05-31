@@ -32,7 +32,8 @@ export class PurchaseOrdersService {
 
   private canApprove(approverRoles: string[], userRole: string) {
     if (['admin', 'super admin'].includes(userRole)) return true;
-    return !approverRoles.length || approverRoles.includes(userRole);
+    // Empty approverRoles means admins-only; don't let anyone through.
+    return approverRoles.length > 0 && approverRoles.includes(userRole);
   }
 
   private cleanData(body: Record<string, any>) {
@@ -146,11 +147,19 @@ export class PurchaseOrdersService {
     if (!po) return null;
     if (po.approvalStatus === 'approved') return toClient(po);
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
-    if (enabled && po.createdById === userId) throw new BadRequestException('Cannot approve your own PO');
+    // Separation-of-duties is always enforced regardless of the approval-enabled toggle.
+    if (po.createdById === userId) throw new BadRequestException('Cannot approve your own PO');
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },
-      data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
+      data: {
+        approvalStatus: 'approved',
+        approvedById: userId,
+        approvedAt: new Date(),
+        rejectionReason: null,
+        // Advance the workflow status in line with vendor-bills behaviour.
+        status: po.status === 'draft' ? 'sent' : po.status,
+      },
       include: PO_INCLUDE,
     });
     await this.timeline.log('po.approved', 'Purchase Order approved', id, 'PurchaseOrder', {}, userId);

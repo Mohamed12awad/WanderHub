@@ -17,8 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { InvoiceStatus } from "@/types/types";
 import { useOrgSettings } from "@/hooks/useOrgSettings";
-
-const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
+import { CURRENCIES } from "@/utils/constants";
 
 async function fetchExchangeRate(baseCurrency: string, toCurrency: string): Promise<number | null> {
   try {

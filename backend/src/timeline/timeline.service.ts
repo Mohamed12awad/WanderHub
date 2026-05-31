@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class TimelineService {
+  private readonly logger = new Logger(TimelineService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -13,7 +15,7 @@ export class TimelineService {
     eventType: string,
     title: string,
     linkedTo: string,
-    linkedModel: 'Customer' | 'Deal' | 'Quote' | 'Invoice' | 'Expense' | 'Product' | 'Task' | 'PurchaseOrder' | 'VendorBill' | 'Project',
+    linkedModel: 'Customer' | 'Deal' | 'Quote' | 'Invoice' | 'Expense' | 'Product' | 'Task' | 'PurchaseOrder' | 'VendorBill' | 'Project' | 'Lead' | 'Supplier',
     payload?: Record<string, unknown>,
     triggeredBy?: string,
   ): Promise<void> {
@@ -33,7 +35,7 @@ export class TimelineService {
         },
       });
     } catch (err) {
-      console.error('[TimelineService] Failed to log event:', err);
+      this.logger.error({ err }, 'Failed to log timeline event');
     }
   }
 }

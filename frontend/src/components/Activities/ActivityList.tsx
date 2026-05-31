@@ -1,59 +1,63 @@
-import React from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { getActivities, updateActivity, deleteActivity } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
 import { format } from "date-fns";
-import { Check, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ActivityDialog } from "./ActivityDialog";
+import { ActivityDetailDialog } from "./ActivityDetailDialog";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ActivityListProps {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote";
 }
 
 const TYPE_ICONS: Record<ActivityType, string> = {
-  call: "📞",
-  meeting: "🤝",
-  task: "✅",
-  note: "📝",
-  email: "📧",
+  call: "📞", meeting: "🤝", task: "✅", note: "📝", email: "📧",
 };
 
-const TYPE_COLORS: Record<ActivityType, string> = {
-  call: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  meeting: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  task: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  note: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400",
-  email: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+const TYPE_BORDER: Record<ActivityType, string> = {
+  call:    "border-l-blue-400",
+  meeting: "border-l-purple-400",
+  task:    "border-l-yellow-400",
+  note:    "border-l-slate-300",
+  email:   "border-l-emerald-400",
 };
 
-export const ActivityList: React.FC<ActivityListProps> = ({
-  linkedTo,
-  linkedModel,
-}) => {
+export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedModel }) => {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [detail, setDetail]     = useState<Activity | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { data, isLoading } = useQuery(
     ["activities", linkedTo],
     () => getActivities(linkedTo, linkedModel),
-    { enabled: !!linkedTo }
+    { enabled: !!linkedTo },
   );
 
   const toggleMutation = useMutation(
-    (activity: Activity) =>
-      updateActivity(activity._id, {
-        status: activity.status === "completed" ? "pending" : "completed",
-      }),
-    { onSuccess: () => queryClient.invalidateQueries(["activities", linkedTo]) }
+    (activity: Activity) => updateActivity(activity._id, {
+      status: activity.status === "completed" ? "pending" : "completed",
+    } as any),
+    {
+      onSuccess: () => queryClient.invalidateQueries(["activities", linkedTo]),
+      onError:   () => { toast({ title: "Failed to update.", variant: "destructive" }); },
+    },
   );
 
   const deleteMutation = useMutation(deleteActivity, {
     onSuccess: () => queryClient.invalidateQueries(["activities", linkedTo]),
+    onError:   () => { toast({ title: "Failed to delete.", variant: "destructive" }); },
   });
 
   const activities: Activity[] = data?.data ?? [];
+
+  const openDetail = (a: Activity) => { setDetail(a); setDetailOpen(true); };
 
   return (
     <div className="mt-6">
@@ -62,9 +66,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         <ActivityDialog linkedTo={linkedTo} linkedModel={linkedModel} />
       </div>
 
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading activities...</p>
-      )}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading activities…</p>}
 
       {!isLoading && activities.length === 0 && (
         <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
@@ -76,73 +78,84 @@ export const ActivityList: React.FC<ActivityListProps> = ({
         {activities.map((activity) => (
           <li
             key={activity._id}
-            className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-              activity.status === "completed"
-                ? "bg-muted/50 opacity-70"
-                : "bg-background"
-            }`}
+            className={cn(
+              "flex items-start gap-0 border-l-4 rounded-r-lg border rounded-lg transition-colors cursor-pointer hover:bg-muted/30",
+              TYPE_BORDER[activity.type] ?? "border-l-slate-300",
+              activity.status === "completed" && "opacity-70",
+            )}
+            onClick={() => openDetail(activity)}
+            title="Click to view / edit"
           >
-            <span className="text-xl mt-0.5 flex-shrink-0">
-              {TYPE_ICONS[activity.type]}
-            </span>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 p-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <span
-                  className={`font-medium text-sm ${
-                    activity.status === "completed" ? "line-through text-muted-foreground" : ""
-                  }`}
-                >
+                <span className="text-xl shrink-0">{TYPE_ICONS[activity.type]}</span>
+                <span className={cn(
+                  "font-medium text-sm",
+                  activity.status === "completed" && "line-through text-muted-foreground",
+                )}>
                   {activity.title}
                 </span>
                 <Badge
                   variant="outline"
-                  className={`text-xs capitalize ${TYPE_COLORS[activity.type]}`}
+                  className={cn(
+                    "text-[10px] capitalize",
+                    activity.status === "completed"
+                      ? "border-emerald-500 text-emerald-600"
+                      : "border-amber-500 text-amber-600",
+                  )}
                 >
-                  {activity.type}
+                  {activity.status}
                 </Badge>
               </div>
               {activity.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {activity.description}
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{activity.description}</p>
               )}
               <p className="text-xs text-muted-foreground mt-0.5">
                 {format(new Date(activity.date), "dd MMM yyyy")}
                 {activity.createdBy && ` · by ${activity.createdBy.name}`}
               </p>
             </div>
-            <div className="flex gap-1 flex-shrink-0">
+
+            {/* Quick-action column */}
+            <div className="flex flex-col gap-0.5 p-2 shrink-0" onClick={(e) => e.stopPropagation()}>
               <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                title={
-                  activity.status === "completed"
-                    ? "Mark as pending"
-                    : "Mark as done"
-                }
+                size="icon" variant="ghost" className={cn("h-7 w-7", activity.status === "completed" && "text-emerald-600")}
+                title={activity.status === "completed" ? "Mark as pending" : "Mark as done"}
                 onClick={() => toggleMutation.mutate(activity)}
               >
-                <Check
-                  className={`h-4 w-4 ${
-                    activity.status === "completed"
-                      ? "text-green-500"
-                      : "text-muted-foreground"
-                  }`}
-                />
+                {activity.status === "completed"
+                  ? <CheckCircle2 className="h-4 w-4" />
+                  : <Circle className="h-4 w-4 text-muted-foreground" />}
               </Button>
               <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7 text-destructive hover:text-destructive"
-                onClick={() => deleteMutation.mutate(activity._id)}
+                size="icon" variant="ghost" className="h-7 w-7"
+                title="Edit"
+                onClick={() => openDetail(activity)}
               >
-                <Trash2 className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+              <Button
+                size="icon" variant="ghost"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                title="Delete"
+                onClick={() => { if (confirm("Delete this activity?")) deleteMutation.mutate(activity._id); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           </li>
         ))}
       </ul>
+
+      <ActivityDetailDialog
+        activity={detail}
+        open={detailOpen}
+        onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetail(null); }}
+        invalidateKeys={[`activities-${linkedTo}`]}
+      />
     </div>
   );
 };
+
+// needed for TSX without explicit import
+import React from "react";

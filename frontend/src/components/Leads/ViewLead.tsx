@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "react-query";
-import { getLeadById, convertLead, deleteLead } from "@/utils/api";
+import { getLeadById, convertLead, deleteLead, getNotes, getActivities } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,12 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, ArrowRightCircle, Edit, MoreHorizontal, Trash2, Flame, Thermometer, Snowflake } from "lucide-react";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { NotesPanel } from "@/components/common/NotesPanel";
+import { ActivityList } from "@/components/Activities/ActivityList";
 
 const STATUS_COLORS: Record<string, string> = {
   new:         "bg-sky-500     text-white border-sky-500     dark:bg-sky-600     dark:border-sky-600",
@@ -57,6 +61,11 @@ export function ViewLead() {
 
   const { data, isLoading, isError } = useQuery(["lead", id], () => getLeadById(id!), { enabled: !!id });
   const lead = data?.data;
+
+  const { data: notesData }      = useQuery(["notes", id, "Lead"],      () => getNotes({ linkedTo: id!, linkedModel: "Lead" }),      { enabled: !!id });
+  const { data: activitiesData } = useQuery(["activities", id],         () => getActivities(id!, "Lead"),                           { enabled: !!id });
+  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   const handleConvert = async () => {
     if (!id) return;
@@ -225,6 +234,29 @@ export function ViewLead() {
           </div>
         </CardContent>
       </Card>
+
+      {id && (
+        <Card>
+          <CardContent className="py-5">
+            <Tabs defaultValue="timeline">
+              <TabsList className="mb-4 flex-wrap h-auto">
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
+                <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="timeline">
+                <RecordTimeline linkedTo={id} linkedModel="Lead" />
+              </TabsContent>
+              <TabsContent value="notes">
+                <NotesPanel linkedTo={id} linkedModel="Lead" />
+              </TabsContent>
+              <TabsContent value="activities">
+                <ActivityList linkedTo={id} linkedModel="Lead" />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={confirmOpen}

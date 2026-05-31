@@ -39,7 +39,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   try {
     // Bare axios (no interceptors) so a 401 here can't recurse.
-    const resp = await axios.post(`${import.meta.env.VITE_API_URL}auth/refresh`, { refreshToken });
+    const resp = await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, { refreshToken });
     const { token, refreshToken: rotated, user } = resp.data;
     localStorage.setItem("token", token);
     if (rotated) localStorage.setItem("refreshToken", rotated);
@@ -168,7 +168,7 @@ export const deleteExpenseReportItem = (
 ): Promise<void> => api.delete(`/expenses/${id}/expense/${expenseId}`);
 
 // Activities API Requests
-export const getActivities = (linkedTo: string, linkedModel: "Customer" | "Deal") =>
+export const getActivities = (linkedTo: string, linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote") =>
   api.get("/activities", { params: { linkedTo, linkedModel } });
 export const getAllActivities = (params?: { month?: number; year?: number }) =>
   api.get("/activities", { params });
@@ -254,6 +254,7 @@ export const updateInvoice = (id: string, data: Partial<InvoiceFormData>) =>
 export const deleteInvoice = (id: string): Promise<void> => api.delete(`/finance/invoices/${id}`);
 export const approveInvoice = (id: string) => api.patch(`/finance/invoices/${id}/approve`);
 export const rejectInvoice = (id: string, reason: string) => api.patch(`/finance/invoices/${id}/reject`, { reason });
+export const sendInvoice   = (id: string) => api.patch(`/finance/invoices/${id}/send`);
 export const recordInvoicePayment = (
   invoiceId: string,
   data: { amount: number; currency: string; date: string; method: string; reference?: string; notes?: string }
@@ -351,6 +352,7 @@ export const deletePurchaseOrder = (id: string): Promise<void> =>
 export const updatePurchaseOrderStatus = (id: string, status: string) =>
   api.patch(`/procurement/purchase-orders/${id}/status`, { status });
 export const approvePurchaseOrder = (id: string) => api.patch(`/procurement/purchase-orders/${id}/approve`);
+export const createBillFromPO = (id: string) => api.post(`/procurement/purchase-orders/${id}/create-bill`);
 export const rejectPurchaseOrder = (id: string, reason: string) =>
   api.patch(`/procurement/purchase-orders/${id}/reject`, { reason });
 

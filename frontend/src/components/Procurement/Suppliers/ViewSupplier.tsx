@@ -1,11 +1,15 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "react-query";
-import { getSupplierById, getPurchaseOrders } from "@/utils/api";
+import { getSupplierById, getPurchaseOrders, getNotes, getActivities } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Edit, Mail, Phone, MapPin, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { NotesPanel } from "@/components/common/NotesPanel";
+import { ActivityList } from "@/components/Activities/ActivityList";
 
 export default function ViewSupplier() {
   const { id } = useParams();
@@ -15,12 +19,15 @@ export default function ViewSupplier() {
   const { data, isLoading } = useQuery(["supplier", id], () => getSupplierById(id!));
   const supplier = data?.data;
 
-  // We can fetch POs and Bills related to this supplier to show in a list
   const { data: posData } = useQuery(
     ["pos-by-supplier", id],
-    () => getPurchaseOrders({ limit: 5 }), // Ideally backend filters by supplier ID
+    () => getPurchaseOrders({ limit: 5 }),
     { enabled: !!id }
   );
+  const { data: notesData }      = useQuery(["notes", id, "Supplier"],      () => getNotes({ linkedTo: id!, linkedModel: "Supplier" }),      { enabled: !!id });
+  const { data: activitiesData } = useQuery(["activities", id],             () => getActivities(id!, "Supplier"),                           { enabled: !!id });
+  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <div className="p-6">Loading...</div>;
   if (!supplier) return <div className="p-6">Supplier not found</div>;
@@ -159,6 +166,28 @@ export default function ViewSupplier() {
           </Card>
         </div>
       </div>
+      {id && (
+        <Card>
+          <CardContent className="py-5">
+            <Tabs defaultValue="timeline">
+              <TabsList className="mb-4 flex-wrap h-auto">
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
+                <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="timeline">
+                <RecordTimeline linkedTo={id} linkedModel="Supplier" />
+              </TabsContent>
+              <TabsContent value="notes">
+                <NotesPanel linkedTo={id} linkedModel="Supplier" />
+              </TabsContent>
+              <TabsContent value="activities">
+                <ActivityList linkedTo={id} linkedModel="Supplier" />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

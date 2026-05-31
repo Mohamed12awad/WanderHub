@@ -5,7 +5,7 @@ import {
   Users2, Handshake, WalletCards, LayoutDashboard,
   Package, Banknote, KanbanSquare,
   CalendarDays, CheckSquare, FileText, Receipt, CreditCard, UserSearch,
-  ShoppingCart, Briefcase, Truck, ClipboardList, HandCoins,
+  ShoppingCart, Briefcase, Truck, ClipboardList, HandCoins, ListChecks,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -91,6 +91,9 @@ function NavLinks() {
       )}
       {modules.calendar && (
         <NavItem href="/calendar" icon={CalendarDays} label={tr.nav.calendar} active={isActive("/calendar")} />
+      )}
+      {modules.calendar && (
+        <NavItem href="/activities" icon={ListChecks} label="Activities" active={isActive("/activities")} />
       )}
 
       {/* ── Catalog: products → reports ── */}

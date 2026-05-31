@@ -5,7 +5,11 @@ import {
   getProjectById, deleteProject, getProjectInvoices, getProjectExpenses,
   getProjectTasks, getProjectMilestones, createMilestone, updateMilestone, deleteMilestone,
   getProjectMembers, addProjectMember, removeProjectMember, getUsers,
+  getNotes, getActivities,
 } from "@/utils/api";
+import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { NotesPanel } from "@/components/common/NotesPanel";
+import { ActivityList } from "@/components/Activities/ActivityList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +46,10 @@ export default function ViewProject() {
   const { data: msData } = useQuery(["project-milestones", id], () => getProjectMilestones(id!), { enabled: !!id });
   const { data: memData } = useQuery(["project-members", id], () => getProjectMembers(id!), { enabled: !!id });
   const { data: usersData } = useQuery("users-all", () => getUsers());
+  const { data: notesData }      = useQuery(["notes", id, "Project"],      () => getNotes({ linkedTo: id!, linkedModel: "Project" }),      { enabled: !!id });
+  const { data: activitiesData } = useQuery(["activities", id],             () => getActivities(id!, "Project"),                           { enabled: !!id });
+  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   const invoices = invData?.data ?? [];
   const expenses = expData?.data ?? [];
@@ -100,11 +108,14 @@ export default function ViewProject() {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList className="h-9">
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs">Tasks ({tasks.length})</TabsTrigger>
           <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
           <TabsTrigger value="team" className="text-xs">Team ({members.length})</TabsTrigger>
+          <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+          <TabsTrigger value="notes" className="text-xs">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
+          <TabsTrigger value="activities" className="text-xs">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
         </TabsList>
 
         {/* Overview */}
@@ -217,6 +228,21 @@ export default function ViewProject() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Timeline */}
+        <TabsContent value="timeline" className="mt-5">
+          <RecordTimeline linkedTo={id!} linkedModel="Project" />
+        </TabsContent>
+
+        {/* Notes */}
+        <TabsContent value="notes" className="mt-5">
+          <NotesPanel linkedTo={id!} linkedModel="Project" />
+        </TabsContent>
+
+        {/* Activities */}
+        <TabsContent value="activities" className="mt-5">
+          <ActivityList linkedTo={id!} linkedModel="Project" />
         </TabsContent>
 
         {/* Team */}

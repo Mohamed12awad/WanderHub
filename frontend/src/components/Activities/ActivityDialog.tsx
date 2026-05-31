@@ -24,7 +24,7 @@ import { ActivityFormData, ActivityType } from "@/types/types";
 
 interface ActivityDialogProps {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote";
 }
 
 const ACTIVITY_ICONS: Record<ActivityType, string> = {

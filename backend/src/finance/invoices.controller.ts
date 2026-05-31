@@ -52,6 +52,12 @@ export class InvoicesController {
     return this.finance.deleteInvoice(id);
   }
 
+  @Patch('invoices/:id/send')
+  @RequirePermission('finance:edit')
+  send(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.finance.sendInvoice(id, user.id);
+  }
+
   @Patch('invoices/:id/approve')
   @RequirePermission('finance:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {

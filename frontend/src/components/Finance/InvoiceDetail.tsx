@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, MoreHorizontal } from "lucide-react";
 import { useQuery, useQueryClient } from "react-query";
-import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice } from "@/utils/api";
+import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice, sendInvoice, getActivities } from "@/utils/api";
+import { ActivityList } from "@/components/Activities/ActivityList";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import RecordPaymentDialog from "./RecordPaymentDialog";
@@ -51,6 +52,8 @@ const InvoiceDetail: React.FC = () => {
   const { data, isLoading } = useQuery(["invoices", id], () => getInvoiceById(id!));
   const invoice: Invoice | undefined = data?.data?.invoice;
   const payments: InvoicePayment[] = data?.data?.payments ?? [];
+  const { data: activitiesData } = useQuery(["activities", id], () => getActivities(id!, "Invoice"), { enabled: !!id });
+  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <LoadingSpinner loading />;
   if (!invoice) return <div className="p-4">Invoice not found.</div>;
@@ -64,6 +67,17 @@ const InvoiceDetail: React.FC = () => {
   const isPaid = outstanding <= 0;
   const canRecordPayment = !isPaid && (isAdmin || !approvalEnabled || approvalStatus === "approved");
   const userCanApprove = canUserApprove("invoices", user!.role);
+
+  const handleSend = async () => {
+    setActionLoading(true);
+    try {
+      await sendInvoice(id!);
+      queryClient.invalidateQueries(["invoices", id]);
+      toast({ title: "Invoice marked as sent." });
+    } catch {
+      toast({ title: "Failed to mark as sent.", variant: "destructive" });
+    } finally { setActionLoading(false); }
+  };
 
   const handleApprove = async () => {
     setActionLoading(true);
@@ -165,6 +179,11 @@ const InvoiceDetail: React.FC = () => {
                 <Edit className="h-3.5 w-3.5 me-1" />Edit
               </Button>
             </Link>
+            {invoice.status === "draft" && approvalStatus === "approved" && (
+              <Button size="sm" variant="outline" className="h-8 px-4 gap-1" onClick={handleSend} disabled={actionLoading}>
+                <CheckCircle className="h-3.5 w-3.5" />Mark as Sent
+              </Button>
+            )}
             {!isPaid && (
               <RecordPaymentDialog
                 invoiceId={id!}
@@ -389,12 +408,16 @@ const InvoiceDetail: React.FC = () => {
             <TabsList className="mb-4">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={id!} linkedModel="Invoice" />
             </TabsContent>
             <TabsContent value="notes">
               <NotesPanel linkedTo={id!} linkedModel="Invoice" />
+            </TabsContent>
+            <TabsContent value="activities">
+              <ActivityList linkedTo={id!} linkedModel="Invoice" />
             </TabsContent>
           </Tabs>
         </CardContent>

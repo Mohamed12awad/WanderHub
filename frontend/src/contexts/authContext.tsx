@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const refreshToken = localStorage.getItem("refreshToken");
     if (refreshToken) {
       axios
-        .post(`${import.meta.env.VITE_API_URL}auth/logout`, { refreshToken })
+        .post(`${import.meta.env.VITE_API_URL}/auth/logout`, { refreshToken })
         .catch(() => undefined);
     }
     setIsLoggedIn(false);

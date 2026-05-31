@@ -169,10 +169,12 @@ export function Tasks() {
       queryClient.invalidateQueries("tasks");
       toast({ title: "Task deleted." });
     },
+    onError: () => { toast({ title: "Failed to delete task.", variant: "destructive" }); },
   });
 
   const completeMut = useMutation((id: string) => completeTask(id), {
     onSuccess: () => queryClient.invalidateQueries("tasks"),
+    onError: () => { toast({ title: "Failed to update task.", variant: "destructive" }); },
   });
 
   const openEdit = (task: Task) => {

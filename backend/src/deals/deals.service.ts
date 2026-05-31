@@ -199,6 +199,12 @@ export class DealsService {
     const subtotal = items.reduce((s, i) => s + i.total, 0);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');
 
+    // Respect the workspace approval config — same behaviour as finance.createQuote.
+    const config = await this.prisma.workspaceConfig.findFirst();
+    const approvals = (config?.approvals as any[]) ?? [];
+    const quoteCfg = approvals.find((c: any) => c.module === 'quotes');
+    const approvalStatus = quoteCfg?.enabled ? 'pending' : 'approved';
+
     const quote = await this.prisma.quote.create({
       data: {
         quoteNumber,
@@ -210,11 +216,25 @@ export class DealsService {
         taxRate: 0,
         tax: 0,
         total: subtotal,
-        currency: deal.currency || 'USD',
+        currency: deal.currency || 'EGP',
+        approvalStatus,
         createdById: userId,
       },
       include: { items: true },
     });
+
+    await this.timeline.log(
+      'quote.created',
+      `Quote ${quoteNumber} created from deal`,
+      quote.id, 'Quote',
+      { total: quote.total, currency: quote.currency },
+      userId,
+    );
+
+    // Advance the deal to "proposal" stage if it's still in early discovery.
+    if (['lead', 'qualified'].includes(deal.status as string)) {
+      await this.prisma.deal.update({ where: { id }, data: { status: 'proposal' } });
+    }
 
     return toClient(quote);
   }

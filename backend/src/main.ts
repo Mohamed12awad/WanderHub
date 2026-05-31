@@ -1,9 +1,13 @@
 import 'reflect-metadata';
 import * as Sentry from '@sentry/node';
+import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { validateEnv } from './config/env.validation';
+
+validateEnv();
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV ?? 'development' });
@@ -12,6 +16,7 @@ if (process.env.SENTRY_DSN) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: true, bufferLogs: true });
   app.useLogger(app.get(Logger));
+  app.use(helmet());
   app.setGlobalPrefix('api');
   app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
   app.useGlobalPipes(

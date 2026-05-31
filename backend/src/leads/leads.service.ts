@@ -170,6 +170,7 @@ export class LeadsService {
     if (lead.expectedCloseDate) extra.expectedCloseDate = lead.expectedCloseDate;
 
     // Create the contact and flip the lead atomically so the link can never be lost.
+    // Also auto-create a deal to start the pipeline so the rep doesn't re-key the opportunity.
     const customer = await this.prisma.$transaction(async (tx) => {
       const created = await tx.customer.create({
         data: {
@@ -189,6 +190,21 @@ export class LeadsService {
         where: { id },
         data: { status: 'converted', convertedAt: new Date(), convertedToId: created.id },
       });
+
+      // Seed the deal from the lead's known opportunity details.
+      await tx.deal.create({
+        data: {
+          title: lead.name,
+          customerId: created.id,
+          price: lead.budget ?? 0,
+          currency: lead.currency ?? 'EGP',
+          status: 'qualified',
+          source: lead.source ?? undefined,
+          ownerId: lead.ownerId ?? undefined,
+          expectedCloseDate: lead.expectedCloseDate ?? undefined,
+        } as any,
+      });
+
       return created;
     });
 

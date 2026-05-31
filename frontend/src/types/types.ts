@@ -97,9 +97,12 @@ export interface Activity {
   date: string;
   status: ActivityStatus;
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: string;
+  customer?:   { _id: string; name: string };
+  deal?:       { _id: string; title: string };
+  project?:    { _id: string; name: string };
   assignedTo?: { _id: string; name: string };
-  createdBy?: { _id: string; name: string };
+  createdBy?:  { _id: string; name: string };
   createdAt: string;
 }
 
@@ -110,7 +113,7 @@ export interface ActivityFormData {
   date: string;
   status: ActivityStatus;
   linkedTo: string;
-  linkedModel: "Customer" | "Deal";
+  linkedModel: string;
 }
 
 export interface LogEntry {
@@ -176,7 +179,7 @@ export interface Product {
   customFields?: Record<string, string>;
 }
 
-export type NoteLinkedModel = "Customer" | "Deal" | "Product" | "Expense" | "Quote" | "Invoice";
+export type NoteLinkedModel = "Customer" | "Deal" | "Product" | "Expense" | "Quote" | "Invoice" | "Lead" | "Project" | "Supplier" | "PurchaseOrder";
 
 export interface Note {
   _id: string;

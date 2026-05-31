@@ -4,13 +4,17 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { VendorBillsService } from './vendor-bills.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 
 @Controller('procurement/purchase-orders')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PurchaseOrdersController {
-  constructor(private readonly pos: PurchaseOrdersService) {}
+  constructor(
+    private readonly pos: PurchaseOrdersService,
+    private readonly bills: VendorBillsService,
+  ) {}
 
   @Get()
   @RequirePermission('procurement:view')
@@ -55,6 +59,13 @@ export class PurchaseOrdersController {
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
     return this.pos.reject(id, user.id, user.role, body.reason.trim());
+  }
+
+  @Post(':id/create-bill')
+  @HttpCode(201)
+  @RequirePermission('procurement:create')
+  createBill(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.bills.createFromPO(id, user.id);
   }
 
   @Delete(':id')

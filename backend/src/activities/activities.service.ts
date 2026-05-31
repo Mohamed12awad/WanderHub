@@ -24,7 +24,13 @@ export class ActivitiesService {
     }
     const activities = await this.prisma.activity.findMany({
       where,
-      include: { assignedTo: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        createdBy:  { select: { id: true, name: true } },
+        customer:   { select: { id: true, name: true } },
+        deal:       { select: { id: true, title: true } },
+        project:    { select: { id: true, name: true } },
+      },
       orderBy: { date: 'desc' },
     });
     return toClient(activities);
@@ -35,13 +41,24 @@ export class ActivitiesService {
     const resolvedLinkedToId = rest.linkedToId ?? linkedTo;
     const data: any = { ...rest, linkedToId: resolvedLinkedToId, createdById: userId };
     delete data.linkedTo;
+    // Prisma requires a proper Date object for DateTime fields
+    if (data.date && typeof data.date === 'string') data.date = new Date(data.date);
+    // Strip empty description so it's stored as null, not empty string
+    if (data.description === '') delete data.description;
     if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
     if (resolvedLinkedToId && rest.linkedModel === 'Customer') data.customerId = resolvedLinkedToId;
     if (resolvedLinkedToId && rest.linkedModel === 'Deal') data.dealId = resolvedLinkedToId;
+    if (resolvedLinkedToId && rest.linkedModel === 'Project') data.projectId = resolvedLinkedToId;
 
     const activity = await this.prisma.activity.create({
       data,
-      include: { assignedTo: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        createdBy:  { select: { id: true, name: true } },
+        customer:   { select: { id: true, name: true } },
+        deal:       { select: { id: true, title: true } },
+        project:    { select: { id: true, name: true } },
+      },
     });
 
     const type = activity.type;
@@ -62,6 +79,8 @@ export class ActivitiesService {
     if (!existing) throw new NotFoundException('activity not found');
     const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } = body as any;
     const data: any = { ...rest };
+    if (data.date && typeof data.date === 'string') data.date = new Date(data.date);
+    if (data.description === '') delete data.description;
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
     const activity = await this.prisma.activity.update({ where: { id }, data });
     return toClient(activity);

@@ -7,6 +7,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeal, getCustomers, getUsers } from "@/utils/api";
+import { CURRENCIES } from "@/utils/constants";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
@@ -23,7 +24,6 @@ const DEAL_TYPE_LABELS: Record<string, string> = {
   upsell: "Upsell", cross_sell: "Cross-sell",
 };
 const DEAL_CATEGORIES = ["Software", "Hardware", "Services", "Consulting", "Maintenance", "Licensing", "Support", "Training", "Marketing", "Other"];
-const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR", "Other"];
 const PRIORITIES = ["low", "medium", "high"];
 const STATUS_PROBABILITY: Record<string, number> = {
   lead: 10, qualified: 30, proposal: 50, negotiation: 75, won: 100, lost: 0, cancelled: 0,

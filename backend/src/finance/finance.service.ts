@@ -20,6 +20,7 @@ const QUOTE_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
   deal: { select: { id: true, title: true } },
   items: { orderBy: { order: 'asc' as const } },
+  convertedToInvoice: { select: { id: true, invoiceNumber: true } },
 };
 
 const INVOICE_INCLUDE = {
@@ -46,14 +47,16 @@ export class FinanceService {
 
   private canUserApprove(approverRoles: string[], userRole: string): boolean {
     if (['admin', 'super admin'].includes(userRole)) return true;
-    if (!approverRoles.length) return true;
+    // Empty approverRoles with approvals enabled means admins-only; don't let anyone through.
+    if (!approverRoles.length) return false;
     return approverRoles.includes(userRole);
   }
 
   /**
-   * Recomputes an invoice's totalPaid as the authoritative SUM of its payments
-   * and derives its status — inside the given transaction. Avoids read-modify-
-   * write races where concurrent payments could clobber each other's totals.
+   * Recomputes an invoice's totalPaid as the authoritative SUM of its payments,
+   * derives its status, and keeps the linked deal's won/active state in sync.
+   * Running on every payment mutation (record, edit, delete) ensures the deal
+   * can never stay "won" after a payment is reversed.
    */
   private async recalcInvoiceTotals(tx: Prisma.TransactionClient, invoiceId: string) {
     const invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
@@ -64,7 +67,22 @@ export class FinanceService {
     });
     const totalPaid = agg._sum.amount ?? 0;
     const status = deriveInvoiceStatus(invoice.total, totalPaid, invoice.dueDate) as any;
-    return tx.invoice.update({ where: { id: invoiceId }, data: { totalPaid, status } });
+    const updated = await tx.invoice.update({ where: { id: invoiceId }, data: { totalPaid, status } });
+
+    // Sync the linked deal's pipeline stage with payment state.
+    if (invoice.dealId) {
+      const deal = await tx.deal.findUnique({ where: { id: invoice.dealId } });
+      if (deal && deal.status !== 'lost' && deal.status !== 'cancelled') {
+        if (totalPaid >= invoice.total) {
+          await tx.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
+        } else if (deal.status === 'won') {
+          // Payment reversed or reduced — walk the deal back to an active stage.
+          await tx.deal.update({ where: { id: invoice.dealId }, data: { status: 'negotiation' } });
+        }
+      }
+    }
+
+    return updated;
   }
 
   /**
@@ -208,6 +226,7 @@ export class FinanceService {
     if (quote.approvalStatus !== 'approved') throw new BadRequestException('Quote must be approved before conversion to invoice');
 
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
+    const { enabled: invoiceApprovalEnabled } = await this.getApprovalConfig('invoices');
 
     try {
       const invoice = await this.prisma.$transaction(async (tx) => {
@@ -221,6 +240,7 @@ export class FinanceService {
             customerId: quote.customerId,
             dealId: quote.dealId,
             status: 'draft',
+            approvalStatus: invoiceApprovalEnabled ? 'pending' : 'approved',
             subtotal: quote.subtotal,
             taxRate: quote.taxRate,
             tax: quote.tax,
@@ -350,6 +370,20 @@ export class FinanceService {
     return toClient(updated);
   }
 
+  async sendInvoice(id: string, userId: string) {
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before sending');
+    if (invoice.status !== 'draft') return this.getInvoiceById(id);
+    const updated = await this.prisma.invoice.update({
+      where: { id },
+      data: { status: 'sent' },
+      include: INVOICE_INCLUDE,
+    });
+    await this.timeline.log('invoice.sent', `Invoice ${invoice.invoiceNumber} sent`, id, 'Invoice', {}, userId);
+    return toClient(updated);
+  }
+
   async deleteInvoice(id: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) throw new NotFoundException('Invoice not found');
@@ -407,11 +441,6 @@ export class FinanceService {
       await this.applyAccountDelta(tx, body.accountId, currency, amount);
 
       const updatedInvoice = await this.recalcInvoiceTotals(tx, invoiceId);
-
-      // Mark the deal won once the invoice is fully paid.
-      if (invoice.dealId && updatedInvoice && updatedInvoice.totalPaid >= updatedInvoice.total) {
-        await tx.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
-      }
       return { payment, updatedInvoice };
     });
 
