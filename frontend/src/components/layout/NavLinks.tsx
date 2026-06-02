@@ -5,7 +5,7 @@ import {
   Users2, Handshake, WalletCards, LayoutDashboard,
   Package, Banknote, KanbanSquare,
   CalendarDays, CheckSquare, FileText, Receipt, CreditCard, UserSearch,
-  ShoppingCart, Briefcase, Truck, ClipboardList, HandCoins, ListChecks,
+  ShoppingCart, Briefcase, Truck, ClipboardList, HandCoins, ListChecks, Boxes,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -100,6 +100,9 @@ function NavLinks() {
       {hasCatalog && <NavSection label={lang === "ar" ? "الكتالوج" : "Catalog"} />}
       {isAdminOrAbove && modules.products && (
         <NavItem href="/products" icon={Package}     label={tr.nav.products} active={isActive("/products")} />
+      )}
+      {isAdminOrAbove && modules.products && (
+        <NavItem href="/inventory" icon={Boxes}      label="Inventory" active={isActive("/inventory")} />
       )}
       {modules.reports && (
         <NavItem href="/reports"  icon={WalletCards} label={tr.nav.reports}  active={isActive("/reports")} />

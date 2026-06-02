@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/authContext";
 import { cn } from "@/lib/utils";
 import {
   User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck,
-  LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2, Building2,
+  LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2, Building2, Coins,
 } from "lucide-react";
 import ProfileSettings from "./settings/ProfileSettings";
 import AppearanceSettings from "./settings/AppearanceSettings";
@@ -13,6 +13,7 @@ import FieldsSettings from "./settings/FieldsSettings";
 import ApprovalsSettings from "./settings/ApprovalsSettings";
 import AccountsSettings from "./settings/AccountsSettings";
 import OrganizationSettings from "./settings/OrganizationSettings";
+import ExchangeRatesSettings from "./settings/ExchangeRatesSettings";
 import { Tasks } from "@/pages/Tasks";
 import { Logs } from "@/components/Logs/Logs";
 import { Roles } from "@/components/Roles/Roles";
@@ -37,6 +38,7 @@ export default function Settings() {
 
   const workspaceItems: NavItem[] = [
     { to: "organization", icon: Building2, label: "Organization" },
+    { to: "exchange-rates", icon: Coins, label: "Exchange Rates" },
     { to: "modules", icon: LayoutGrid, label: s.modules },
     { to: "fields", icon: TableProperties, label: s.fields },
   ];
@@ -125,6 +127,7 @@ export default function Settings() {
             <Route path="approvals"     element={<ApprovalsSettings />} />
             <Route path="accounts"      element={<AccountsSettings />} />
             <Route path="organization"  element={<OrganizationSettings />} />
+            <Route path="exchange-rates" element={<ExchangeRatesSettings />} />
           </Routes>
         </main>
       </div>

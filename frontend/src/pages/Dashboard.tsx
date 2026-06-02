@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  getSummery, getDeals, getAccounts,
+  getSummery, getDeals, getAccounts, getLowStock,
   getPendingApprovals, getOutstandingReport, getLeadsReport, getPipelineReport,
 } from "@/utils/api";
 import { useQuery } from "@tanstack/react-query";
@@ -105,6 +105,9 @@ export function Dashboard() {
   const { tr } = useLanguage();
   const d = tr.dashboard;
 
+  const { data: lowStockData } = useQuery({ queryKey: ["low-stock"], queryFn: getLowStock, staleTime: 30000 });
+  const lowStock: any[] = lowStockData?.data ?? [];
+
   const { data: summeryData, isPending: summeryLoading } = useQuery({
     queryKey: ["summery"],
     queryFn: () => getSummery("month")
@@ -157,11 +160,14 @@ export function Dashboard() {
     [d.lastPeriod]: prev.revenue?.[currency] ?? 0,
   }));
 
-  const primaryCurrency = allCurrencies[0] ?? "USD";
-  const revenue = cur.revenue?.[primaryCurrency] ?? 0;
-  const prevRevenue = prev.revenue?.[primaryCurrency] ?? 0;
-  const underCollection = cur.underCollection?.[primaryCurrency] ?? 0;
-  const prevUnder = prev.underCollection?.[primaryCurrency] ?? 0;
+  // Prefer the base-currency consolidated totals (multi-currency normalized);
+  // fall back to the first currency's figure if the backend didn't supply them.
+  const baseCurrency: string = summeryData?.data?.baseCurrency ?? allCurrencies[0] ?? "USD";
+  const primaryCurrency = baseCurrency;
+  const revenue = cur.revenueBase ?? cur.revenue?.[primaryCurrency] ?? 0;
+  const prevRevenue = prev.revenueBase ?? prev.revenue?.[primaryCurrency] ?? 0;
+  const underCollection = cur.underCollectionBase ?? cur.underCollection?.[primaryCurrency] ?? 0;
+  const prevUnder = prev.underCollectionBase ?? prev.underCollection?.[primaryCurrency] ?? 0;
   const newCustomers = cur.newCustomers ?? 0;
   const prevCustomers = prev.newCustomers ?? 0;
   const expenses = cur.expenses?.total ?? 0;
@@ -630,6 +636,28 @@ export function Dashboard() {
                 <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Low stock */}
+      {lowStock.length > 0 && (
+        <Card className="shadow-sm border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Low stock</CardTitle>
+            <CardDescription className="text-xs">{lowStock.length} product(s) at or below reorder level</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {lowStock.slice(0, 6).map((s) => (
+                <div key={s._id ?? s.productId} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{s.productName ?? s.product?.name ?? s.productId}</span>
+                  <span className="font-mono text-muted-foreground">
+                    {s.quantityOnHand} / {s.reorderLevel}
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
