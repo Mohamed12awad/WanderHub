@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { WorkspaceConfigModule } from './common/workspace-config.module';
 import { VisibilityModule } from './common/visibility.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
@@ -51,6 +52,7 @@ import { LeadsModule } from './leads/leads.module';
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     PrismaModule,
+    WorkspaceConfigModule,
     VisibilityModule,
     TimelineModule,
     NumberSequenceModule,
