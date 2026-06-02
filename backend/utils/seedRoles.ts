@@ -1,8 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-import * as dotenv from 'dotenv';
-dotenv.config();
-
-const prisma = new PrismaClient();
+import { prisma } from './prisma';
 
 const ALL_PERMISSIONS = [
   'contacts:view', 'contacts:create', 'contacts:edit', 'contacts:delete',

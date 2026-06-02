@@ -1,8 +1,5 @@
-import { PrismaClient, DealStatus, LeadStatus, QuoteStatus, InvoiceStatus, ApprovalStatus, TaskPriority, TaskStatus, ActivityType, ActivityStatus, AccountType } from '@prisma/client';
-import * as dotenv from 'dotenv';
-dotenv.config();
-
-const prisma = new PrismaClient();
+import { DealStatus, LeadStatus, QuoteStatus, InvoiceStatus, ApprovalStatus, TaskPriority, TaskStatus, ActivityType, ActivityStatus, AccountType } from '@prisma/client';
+import { prisma } from './prisma';
 
 function daysAgo(n: number) {
   const d = new Date();

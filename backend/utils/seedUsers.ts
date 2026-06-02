@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import * as dotenv from 'dotenv';
-dotenv.config();
-
-const prisma = new PrismaClient();
+import { prisma } from './prisma';
 
 const PASSWORD = 'Wonder@123';
 
