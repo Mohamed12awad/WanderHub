@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,14 +46,18 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const { mutate, isLoading } = useMutation(createActivity, {
+  const { mutate, isPending } = useMutation({
+    mutationFn: createActivity,
+
     onSuccess: () => {
-      queryClient.invalidateQueries(["activities", linkedTo]);
+      queryClient.invalidateQueries({
+        queryKey: ["activities", linkedTo]
+      });
       setOpen(false);
       setTitle("");
       setDescription("");
       setType("call");
-    },
+    }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -133,8 +137,8 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </form>

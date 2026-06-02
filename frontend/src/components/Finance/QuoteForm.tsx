@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getQuoteById, createQuote, updateQuote } from "@/utils/api";
 import LineItemsTable, { LineItemRow } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
@@ -79,11 +79,11 @@ const QuoteForm: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealParam, isEdit]);
 
-  const { data: quoteData } = useQuery(
-    ["quotes", id],
-    () => getQuoteById(id!),
-    { enabled: isEdit }
-  );
+  const { data: quoteData } = useQuery({
+    queryKey: ["quotes", id],
+    queryFn: () => getQuoteById(id!),
+    enabled: isEdit
+  });
 
   useEffect(() => {
     if (!quoteData?.data) return;

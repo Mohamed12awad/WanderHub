@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { updateUser, getUserById, getRoles, getUsers } from "@/utils/api";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/authContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,12 +42,15 @@ const EditUser: React.FC = () => {
   const [reportsTo, setReportsTo] = useState("");
   const [reportsToLabel, setReportsToLabel] = useState("");
 
-  const { data: rolesData, isLoading: rolesLoading } = useQuery("roles", getRoles);
-  const { data: userData, isLoading: userLoading } = useQuery(
-    ["user", userId],
-    () => getUserById(userId!),
-    { enabled: !!userId }
-  );
+  const { data: rolesData, isPending: rolesLoading } = useQuery({
+    queryKey: ["roles"],
+    queryFn: getRoles
+  });
+  const { data: userData, isPending: userLoading } = useQuery({
+    queryKey: ["user", userId],
+    queryFn: () => getUserById(userId!),
+    enabled: !!userId
+  });
 
   useEffect(() => {
     if (!userData) return;
@@ -70,24 +73,26 @@ const EditUser: React.FC = () => {
     [userId]
   );
 
-  const mutation = useMutation(
-    () => updateUser(userId!, { name, email, phone, role, ...(password ? { password } : {}), reportsTo: reportsTo || null }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries("users");
-        queryClient.invalidateQueries(["user", userId]);
-        toast({ title: "User updated." });
-        navigate("/settings/users");
-      },
-      onError: () => { toast({ title: "Failed to update user.", variant: "destructive" }); },
-    }
-  );
+  const mutation = useMutation({
+    mutationFn: () => updateUser(userId!, { name, email, phone, role, ...(password ? { password } : {}), reportsTo: reportsTo || null }),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({
+        queryKey: ["user", userId]
+      });
+      toast({ title: "User updated." });
+      navigate("/settings/users");
+    },
+
+    onError: () => { toast({ title: "Failed to update user.", variant: "destructive" }); }
+  });
 
   if (!currentUser || !["admin", "super admin"].includes(currentUser.role)) {
     return <p className="p-8 text-center font-semibold">You do not have permission to edit users.</p>;
   }
 
-  const isLoading = rolesLoading || userLoading;
+  const isPending = rolesLoading || userLoading;
   const userDetail = userData ? (userData as AxiosResponse<UserDetail>).data : null;
 
   return (
@@ -113,7 +118,7 @@ const EditUser: React.FC = () => {
         </CardHeader>
 
         <CardContent>
-          {isLoading ? (
+          {isPending ? (
             <div className="space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="space-y-1.5">
@@ -195,8 +200,8 @@ const EditUser: React.FC = () => {
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={() => navigate("/settings/users")}>Cancel</Button>
-                <Button type="submit" disabled={mutation.isLoading}>
-                  {mutation.isLoading ? "Saving…" : "Save Changes"}
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? "Saving…" : "Save Changes"}
                 </Button>
               </div>
             </form>

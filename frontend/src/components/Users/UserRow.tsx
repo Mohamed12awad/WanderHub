@@ -12,7 +12,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/authContext";
 import React from "react";
 import { toggleUserState } from "@/utils/api";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UserRowProps {
   id: string;
@@ -31,7 +31,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
 
   const handleToggleState = async () => {
     await toggleUserState(id);
-    queryClient.invalidateQueries("users");
+    queryClient.invalidateQueries({ queryKey: ["users"] });
   };
 
   return (

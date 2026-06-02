@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus } from "lucide-react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getQuotes, getInvoices } from "@/utils/api";
 import { FinanceStatusBadge } from "./FinanceStatusBadge";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -39,14 +39,14 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId, view }
     prefilledCustomer ? `customer=${prefilledCustomer}` : "",
   ].filter(Boolean).join("&")}`;
 
-  const { data: quotesData, isLoading: loadingQ } = useQuery(
-    ["quotes", filterParam],
-    () => getQuotes(filterParam)
-  );
-  const { data: invoicesData, isLoading: loadingI } = useQuery(
-    ["invoices", filterParam],
-    () => getInvoices(filterParam)
-  );
+  const { data: quotesData, isPending: loadingQ } = useQuery({
+    queryKey: ["quotes", filterParam],
+    queryFn: () => getQuotes(filterParam)
+  });
+  const { data: invoicesData, isPending: loadingI } = useQuery({
+    queryKey: ["invoices", filterParam],
+    queryFn: () => getInvoices(filterParam)
+  });
 
   const quotes: Quote[] = quotesData?.data ?? [];
   const invoices: Invoice[] = invoicesData?.data ?? [];

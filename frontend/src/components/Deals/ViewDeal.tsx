@@ -10,7 +10,7 @@ import {
 import { getDealById, deleteDeal, getNotes, getActivities, getQuotes, getInvoices } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2, Copy } from "lucide-react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
 import { Button } from "../ui/button";
@@ -77,10 +77,10 @@ const ViewDeal = () => {
   const canDelete = ["admin", "super admin"].includes(user!.role);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { data: dealData, isLoading, error } = useQuery(
-    ["deals", dealId],
-    () => getDealById(dealId!)
-  );
+  const { data: dealData, isPending, error } = useQuery({
+    queryKey: ["deals", dealId],
+    queryFn: () => getDealById(dealId!)
+  });
   const { getFieldsForModule } = useWorkspaceSettings();
   const _dealFields = getFieldsForModule("deals");
   const fieldLabels = Object.fromEntries([
@@ -111,10 +111,26 @@ const ViewDeal = () => {
     });
   }, [dealData]);
 
-  const { data: notesData }      = useQuery(["notes", dealId, "Deal"],      () => getNotes({ linkedTo: dealId!, linkedModel: "Deal" }),  { enabled: !!dealId });
-  const { data: activitiesData } = useQuery(["activities", dealId],          () => getActivities(dealId!, "Deal"),                        { enabled: !!dealId });
-  const { data: quotesData }     = useQuery(["quotes",   { deal: dealId }],  () => getQuotes({ deal: dealId }),                           { enabled: !!dealId });
-  const { data: invoicesData }   = useQuery(["invoices", { deal: dealId }],  () => getInvoices({ deal: dealId }),                         { enabled: !!dealId });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", dealId, "Deal"],
+    queryFn: () => getNotes({ linkedTo: dealId!, linkedModel: "Deal" }),
+    enabled: !!dealId
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", dealId],
+    queryFn: () => getActivities(dealId!, "Deal"),
+    enabled: !!dealId
+  });
+  const { data: quotesData }     = useQuery({
+    queryKey: ["quotes",   { deal: dealId }],
+    queryFn: () => getQuotes({ deal: dealId }),
+    enabled: !!dealId
+  });
+  const { data: invoicesData }   = useQuery({
+    queryKey: ["invoices", { deal: dealId }],
+    queryFn: () => getInvoices({ deal: dealId }),
+    enabled: !!dealId
+  });
 
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
@@ -159,7 +175,7 @@ const ViewDeal = () => {
     }
   };
 
-  if (isLoading || !formData) {
+  if (isPending || !formData) {
     return (
       <main className="p-4 space-y-4">
         <Card>

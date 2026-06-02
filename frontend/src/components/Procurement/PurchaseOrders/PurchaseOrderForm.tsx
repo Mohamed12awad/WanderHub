@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery } from "react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createPurchaseOrder, updatePurchaseOrder, getPurchaseOrderById, getSuppliers } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -33,45 +33,49 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
     total: 0,
   });
 
-  const { data: suppliersData } = useQuery("suppliers-all", () => getSuppliers({ limit: 1000 }));
+  const { data: suppliersData } = useQuery({
+    queryKey: ["suppliers-all"],
+    queryFn: () => getSuppliers({ limit: 1000 })
+  });
   const suppliers = suppliersData?.data?.data || [];
 
-  const { isLoading: isFetching } = useQuery(
-    ["purchase-order", id],
-    () => getPurchaseOrderById(id!),
-    {
-      enabled: mode === "edit" && !!id,
-      onSuccess: (res) => {
-        const d = res.data;
-        setFormData({
-          supplierId: d.supplier?._id || "",
-          status: d.status || "draft",
-          currency: d.currency || "EGP",
-          issueDate: d.issueDate ? new Date(d.issueDate).toISOString().split("T")[0] : "",
-          expectedDeliveryDate: d.expectedDeliveryDate ? new Date(d.expectedDeliveryDate).toISOString().split("T")[0] : "",
-          notes: d.notes || "",
-          items: d.items || [],
-          subtotal: d.subtotal || 0,
-          taxRate: d.taxRate || 14,
-          tax: d.tax || 0,
-          total: d.total || 0,
-        });
-      },
-    }
-  );
+  const { data: poData, isPending: isFetching } = useQuery({
+    queryKey: ["purchase-order", id],
+    queryFn: () => getPurchaseOrderById(id!),
+    enabled: mode === "edit" && !!id,
+  });
 
-  const mutation = useMutation(
-    (data: any) => (mode === "add" ? createPurchaseOrder(data) : updatePurchaseOrder(id!, data)),
-    {
-      onSuccess: () => {
-        toast({ title: "Success", description: "Purchase Order saved successfully." });
-        navigate("/procurement/purchase-orders");
-      },
-      onError: () => {
-        toast({ title: "Error", description: "Failed to save Purchase Order.", variant: "destructive" });
-      },
+  // v5 removed useQuery onSuccess — prefill the form from the fetched record.
+  useEffect(() => {
+    if (!poData) return;
+    const d = poData.data;
+    setFormData({
+      supplierId: d.supplier?._id || "",
+      status: d.status || "draft",
+      currency: d.currency || "EGP",
+      issueDate: d.issueDate ? new Date(d.issueDate).toISOString().split("T")[0] : "",
+      expectedDeliveryDate: d.expectedDeliveryDate ? new Date(d.expectedDeliveryDate).toISOString().split("T")[0] : "",
+      notes: d.notes || "",
+      items: d.items || [],
+      subtotal: d.subtotal || 0,
+      taxRate: d.taxRate || 14,
+      tax: d.tax || 0,
+      total: d.total || 0,
+    });
+  }, [poData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => (mode === "add" ? createPurchaseOrder(data) : updatePurchaseOrder(id!, data)),
+
+    onSuccess: () => {
+      toast({ title: "Success", description: "Purchase Order saved successfully." });
+      navigate("/procurement/purchase-orders");
+    },
+
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save Purchase Order.", variant: "destructive" });
     }
-  );
+  });
 
   const handleChange = (field: string, value: any) => {
     setFormData((p) => ({ ...p, [field]: value }));
@@ -111,7 +115,6 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
           {tr.common.cancel}
         </Button>
       </div>
-
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
@@ -211,8 +214,8 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
                   </select>
                 </div>
                 <div className="pt-4 border-t">
-                  <Button type="submit" className="w-full" disabled={mutation.isLoading}>
-                    {mutation.isLoading ? "Saving..." : tr.common.save}
+                  <Button type="submit" className="w-full" disabled={mutation.isPending}>
+                    {mutation.isPending ? "Saving..." : tr.common.save}
                   </Button>
                 </div>
               </CardContent>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getDeals, updateDeal } from "@/utils/api";
 import { Link } from "react-router-dom";
 import { DealData } from "@/types/types";
@@ -238,13 +238,17 @@ export function Pipeline() {
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useQuery("deals", () => getDeals());
+  const { data, isPending, error } = useQuery({
+    queryKey: ["deals"],
+    queryFn: () => getDeals()
+  });
 
-  const moveMutation = useMutation(
-    ({ id, status }: { id: string; status: string }) =>
+  const moveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
       updateDeal(id, { status } as DealData),
-    { onSuccess: () => queryClient.invalidateQueries("deals") }
-  );
+
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deals"] })
+  });
 
   const deals: Deal[] = Array.isArray(data?.data) ? data.data : [];
 
@@ -301,11 +305,10 @@ export function Pipeline() {
           )}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <User className="h-3.5 w-3.5" />
-            {isLoading ? "…" : deals.length} deals
+            {isPending ? "…" : deals.length} deals
           </div>
         </div>
       </div>
-
       {/* Board */}
       <div className="flex-1 overflow-x-auto px-6 pb-6">
         <DndContext
@@ -321,7 +324,7 @@ export function Pipeline() {
                 status={status}
                 deals={grouped[status]}
                 label={tr.pipeline.stages[status] ?? status}
-                isLoading={isLoading}
+                isLoading={isPending}
                 onAddDeal={handleAddDeal}
               />
             ))}

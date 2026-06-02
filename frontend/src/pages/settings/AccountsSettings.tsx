@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Landmark, Wallet, Lock } from "lucide-react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAccounts, createAccount, updateAccount, deleteAccount } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Account, AccountType } from "@/types/types";
@@ -57,7 +57,11 @@ export default function AccountsSettings() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
 
-  const { data } = useQuery("accounts", getAccounts, { staleTime: 30000 });
+  const { data } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 30000
+  });
   const accounts: Account[] = data?.data ?? [];
 
   const openCreate = () => {
@@ -97,7 +101,7 @@ export default function AccountsSettings() {
         await createAccount(payload);
         toast({ title: "Account created." });
       }
-      queryClient.invalidateQueries("accounts");
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setDialogOpen(false);
     } catch {
       toast({ title: "Failed to save account", variant: "destructive" });
@@ -111,7 +115,7 @@ export default function AccountsSettings() {
     try {
       await deleteAccount(acc._id);
       toast({ title: "Account deleted." });
-      queryClient.invalidateQueries("accounts");
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
     } catch {
       toast({ title: "Failed to delete account", variant: "destructive" });
     }

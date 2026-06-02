@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { getVendorPayments, deleteVendorBillPayment } from "@/utils/api";
 import { GenericTable, FilterConfig } from "@/components/common/GenericTable";
 import { useAuth } from "@/contexts/authContext";
@@ -91,7 +91,7 @@ export const VendorPayments: React.FC = () => {
     const billId = billMapRef.current.get(paymentId);
     if (!billId) throw new Error("Bill not found for payment");
     await deleteVendorBillPayment(billId, paymentId);
-    queryClient.invalidateQueries("vendor-payments");
+    queryClient.invalidateQueries({ queryKey: ["vendor-payments"] });
   }, [queryClient]);
 
   return (

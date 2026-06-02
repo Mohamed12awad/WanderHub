@@ -11,7 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, MoreHorizontal } from "lucide-react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice, sendInvoice, getActivities } from "@/utils/api";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
@@ -49,10 +49,17 @@ const InvoiceDetail: React.FC = () => {
   const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null);
   const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
 
-  const { data, isLoading } = useQuery(["invoices", id], () => getInvoiceById(id!));
+  const { data, isLoading } = useQuery({
+    queryKey: ["invoices", id],
+    queryFn: () => getInvoiceById(id!)
+  });
   const invoice: Invoice | undefined = data?.data?.invoice;
   const payments: InvoicePayment[] = data?.data?.payments ?? [];
-  const { data: activitiesData } = useQuery(["activities", id], () => getActivities(id!, "Invoice"), { enabled: !!id });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Invoice"),
+    enabled: !!id
+  });
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <LoadingSpinner loading />;
@@ -72,7 +79,9 @@ const InvoiceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await sendInvoice(id!);
-      queryClient.invalidateQueries(["invoices", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", id]
+      });
       toast({ title: "Invoice marked as sent." });
     } catch {
       toast({ title: "Failed to mark as sent.", variant: "destructive" });
@@ -83,7 +92,9 @@ const InvoiceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await approveInvoice(id!);
-      queryClient.invalidateQueries(["invoices", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", id]
+      });
       toast({ title: "Invoice approved." });
     } catch {
       toast({ title: "Approval failed", variant: "destructive" });
@@ -94,7 +105,9 @@ const InvoiceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await rejectInvoice(id!, reason);
-      queryClient.invalidateQueries(["invoices", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", id]
+      });
       setRejectOpen(false);
       toast({ title: "Invoice rejected." });
     } catch {
@@ -116,7 +129,9 @@ const InvoiceDetail: React.FC = () => {
     if (!confirm("Delete this payment?")) return;
     try {
       await deleteInvoicePayment(id!, paymentId);
-      queryClient.invalidateQueries(["invoices", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", id]
+      });
       toast({ title: "Payment deleted." });
     } catch {
       toast({ title: "Failed to delete payment", variant: "destructive" });
@@ -131,7 +146,6 @@ const InvoiceDetail: React.FC = () => {
         onCancel={() => setRejectOpen(false)}
         loading={actionLoading}
       />
-
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300 print:hidden">
@@ -149,7 +163,6 @@ const InvoiceDetail: React.FC = () => {
           )}
         </div>
       )}
-
       {/* Rejection banner */}
       {approvalEnabled && isRejected && (
         <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 dark:bg-destructive/10 px-4 py-3 text-destructive print:hidden">
@@ -166,7 +179,6 @@ const InvoiceDetail: React.FC = () => {
           )}
         </div>
       )}
-
       <Card>
         <CardHeader className="flex flex-row items-start justify-between print:hidden">
           <CardTitle className="flex items-center gap-3">
@@ -191,7 +203,9 @@ const InvoiceDetail: React.FC = () => {
                 outstanding={Math.max(0, outstanding)}
                 disabled={!canRecordPayment}
                 disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
-                onSuccess={() => queryClient.invalidateQueries(["invoices", id])}
+                onSuccess={() => queryClient.invalidateQueries({
+                  queryKey: ["invoices", id]
+                })}
               />
             )}
             <DropdownMenu>
@@ -350,7 +364,6 @@ const InvoiceDetail: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-
       {/* Payments */}
       <Card className="print:hidden">
         <CardHeader>
@@ -400,7 +413,6 @@ const InvoiceDetail: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
       {/* Notes & Timeline */}
       <Card className="print:hidden">
         <CardContent className="py-5">
@@ -422,7 +434,6 @@ const InvoiceDetail: React.FC = () => {
           </Tabs>
         </CardContent>
       </Card>
-
       {editingPayment && (
         <RecordPaymentDialog
           mode="edit"
@@ -433,7 +444,9 @@ const InvoiceDetail: React.FC = () => {
           onOpenChange={(o) => { if (!o) setEditingPayment(null); }}
           onSuccess={() => {
             setEditingPayment(null);
-            queryClient.invalidateQueries(["invoices", id]);
+            queryClient.invalidateQueries({
+              queryKey: ["invoices", id]
+            });
           }}
         />
       )}

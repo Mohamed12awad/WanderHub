@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Printer } from "lucide-react";
-import { useQuery } from "react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend,
@@ -91,33 +91,41 @@ const Reports: React.FC = () => {
   const [dateRange, setDateRange] = useState<DateRange>({ start: defaultStart(), end: defaultEnd() });
 
   // Analytics queries
-  const { data: revenueData, isFetching: fetchingRev } = useQuery(
-    ["report-revenue", dateRange],
-    () => getRevenueReport({ startDate: dateRange.start, endDate: dateRange.end }),
-    { keepPreviousData: true }
-  );
-  const { data: pipelineData, isFetching: fetchingPipe } = useQuery(
-    ["report-pipeline"],
-    getPipelineReport,
-    { keepPreviousData: true }
-  );
-  const { data: expCatData, isFetching: fetchingExp } = useQuery(
-    ["report-expenses-cat", dateRange],
-    () => getExpensesCategoryReport({ startDate: dateRange.start, endDate: dateRange.end }),
-    { keepPreviousData: true }
-  );
-  const { data: outstandingData, isFetching: fetchingOut } = useQuery(
-    ["report-outstanding"],
-    getOutstandingReport,
-    { keepPreviousData: true }
-  );
-  const { data: custData, isFetching: fetchingCust } = useQuery(
-    ["report-customers", dateRange],
-    () => getCustomerAcquisitionReport({ startDate: dateRange.start, endDate: dateRange.end }),
-    { keepPreviousData: true }
-  );
-  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
-  const { data: leadsReportData } = useQuery("leads-report", getLeadsReport, { staleTime: 60000 });
+  const { data: revenueData, isFetching: fetchingRev } = useQuery({
+    queryKey: ["report-revenue", dateRange],
+    queryFn: () => getRevenueReport({ startDate: dateRange.start, endDate: dateRange.end }),
+    placeholderData: keepPreviousData
+  });
+  const { data: pipelineData, isFetching: fetchingPipe } = useQuery({
+    queryKey: ["report-pipeline"],
+    queryFn: getPipelineReport,
+    placeholderData: keepPreviousData
+  });
+  const { data: expCatData, isFetching: fetchingExp } = useQuery({
+    queryKey: ["report-expenses-cat", dateRange],
+    queryFn: () => getExpensesCategoryReport({ startDate: dateRange.start, endDate: dateRange.end }),
+    placeholderData: keepPreviousData
+  });
+  const { data: outstandingData, isFetching: fetchingOut } = useQuery({
+    queryKey: ["report-outstanding"],
+    queryFn: getOutstandingReport,
+    placeholderData: keepPreviousData
+  });
+  const { data: custData, isFetching: fetchingCust } = useQuery({
+    queryKey: ["report-customers", dateRange],
+    queryFn: () => getCustomerAcquisitionReport({ startDate: dateRange.start, endDate: dateRange.end }),
+    placeholderData: keepPreviousData
+  });
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 60000
+  });
+  const { data: leadsReportData } = useQuery({
+    queryKey: ["leads-report"],
+    queryFn: getLeadsReport,
+    staleTime: 60000
+  });
 
   const revenue: { month: string; revenue: number; count: number }[] = revenueData?.data ?? [];
   const pipeline: { stage: string; count: number; value: number }[] = pipelineData?.data ?? [];

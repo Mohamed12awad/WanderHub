@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQueryClient } from "react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -71,46 +71,48 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
     // Invalidate the passed keys (e.g. "activities-calendar" invalidates the array key starting with that string)
     invalidateKeys.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     // Always re-fetch the entity's own activities list too
-    if (activity) queryClient.invalidateQueries(["activities", activity.linkedTo]);
+    if (activity) queryClient.invalidateQueries({
+      queryKey: ["activities", activity.linkedTo]
+    });
   };
 
-  const toggleMut = useMutation(
-    (a: Activity) => updateActivity(a._id, {
+  const toggleMut = useMutation({
+    mutationFn: (a: Activity) => updateActivity(a._id, {
       status: a.status === "completed" ? "pending" : "completed",
     } as any),
-    {
-      onSuccess: () => {
-        invalidate();
-        toast({ title: "Activity updated." });
-        onOpenChange(false);
-      },
-      onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); },
-    },
-  );
 
-  const saveMut = useMutation(
-    () => updateActivity(activity!._id, { title, description, date, type, status } as any),
-    {
-      onSuccess: () => {
-        invalidate();
-        setEditing(false);
-        toast({ title: "Activity saved." });
-      },
-      onError: () => { toast({ title: "Failed to save.", variant: "destructive" }); },
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Activity updated." });
+      onOpenChange(false);
     },
-  );
 
-  const deleteMut = useMutation(
-    () => deleteActivity(activity!._id),
-    {
-      onSuccess: () => {
-        invalidate();
-        onOpenChange(false);
-        toast({ title: "Activity deleted." });
-      },
-      onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); },
+    onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); }
+  });
+
+  const saveMut = useMutation({
+    mutationFn: () => updateActivity(activity!._id, { title, description, date, type, status } as any),
+
+    onSuccess: () => {
+      invalidate();
+      setEditing(false);
+      toast({ title: "Activity saved." });
     },
-  );
+
+    onError: () => { toast({ title: "Failed to save.", variant: "destructive" }); }
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => deleteActivity(activity!._id),
+
+    onSuccess: () => {
+      invalidate();
+      onOpenChange(false);
+      toast({ title: "Activity deleted." });
+    },
+
+    onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); }
+  });
 
   if (!activity) return null;
 
@@ -255,7 +257,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
                 size="sm" variant="outline"
                 className="gap-1.5 h-8"
                 onClick={() => toggleMut.mutate(activity)}
-                disabled={toggleMut.isLoading}
+                disabled={toggleMut.isPending}
               >
                 <Circle className="h-3.5 w-3.5" />
                 Mark done
@@ -275,8 +277,8 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
                 <Button size="sm" variant="ghost" className="h-8 gap-1" onClick={() => setEditing(false)}>
                   <X className="h-3.5 w-3.5" />Cancel
                 </Button>
-                <Button size="sm" className="h-8 gap-1" onClick={() => saveMut.mutate()} disabled={saveMut.isLoading}>
-                  <Save className="h-3.5 w-3.5" />{saveMut.isLoading ? "Saving…" : "Save"}
+                <Button size="sm" className="h-8 gap-1" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+                  <Save className="h-3.5 w-3.5" />{saveMut.isPending ? "Saving…" : "Save"}
                 </Button>
               </>
             ) : (
@@ -284,7 +286,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
                 size="sm" variant="ghost"
                 className="h-8 gap-1 text-destructive hover:text-destructive"
                 onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(); }}
-                disabled={deleteMut.isLoading}
+                disabled={deleteMut.isPending}
               >
                 <Trash2 className="h-3.5 w-3.5" />Delete
               </Button>

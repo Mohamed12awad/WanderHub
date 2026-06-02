@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getLeadById } from "@/utils/api";
 import { LeadForm } from "./LeadForm";
 import LoadingSpinner from "@/components/common/spinner";
@@ -8,10 +8,14 @@ import { useLanguage } from "@/contexts/LanguageContext";
 export function EditLead() {
   const { tr } = useLanguage();
   const { id } = useParams<{ id: string }>();
-  const { data, isLoading } = useQuery(["lead", id], () => getLeadById(id!), { enabled: !!id });
+  const { data, isPending } = useQuery({
+    queryKey: ["lead", id],
+    queryFn: () => getLeadById(id!),
+    enabled: !!id
+  });
   const lead = data?.data;
 
-  if (isLoading) return <LoadingSpinner loading />;
+  if (isPending) return <LoadingSpinner loading />;
   if (!lead) return <div className="p-4 text-destructive">{tr.common.errorLoading}</div>;
 
   return (

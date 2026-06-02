@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice } from "@/utils/api";
 import LineItemsTable, { LineItemRow } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
@@ -101,14 +101,14 @@ const InvoiceForm: React.FC = () => {
     fetchExchangeRate(baseCurrency, currency).then((rate) => {
       setExchangeRate(rate ?? "");
     }).finally(() => setFetchingRate(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currency, isEdit, baseCurrency]);
 
-  const { data: invoiceData } = useQuery(
-    ["invoices", id],
-    () => getInvoiceById(id!),
-    { enabled: isEdit }
-  );
+  const { data: invoiceData } = useQuery({
+    queryKey: ["invoices", id],
+    queryFn: () => getInvoiceById(id!),
+    enabled: isEdit
+  });
 
   useEffect(() => {
     if (!invoiceData?.data?.invoice) return;

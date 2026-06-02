@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { getUserById, updateUser } from "@/utils/api";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -22,11 +22,11 @@ export default function ProfileSettings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const { data: userData, isLoading } = useQuery(
-    ["user-profile", user?.id],
-    () => getUserById(user!.id),
-    { enabled: !!user?.id }
-  );
+  const { data: userData, isPending } = useQuery({
+    queryKey: ["user-profile", user?.id],
+    queryFn: () => getUserById(user!.id),
+    enabled: !!user?.id
+  });
 
   useEffect(() => {
     if (userData?.data) {
@@ -35,21 +35,21 @@ export default function ProfileSettings() {
     }
   }, [userData]);
 
-  const mutation = useMutation(
-    (payload: { name: string; phone: string; email: string; role: string; password?: string }) =>
+  const mutation = useMutation({
+    mutationFn: (payload: { name: string; phone: string; email: string; role: string; password?: string }) =>
       updateUser(user!.id, payload as any),
-    {
-      onSuccess: () => {
-        updateCurrentUser({ name });
-        setNewPassword("");
-        setConfirmPassword("");
-        toast({ title: s.saved });
-      },
-      onError: () => {
-        toast({ title: s.saveFailed, variant: "destructive" });
-      },
+
+    onSuccess: () => {
+      updateCurrentUser({ name });
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: s.saved });
+    },
+
+    onError: () => {
+      toast({ title: s.saveFailed, variant: "destructive" });
     }
-  );
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,14 +69,13 @@ export default function ProfileSettings() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-5">
-
       {/* ── Profile hero card ── */}
       <Card className="overflow-hidden">
         <div className="h-20 bg-gradient-to-r from-primary/25 via-primary/15 to-primary/5" />
         <CardContent className="pt-0 pb-5 px-6">
           <div className="flex items-end gap-4 -mt-9">
             <div className="h-16 w-16 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold ring-4 ring-background shrink-0 select-none">
-              {isLoading ? "…" : initials}
+              {isPending ? "…" : initials}
             </div>
             <div className="pb-1 min-w-0">
               <p className="font-semibold text-base leading-tight truncate">{name || "—"}</p>
@@ -86,8 +85,7 @@ export default function ProfileSettings() {
           </div>
         </CardContent>
       </Card>
-
-      {isLoading ? (
+      {isPending ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
         </div>
@@ -165,8 +163,8 @@ export default function ProfileSettings() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={mutation.isLoading} className="px-8">
-              {mutation.isLoading ? tr.common.loading : s.saveChanges}
+            <Button type="submit" disabled={mutation.isPending} className="px-8">
+              {mutation.isPending ? tr.common.loading : s.saveChanges}
             </Button>
           </div>
         </form>

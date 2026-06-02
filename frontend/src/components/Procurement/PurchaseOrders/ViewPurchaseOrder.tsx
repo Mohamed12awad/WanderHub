@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPurchaseOrderById, approvePurchaseOrder, rejectPurchaseOrder,
   updatePurchaseOrderStatus, deletePurchaseOrder, createBillFromPO,
@@ -41,23 +41,38 @@ export default function ViewPurchaseOrder() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading } = useQuery(["purchase-order", id], () => getPurchaseOrderById(id!), { enabled: !!id });
+  const { data, isLoading } = useQuery({
+    queryKey: ["purchase-order", id],
+    queryFn: () => getPurchaseOrderById(id!),
+    enabled: !!id
+  });
   const po = data?.data;
 
-  const { data: notesData }      = useQuery(["notes", id, "PurchaseOrder"],      () => getNotes({ linkedTo: id!, linkedModel: "PurchaseOrder" }),      { enabled: !!id });
-  const { data: activitiesData } = useQuery(["activities", id],                  () => getActivities(id!, "PurchaseOrder"),                           { enabled: !!id });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", id, "PurchaseOrder"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "PurchaseOrder" }),
+    enabled: !!id
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "PurchaseOrder"),
+    enabled: !!id
+  });
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
-  const refresh = () => queryClient.invalidateQueries(["purchase-order", id]);
+  const refresh = () => queryClient.invalidateQueries({
+    queryKey: ["purchase-order", id]
+  });
 
   const canApprove = ["admin", "super admin", "manager"].includes(user?.role ?? "");
   const isPending = po?.approvalStatus === "pending";
   const isRejected = po?.approvalStatus === "rejected";
 
-  const statusMutation = useMutation((status: string) => updatePurchaseOrderStatus(id!, status), {
+  const statusMutation = useMutation({
+    mutationFn: (status: string) => updatePurchaseOrderStatus(id!, status),
     onSuccess: () => { refresh(); toast({ title: "Status updated" }); },
-    onError: () => { toast({ title: "Failed to update status.", variant: "destructive" }); },
+    onError: () => { toast({ title: "Failed to update status.", variant: "destructive" }); }
   });
 
   const handleApprove = async () => {
@@ -89,7 +104,6 @@ export default function ViewPurchaseOrder() {
   return (
     <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
-
       {/* Approval banners */}
       {isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
@@ -116,7 +130,6 @@ export default function ViewPurchaseOrder() {
           </div>
         </div>
       )}
-
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
           <CardTitle className="flex items-center gap-3 flex-wrap">
@@ -127,7 +140,7 @@ export default function ViewPurchaseOrder() {
           </CardTitle>
           <div className="flex gap-2 items-center">
             {transition && (
-              <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isLoading}>
+              <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isPending}>
                 {transition.label}
               </Button>
             )}
@@ -162,7 +175,6 @@ export default function ViewPurchaseOrder() {
           {po.expectedDeliveryDate && <div><span className="text-muted-foreground">Expected:</span> {new Date(po.expectedDeliveryDate).toLocaleDateString()}</div>}
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent className="p-0">
@@ -189,9 +201,7 @@ export default function ViewPurchaseOrder() {
           </div>
         </CardContent>
       </Card>
-
       {po.notes && <Card><CardContent className="pt-4 text-sm"><span className="text-muted-foreground">Notes: </span>{po.notes}</CardContent></Card>}
-
       <Card>
         <CardContent className="py-5">
           <Tabs defaultValue="timeline">

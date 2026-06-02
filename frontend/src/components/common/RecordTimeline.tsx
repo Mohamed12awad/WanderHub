@@ -1,4 +1,4 @@
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getTimeline } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { TimelineItem, TimelineEventType } from "@/types/types";
@@ -79,16 +79,16 @@ export function RecordTimeline({ linkedTo, linkedModel }: Props) {
   const { tr } = useLanguage();
   const t = tr.timeline;
 
-  const { data, isLoading } = useQuery(
-    ["timeline", linkedTo, linkedModel],
-    () => getTimeline({ linkedTo, linkedModel }),
-    { enabled: !!linkedTo }
-  );
+  const { data, isPending } = useQuery({
+    queryKey: ["timeline", linkedTo, linkedModel],
+    queryFn: () => getTimeline({ linkedTo, linkedModel }),
+    enabled: !!linkedTo
+  });
 
   const items: TimelineItem[] = data?.data ?? [];
   const groups = groupByDate(items);
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="space-y-3 py-2">
         {[...Array(4)].map((_, i) => (

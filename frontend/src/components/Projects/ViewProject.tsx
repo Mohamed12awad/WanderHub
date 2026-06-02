@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getProjectById, deleteProject, getProjectInvoices, getProjectExpenses,
   getProjectTasks, getProjectMilestones, createMilestone, updateMilestone, deleteMilestone,
@@ -37,17 +37,52 @@ export default function ViewProject() {
   const { tr } = useLanguage();
   const { toast } = useToast();
 
-  const { data, isLoading } = useQuery(["project", id], () => getProjectById(id!), { enabled: !!id });
+  const { data, isPending } = useQuery({
+    queryKey: ["project", id],
+    queryFn: () => getProjectById(id!),
+    enabled: !!id
+  });
   const project = data?.data;
 
-  const { data: invData } = useQuery(["project-invoices", id], () => getProjectInvoices(id!), { enabled: !!id });
-  const { data: expData } = useQuery(["project-expenses", id], () => getProjectExpenses(id!), { enabled: !!id });
-  const { data: taskData } = useQuery(["project-tasks", id], () => getProjectTasks(id!), { enabled: !!id });
-  const { data: msData } = useQuery(["project-milestones", id], () => getProjectMilestones(id!), { enabled: !!id });
-  const { data: memData } = useQuery(["project-members", id], () => getProjectMembers(id!), { enabled: !!id });
-  const { data: usersData } = useQuery("users-all", () => getUsers());
-  const { data: notesData }      = useQuery(["notes", id, "Project"],      () => getNotes({ linkedTo: id!, linkedModel: "Project" }),      { enabled: !!id });
-  const { data: activitiesData } = useQuery(["activities", id],             () => getActivities(id!, "Project"),                           { enabled: !!id });
+  const { data: invData } = useQuery({
+    queryKey: ["project-invoices", id],
+    queryFn: () => getProjectInvoices(id!),
+    enabled: !!id
+  });
+  const { data: expData } = useQuery({
+    queryKey: ["project-expenses", id],
+    queryFn: () => getProjectExpenses(id!),
+    enabled: !!id
+  });
+  const { data: taskData } = useQuery({
+    queryKey: ["project-tasks", id],
+    queryFn: () => getProjectTasks(id!),
+    enabled: !!id
+  });
+  const { data: msData } = useQuery({
+    queryKey: ["project-milestones", id],
+    queryFn: () => getProjectMilestones(id!),
+    enabled: !!id
+  });
+  const { data: memData } = useQuery({
+    queryKey: ["project-members", id],
+    queryFn: () => getProjectMembers(id!),
+    enabled: !!id
+  });
+  const { data: usersData } = useQuery({
+    queryKey: ["users-all"],
+    queryFn: () => getUsers()
+  });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", id, "Project"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Project" }),
+    enabled: !!id
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Project"),
+    enabled: !!id
+  });
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
@@ -61,20 +96,30 @@ export default function ViewProject() {
   const [newMilestone, setNewMilestone] = useState("");
   const [newMember, setNewMember] = useState("");
 
-  const refresh = (key: string) => queryClient.invalidateQueries([key, id]);
+  const refresh = (key: string) => queryClient.invalidateQueries({
+    queryKey: [key, id]
+  });
 
-  const addMsMutation = useMutation(() => createMilestone(id!, { title: newMilestone }), {
-    onSuccess: () => { setNewMilestone(""); refresh("project-milestones"); },
+  const addMsMutation = useMutation({
+    mutationFn: () => createMilestone(id!, { title: newMilestone }),
+    onSuccess: () => { setNewMilestone(""); refresh("project-milestones"); }
   });
-  const toggleMsMutation = useMutation(
-    ({ msId, status }: { msId: string; status: string }) => updateMilestone(id!, msId, { status }),
-    { onSuccess: () => refresh("project-milestones") }
-  );
-  const delMsMutation = useMutation((msId: string) => deleteMilestone(id!, msId), { onSuccess: () => refresh("project-milestones") });
-  const addMemberMutation = useMutation(() => addProjectMember(id!, { userId: newMember }), {
-    onSuccess: () => { setNewMember(""); refresh("project-members"); },
+  const toggleMsMutation = useMutation({
+    mutationFn: ({ msId, status }: { msId: string; status: string }) => updateMilestone(id!, msId, { status }),
+    onSuccess: () => refresh("project-milestones")
   });
-  const removeMemberMutation = useMutation((userId: string) => removeProjectMember(id!, userId), { onSuccess: () => refresh("project-members") });
+  const delMsMutation = useMutation({
+    mutationFn: (msId: string) => deleteMilestone(id!, msId),
+    onSuccess: () => refresh("project-milestones")
+  });
+  const addMemberMutation = useMutation({
+    mutationFn: () => addProjectMember(id!, { userId: newMember }),
+    onSuccess: () => { setNewMember(""); refresh("project-members"); }
+  });
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: string) => removeProjectMember(id!, userId),
+    onSuccess: () => refresh("project-members")
+  });
 
   const handleDelete = async () => {
     if (!confirm("Delete this project?")) return;
@@ -82,7 +127,7 @@ export default function ViewProject() {
     catch { toast({ title: "Delete failed", variant: "destructive" }); }
   };
 
-  if (isLoading) return <LoadingSpinner loading />;
+  if (isPending) return <LoadingSpinner loading />;
   if (!project) return <div className="p-6 text-sm text-muted-foreground">Project not found.</div>;
 
   const fin = project.financials ?? { budget: 0, billed: 0, collected: 0, costs: 0, profit: 0, budgetUsed: 0, currency: project.currency };

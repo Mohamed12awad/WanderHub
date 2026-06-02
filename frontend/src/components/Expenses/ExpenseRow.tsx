@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/authContext";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { approveExpenseReport } from "@/utils/api";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ExpenseRowProps {
   id: string;
@@ -38,7 +38,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
 
   const handleApprove = async () => {
     await approveExpenseReport(id);
-    queryClient.invalidateQueries("expenses");
+    queryClient.invalidateQueries({ queryKey: ["expenses"] });
   };
 
   return (

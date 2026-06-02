@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRoles, createRole, updateRole, deleteRole } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PERMISSION_REGISTRY, Resource, ALL_ACTIONS } from "@/config/permissions";
@@ -162,37 +162,40 @@ export function Roles() {
   const [editRole, setEditRole] = useState<Role | null>(null);
   const [newName, setNewName] = useState("");
 
-  const { data, isLoading } = useQuery("roles", getRoles);
+  const { data, isPending } = useQuery({
+    queryKey: ["roles"],
+    queryFn: getRoles
+  });
   const roles: Role[] = Array.isArray(data?.data) ? data.data : [];
 
-  const createMutation = useMutation(
-    (name: string) => createRole({ name, permissions: [] }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries("roles");
-        setCreateOpen(false);
-        setNewName("");
-        toast({ title: "Role created." });
-      },
-    }
-  );
+  const createMutation = useMutation({
+    mutationFn: (name: string) => createRole({ name, permissions: [] }),
 
-  const updateMutation = useMutation(
-    ({ id, permissions }: { id: string; permissions: string[] }) => updateRole(id, permissions),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries("roles");
-        setEditRole(null);
-        toast({ title: "Permissions saved." });
-      },
-    }
-  );
-
-  const deleteMutation = useMutation((id: string) => deleteRole(id), {
     onSuccess: () => {
-      queryClient.invalidateQueries("roles");
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      setCreateOpen(false);
+      setNewName("");
+      toast({ title: "Role created." });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, permissions }: { id: string; permissions: string[] }) => updateRole(id, permissions),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      setEditRole(null);
+      toast({ title: "Permissions saved." });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteRole(id),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
       toast({ title: "Role deleted." });
-    },
+    }
   });
 
   return (
@@ -207,8 +210,7 @@ export function Roles() {
           {tr.roles.addRole}
         </Button>
       </div>
-
-      {isLoading ? (
+      {isPending ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
@@ -264,7 +266,6 @@ export function Roles() {
           })}
         </div>
       )}
-
       {/* Create role dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
@@ -283,15 +284,14 @@ export function Roles() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>{tr.common.cancel}</Button>
             <Button
-              disabled={!newName.trim() || createMutation.isLoading}
+              disabled={!newName.trim() || createMutation.isPending}
               onClick={() => createMutation.mutate(newName.trim().toLowerCase())}
             >
-              {createMutation.isLoading ? "Creating…" : "Create"}
+              {createMutation.isPending ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Permission matrix dialog */}
       <Dialog open={!!editRole} onOpenChange={(o) => !o && setEditRole(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -304,7 +304,7 @@ export function Roles() {
           {editRole && (
             <PermissionMatrix
               role={editRole}
-              saving={updateMutation.isLoading}
+              saving={updateMutation.isPending}
               onSave={(permissions) => updateMutation.mutate({ id: editRole._id, permissions })}
             />
           )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery } from "react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   createProject, updateProject, getProjectById, getCustomers, getDeals, getUsers,
 } from "@/utils/api";
@@ -26,14 +26,27 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
     customer: "", deal: searchParams.get("deal") ?? "", manager: "",
   });
 
-  const { data: customersData } = useQuery("customers-all", () => getCustomers());
+  const { data: customersData } = useQuery({
+    queryKey: ["customers-all"],
+    queryFn: () => getCustomers()
+  });
   const customers = customersData?.data?.data ?? customersData?.data ?? [];
-  const { data: dealsData } = useQuery("deals-all", () => getDeals());
+  const { data: dealsData } = useQuery({
+    queryKey: ["deals-all"],
+    queryFn: () => getDeals()
+  });
   const deals = dealsData?.data?.data ?? dealsData?.data ?? [];
-  const { data: usersData } = useQuery("users-all", () => getUsers());
+  const { data: usersData } = useQuery({
+    queryKey: ["users-all"],
+    queryFn: () => getUsers()
+  });
   const users = usersData?.data?.data ?? usersData?.data ?? [];
 
-  const { data } = useQuery(["project", id], () => getProjectById(id!), { enabled: mode === "edit" && !!id });
+  const { data } = useQuery({
+    queryKey: ["project", id],
+    queryFn: () => getProjectById(id!),
+    enabled: mode === "edit" && !!id
+  });
   useEffect(() => {
     if (data?.data) {
       const p = data.data;
@@ -48,8 +61,8 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
-  const mutation = useMutation(
-    () => {
+  const mutation = useMutation({
+    mutationFn: () => {
       const payload: Record<string, unknown> = {
         name: form.name, description: form.description, status: form.status, priority: form.priority,
         currency: form.currency,
@@ -59,11 +72,10 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
       };
       return mode === "edit" ? updateProject(id!, payload) : createProject(payload);
     },
-    {
-      onSuccess: () => { toast({ title: mode === "edit" ? "Project updated" : "Project created" }); navigate("/projects"); },
-      onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed to save", variant: "destructive" }); },
-    }
-  );
+
+    onSuccess: () => { toast({ title: mode === "edit" ? "Project updated" : "Project created" }); navigate("/projects"); },
+    onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed to save", variant: "destructive" }); }
+  });
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto">
@@ -140,7 +152,7 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/projects")}>{tr.common.cancel}</Button>
-              <Button type="submit" disabled={mutation.isLoading}>{mutation.isLoading ? tr.common.loading : tr.common.save}</Button>
+              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? tr.common.loading : tr.common.save}</Button>
             </div>
           </form>
         </CardContent>

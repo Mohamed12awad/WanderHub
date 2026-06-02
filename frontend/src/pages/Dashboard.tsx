@@ -15,7 +15,7 @@ import {
   getSummery, getDeals, getAccounts,
   getPendingApprovals, getOutstandingReport, getLeadsReport, getPipelineReport,
 } from "@/utils/api";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -105,13 +105,39 @@ export function Dashboard() {
   const { tr } = useLanguage();
   const d = tr.dashboard;
 
-  const { data: summeryData, isLoading: summeryLoading } = useQuery("summery", () => getSummery("month"));
-  const { data: dealsData, isLoading: dealsLoading } = useQuery("deals", () => getDeals());
-  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
-  const { data: pendingData } = useQuery("pending-approvals", getPendingApprovals, { staleTime: 30000 });
-  const { data: outstandingData } = useQuery("outstanding", getOutstandingReport, { staleTime: 60000 });
-  const { data: leadsData } = useQuery("leads-report", getLeadsReport, { staleTime: 60000 });
-  const { data: pipelineData } = useQuery("pipeline-report", getPipelineReport, { staleTime: 60000 });
+  const { data: summeryData, isPending: summeryLoading } = useQuery({
+    queryKey: ["summery"],
+    queryFn: () => getSummery("month")
+  });
+  const { data: dealsData, isPending: dealsLoading } = useQuery({
+    queryKey: ["deals"],
+    queryFn: () => getDeals()
+  });
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 60000
+  });
+  const { data: pendingData } = useQuery({
+    queryKey: ["pending-approvals"],
+    queryFn: getPendingApprovals,
+    staleTime: 30000
+  });
+  const { data: outstandingData } = useQuery({
+    queryKey: ["outstanding"],
+    queryFn: getOutstandingReport,
+    staleTime: 60000
+  });
+  const { data: leadsData } = useQuery({
+    queryKey: ["leads-report"],
+    queryFn: getLeadsReport,
+    staleTime: 60000
+  });
+  const { data: pipelineData } = useQuery({
+    queryKey: ["pipeline-report"],
+    queryFn: getPipelineReport,
+    staleTime: 60000
+  });
   const accounts: Account[] = accountsData?.data ?? [];
   const pending = pendingData?.data ?? { total: 0, quotes: [], invoices: [], expenses: [] };
   const outstanding: { _id: string; invoiceNumber: string; dealTitle: string; total: number; totalPaid: number; currency: string; dueDate: string; status: string }[] = outstandingData?.data ?? [];
