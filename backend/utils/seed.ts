@@ -135,7 +135,7 @@ async function seedRoles() {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-const PASSWORD = "Wonder@123";
+const PASSWORD = "Nawa@123";
 
 const USERS = [
   {
