@@ -13,6 +13,7 @@ import { EditPaymentDto } from './dto/edit-payment.dto';
 import { calcTotals, deriveInvoiceStatus } from './finance.math';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { InventoryService } from '../inventory/inventory.service';
+import { ApprovalService } from '../common/approval.service';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -39,6 +40,7 @@ export class FinanceService {
     private readonly numberSequence: NumberSequenceService,
     private readonly timeline: TimelineService,
     private readonly inventory: InventoryService,
+    private readonly approvals: ApprovalService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -129,7 +131,7 @@ export class FinanceService {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');
-    const { enabled } = await this.getApprovalConfig('quotes');
+    const enabled = await this.approvals.isEnabled('quotes');
     const quote = await this.prisma.quote.create({
       data: {
         ...rest,
@@ -146,6 +148,13 @@ export class FinanceService {
       } as any,
       include: QUOTE_INCLUDE,
     });
+    if (enabled) {
+      const overall = await this.approvals.initSteps(this.prisma, 'Quote', quote.id, 'quotes', quote.total);
+      if (overall === 'approved') {
+        await this.prisma.quote.update({ where: { id: quote.id }, data: { approvalStatus: 'approved' } });
+        (quote as any).approvalStatus = 'approved';
+      }
+    }
     await this.timeline.log('quote.created', `Quote ${quote.quoteNumber} created`, quote.id, 'Quote', { total: quote.total, currency: quote.currency }, userId);
     return toClient(quote);
   }
@@ -185,6 +194,19 @@ export class FinanceService {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) throw new NotFoundException('Quote not found');
     if (quote.approvalStatus === 'approved') return toClient(quote);
+
+    const steps = await this.approvals.listSteps('Quote', id);
+    if (steps.length) {
+      const result = await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'approve');
+      const finalApproved = result.status === 'approved';
+      const updated = await this.prisma.quote.update({
+        where: { id },
+        data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
+        include: QUOTE_INCLUDE,
+      });
+      return toClient(updated);
+    }
+
     const { approverRoles } = await this.getApprovalConfig('quotes');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve quotes');
     // Separation of duties: the creator cannot approve their own quote.
@@ -201,6 +223,18 @@ export class FinanceService {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) throw new NotFoundException('Quote not found');
     if (quote.approvalStatus === 'rejected') return toClient(quote);
+
+    const steps = await this.approvals.listSteps('Quote', id);
+    if (steps.length) {
+      await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'reject', reason);
+      const updated = await this.prisma.quote.update({
+        where: { id },
+        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        include: QUOTE_INCLUDE,
+      });
+      return toClient(updated);
+    }
+
     const { approverRoles } = await this.getApprovalConfig('quotes');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject quotes');
     if (quote.createdById === userId) throw new ForbiddenException('You cannot reject a quote you created');
@@ -325,7 +359,7 @@ export class FinanceService {
     const { items = [], taxRate = 0, customer, deal, ...rest } = body;
     const totals = calcTotals(items, taxRate);
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
-    const { enabled } = await this.getApprovalConfig('invoices');
+    const enabled = await this.approvals.isEnabled('invoices');
     const invoice = await this.prisma.invoice.create({
       data: {
         ...rest,
@@ -343,6 +377,16 @@ export class FinanceService {
       } as any,
       include: INVOICE_INCLUDE,
     });
+
+    // Build the approval chain. If no step applies (amount below thresholds),
+    // the document is auto-approved.
+    if (enabled) {
+      const overall = await this.approvals.initSteps(this.prisma, 'Invoice', invoice.id, 'invoices', invoice.total);
+      if (overall === 'approved') {
+        await this.prisma.invoice.update({ where: { id: invoice.id }, data: { approvalStatus: 'approved' } });
+        (invoice as any).approvalStatus = 'approved';
+      }
+    }
     // A sale draws product-linked items out of stock.
     for (const it of totals.items) {
       if (it.productId) {
@@ -417,6 +461,22 @@ export class FinanceService {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus === 'approved') return toClient(invoice);
+
+    // Chain path: advance the next pending step. Only the final approval flips
+    // the document to 'approved'; earlier steps leave it pending.
+    const steps = await this.approvals.listSteps('Invoice', id);
+    if (steps.length) {
+      const result = await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'approve');
+      const finalApproved = result.status === 'approved';
+      const updated = await this.prisma.invoice.update({
+        where: { id },
+        data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
+        include: INVOICE_INCLUDE,
+      });
+      return toClient(updated);
+    }
+
+    // Legacy single-approver path (no chain persisted).
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve invoices');
     if (invoice.createdById === userId) throw new ForbiddenException('You cannot approve an invoice you created');
@@ -432,6 +492,18 @@ export class FinanceService {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus === 'rejected') return toClient(invoice);
+
+    const steps = await this.approvals.listSteps('Invoice', id);
+    if (steps.length) {
+      await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason);
+      const updated = await this.prisma.invoice.update({
+        where: { id },
+        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        include: INVOICE_INCLUDE,
+      });
+      return toClient(updated);
+    }
+
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject invoices');
     if (invoice.createdById === userId) throw new ForbiddenException('You cannot reject an invoice you created');

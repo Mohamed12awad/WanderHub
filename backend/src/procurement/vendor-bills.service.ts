@@ -9,6 +9,7 @@ import { calcTotals } from '../finance/finance.math';
 import { CreateVendorBillDto } from './dto/create-vendor-bill.dto';
 import { UpdateVendorBillDto } from './dto/update-vendor-bill.dto';
 import { RecordBillPaymentDto } from './dto/record-bill-payment.dto';
+import { ApprovalService } from '../common/approval.service';
 
 const BILL_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -32,6 +33,7 @@ export class VendorBillsService {
     private readonly prisma: PrismaService,
     private readonly numberSequence: NumberSequenceService,
     private readonly timeline: TimelineService,
+    private readonly approvals: ApprovalService,
   ) {}
 
   private async getApprovalConfig() {
@@ -100,7 +102,7 @@ export class VendorBillsService {
     const data = this.cleanData(rest as any);
     const totals = calcTotals(items, taxRate);
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
-    const { enabled } = await this.getApprovalConfig();
+    const enabled = await this.approvals.isEnabled('vendor_bills');
 
     const bill = await this.prisma.vendorBill.create({
       data: {
@@ -118,6 +120,13 @@ export class VendorBillsService {
       } as any,
       include: BILL_INCLUDE,
     });
+    if (enabled) {
+      const overall = await this.approvals.initSteps(this.prisma, 'VendorBill', bill.id, 'vendor_bills', bill.total);
+      if (overall === 'approved') {
+        await this.prisma.vendorBill.update({ where: { id: bill.id }, data: { approvalStatus: 'approved' } });
+        (bill as any).approvalStatus = 'approved';
+      }
+    }
 
     await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created`, bill.id, 'VendorBill', { billNumber }, userId);
     return toClient(bill);
@@ -153,10 +162,29 @@ export class VendorBillsService {
   }
 
   async approve(id: string, userId: string, userRole: string) {
-    const { enabled, approverRoles } = await this.getApprovalConfig();
     const bill = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!bill) return null;
     if (bill.approvalStatus === 'approved') return toClient(bill);
+
+    const steps = await this.approvals.listSteps('VendorBill', id);
+    if (steps.length) {
+      const result = await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'approve');
+      const finalApproved = result.status === 'approved';
+      const updated = await this.prisma.vendorBill.update({
+        where: { id },
+        data: {
+          approvalStatus: result.status,
+          ...(finalApproved
+            ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null, status: bill.status === 'draft' ? 'received' : bill.status }
+            : {}),
+        },
+        include: BILL_INCLUDE,
+      });
+      await this.timeline.log('bill.approved', `Vendor Bill approval advanced (${result.status})`, id, 'VendorBill', {}, userId);
+      return toClient(updated);
+    }
+
+    const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
     if (enabled && bill.createdById === userId) throw new BadRequestException('Cannot approve your own bill');
 
@@ -177,10 +205,23 @@ export class VendorBillsService {
   }
 
   async reject(id: string, userId: string, userRole: string, reason: string) {
-    const { enabled, approverRoles } = await this.getApprovalConfig();
     const bill = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!bill) return null;
     if (bill.approvalStatus === 'rejected') return toClient(bill);
+
+    const steps = await this.approvals.listSteps('VendorBill', id);
+    if (steps.length) {
+      await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'reject', reason);
+      const updated = await this.prisma.vendorBill.update({
+        where: { id },
+        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        include: BILL_INCLUDE,
+      });
+      await this.timeline.log('bill.rejected', 'Vendor Bill rejected', id, 'VendorBill', { reason }, userId);
+      return toClient(updated);
+    }
+
+    const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to reject');
 
     const updated = await this.prisma.vendorBill.update({

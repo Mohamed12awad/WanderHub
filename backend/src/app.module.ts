@@ -35,6 +35,7 @@ import { LeadsModule } from './leads/leads.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 
 @Module({
   providers: [
@@ -85,6 +86,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     SchedulerModule,
     InventoryModule,
     AttachmentsModule,
+    ApprovalsModule,
   ],
 })
 export class AppModule {}

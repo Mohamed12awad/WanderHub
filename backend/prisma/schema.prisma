@@ -746,6 +746,24 @@ model Attachment {
   @@index([linkedModel, linkedToId])
 }
 
+// One step in an entity's approval chain. Steps are generated from the module's
+// approval config when the entity is submitted; the entity is fully approved
+// only once every step is approved, and rejected if any step is rejected.
+model ApprovalStep {
+  id            String    @id @default(cuid())
+  entityType    String // Invoice | Quote | ExpenseReport | PurchaseOrder | VendorBill
+  entityId      String
+  sequence      Int
+  approverRoles String[]
+  status        String    @default("pending") // pending | approved | rejected
+  actedById     String?
+  actedAt       DateTime?
+  comment       String?
+  createdAt     DateTime  @default(now())
+
+  @@index([entityType, entityId])
+}
+
 model WorkspaceConfig {
   id             String   @id @default(cuid())
   approvals      Json     @default("[]")
