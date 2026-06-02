@@ -197,18 +197,17 @@ export class VendorBillsService {
     if (!bill) return null;
     if (bill.approvalStatus !== 'approved') throw new BadRequestException('Vendor bill must be approved before recording payment');
 
-    const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Reject payments that would push totalPaid past the bill total.
-      // Only enforceable when the payment shares the bill's currency.
-      const agg = await tx.vendorBillPayment.aggregate({ where: { billId }, _sum: { amount: true } });
-      const outstanding = bill.total - (agg._sum.amount ?? 0);
-      const payCurrency = body.currency ?? bill.currency;
-      if (payCurrency === bill.currency && body.amount > outstanding + 0.005) {
-        throw new BadRequestException(
-          `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${bill.currency}`,
-        );
-      }
+    // Reject payments that would push totalPaid past the bill total. The
+    // persisted totalPaid is authoritative (kept in sync by recalcBillTotals).
+    const outstanding = bill.total - (bill.totalPaid ?? 0);
+    const payCurrency = body.currency ?? bill.currency;
+    if (payCurrency === bill.currency && body.amount > outstanding + 0.005) {
+      throw new BadRequestException(
+        `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${bill.currency}`,
+      );
+    }
 
+    const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.vendorBillPayment.create({
         data: {
           billId,
@@ -287,6 +286,8 @@ export class VendorBillsService {
             quantity: it.quantity,
             unitPrice: it.unitPrice,
             discount: it.discount,
+            taxRate: it.taxRate,
+            taxCode: it.taxCode,
             total: it.total,
             order: idx,
           })),

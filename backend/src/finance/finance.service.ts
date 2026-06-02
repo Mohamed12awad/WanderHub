@@ -257,6 +257,8 @@ export class FinanceService {
                 quantity: it.quantity,
                 unitPrice: it.unitPrice,
                 discount: it.discount,
+                taxRate: it.taxRate,
+                taxCode: it.taxCode,
                 total: it.total,
                 order: it.order,
               })),
@@ -432,18 +434,17 @@ export class FinanceService {
     const amount = Number(body.amount);
     const currency = body.currency ?? invoice.currency;
 
-    const { payment, updatedInvoice } = await this.prisma.$transaction(async (tx) => {
-      // Reject payments that would push totalPaid past the invoice total.
-      // Only enforceable when the payment shares the invoice's currency.
-      const agg = await tx.invoicePayment.aggregate({ where: { invoiceId }, _sum: { amount: true } });
-      const alreadyPaid = agg._sum.amount ?? 0;
-      const outstanding = invoice.total - alreadyPaid;
-      if (currency === invoice.currency && amount > outstanding + 0.005) {
-        throw new BadRequestException(
-          `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
-        );
-      }
+    // Reject payments that would push totalPaid past the invoice total. The
+    // persisted totalPaid is authoritative (kept in sync by recalcInvoiceTotals).
+    // Only enforceable when the payment shares the invoice's currency.
+    const outstanding = invoice.total - (invoice.totalPaid ?? 0);
+    if (currency === invoice.currency && amount > outstanding + 0.005) {
+      throw new BadRequestException(
+        `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
+      );
+    }
 
+    const { payment, updatedInvoice } = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.invoicePayment.create({
         data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as any,
         include: { createdBy: { select: { id: true, name: true } } },
@@ -485,20 +486,16 @@ export class FinanceService {
     const newCurrency = body.currency ?? payment.currency;
     const newAccountId = body.accountId !== undefined ? body.accountId : payment.accountId;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      // Reject edits that would push totalPaid (excluding this payment) past the
-      // invoice total. Only enforceable when the payment shares the invoice's currency.
-      const agg = await tx.invoicePayment.aggregate({
-        where: { invoiceId, id: { not: paymentId } },
-        _sum: { amount: true },
-      });
-      const outstanding = invoice.total - (agg._sum.amount ?? 0);
-      if (newCurrency === invoice.currency && newAmount > outstanding + 0.005) {
-        throw new BadRequestException(
-          `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
-        );
-      }
+    // Reject edits that would push totalPaid past the invoice total. Outstanding
+    // is computed excluding this payment's current amount.
+    const outstandingExcl = invoice.total - ((invoice.totalPaid ?? 0) - payment.amount);
+    if (newCurrency === invoice.currency && newAmount > outstandingExcl + 0.005) {
+      throw new BadRequestException(
+        `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstandingExcl.toFixed(2)} ${invoice.currency}`,
+      );
+    }
 
+    const updated = await this.prisma.$transaction(async (tx) => {
       // Reverse the old payment's effect on its account, then apply the new one.
       // Handles amount, currency, and account changes (including moving between
       // accounts) without double-counting.

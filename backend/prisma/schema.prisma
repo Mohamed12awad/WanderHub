@@ -385,15 +385,17 @@ model Quote {
 }
 
 model QuoteLineItem {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   quoteId     String
-  quote       Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   description String
   quantity    Float
   unitPrice   Float
-  discount    Float  @default(0)
+  discount    Float   @default(0)
+  taxRate     Float   @default(0)
+  taxCode     String?
   total       Float
-  order       Int    @default(0)
+  order       Int     @default(0)
 }
 
 // ─── Finance — Invoices ──────────────────────────────────────────────────────
@@ -450,6 +452,8 @@ model InvoiceLineItem {
   quantity    Float
   unitPrice   Float
   discount    Float   @default(0)
+  taxRate     Float   @default(0)
+  taxCode     String?
   total       Float
   order       Int     @default(0)
 }
@@ -805,6 +809,8 @@ model PurchaseOrderItem {
   quantity        Float
   unitPrice       Float
   discount        Float         @default(0)
+  taxRate         Float         @default(0)
+  taxCode         String?
   total           Float
   order           Int           @default(0)
 }
@@ -859,6 +865,8 @@ model VendorBillItem {
   quantity    Float
   unitPrice   Float
   discount    Float      @default(0)
+  taxRate     Float      @default(0)
+  taxCode     String?
   total       Float
   order       Int        @default(0)
 }

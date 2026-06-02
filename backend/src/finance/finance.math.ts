@@ -6,10 +6,20 @@ export interface RawLineItem {
   quantity: number;
   unitPrice: number;
   discount?: number;
+  /** Per-line tax rate (percentage). When omitted on every line, the document
+   *  rate passed to calcTotals is applied instead (legacy behaviour). */
+  taxRate?: number;
+  taxCode?: string;
 }
 
-export interface ComputedLineItem extends RawLineItem {
+export interface ComputedLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
   discount: number;
+  taxRate: number;
+  taxCode?: string;
+  /** Line net of discount, EXCLUDING tax. */
   total: number;
 }
 
@@ -20,20 +30,35 @@ export interface Totals {
   total: number;
 }
 
-/**
- * Computes per-line and document totals. `discount` is a percentage (0-100)
- * applied to the line's gross; `taxRate` is a percentage applied to the
- * subtotal.
- */
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function calcTotals(items: RawLineItem[], taxRate = 0): Totals {
-  const computed = items.map((i) => {
+/**
+ * Computes per-line and document totals. `discount` is a percentage (0-100)
+ * applied to the line's gross. Tax is per-line: each line's `taxRate` applies
+ * to its net, and the document tax is the sum of line taxes. If no line carries
+ * a `taxRate`, the document-level `docTaxRate` is applied to every line — so
+ * existing single-rate callers behave exactly as before.
+ */
+export function calcTotals(items: RawLineItem[], docTaxRate = 0): Totals {
+  const perLine = items.some((i) => i.taxRate !== undefined && i.taxRate !== null);
+  let taxSum = 0;
+  const computed: ComputedLineItem[] = items.map((i) => {
     const disc = (i.discount ?? 0) / 100;
-    return { ...i, discount: i.discount ?? 0, total: round2(i.quantity * i.unitPrice * (1 - disc)) };
+    const net = round2(i.quantity * i.unitPrice * (1 - disc));
+    const rate = perLine ? (i.taxRate ?? 0) : docTaxRate;
+    taxSum += net * (rate / 100);
+    return {
+      description: i.description,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      discount: i.discount ?? 0,
+      taxRate: rate,
+      ...(i.taxCode !== undefined ? { taxCode: i.taxCode } : {}),
+      total: net,
+    };
   });
   const subtotal = round2(computed.reduce((s, i) => s + i.total, 0));
-  const tax = round2(subtotal * (taxRate / 100));
+  const tax = round2(taxSum);
   return { items: computed, subtotal, tax, total: round2(subtotal + tax) };
 }
 
