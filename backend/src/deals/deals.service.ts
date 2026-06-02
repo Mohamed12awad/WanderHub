@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { buildCfConditions } from '../common/customFields';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
@@ -63,6 +64,7 @@ export class DealsService {
         where: { deletedAt: null, ...scopeWhere },
         include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
+        take: UNPAGINATED_MAX,
       });
       return toClient(deals);
     }

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
 import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
@@ -30,7 +31,7 @@ export class ExpensesService {
     const { page, limit: limitRaw, q, approvalStatus, createdAt_from, createdAt_to } = query;
     const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
-      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' } });
+      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(reports);
     }
     const p = Math.max(1, parseInt(page) || 1);

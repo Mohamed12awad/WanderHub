@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
-import { paginate, dateRange } from '../common/paginate';
+import { paginate, dateRange, UNPAGINATED_MAX } from '../common/paginate';
 import { calcTotals } from '../finance/finance.math';
 import { CreateVendorBillDto } from './dto/create-vendor-bill.dto';
 import { UpdateVendorBillDto } from './dto/update-vendor-bill.dto';
@@ -77,7 +77,7 @@ export class VendorBillsService {
     if (purchaseOrderId) where.purchaseOrderId = purchaseOrderId;
 
     if (!page) {
-      const bills = await this.prisma.vendorBill.findMany({ where, include: BILL_INCLUDE, orderBy: { createdAt: 'desc' } });
+      const bills = await this.prisma.vendorBill.findMany({ where, include: BILL_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(bills);
     }
 

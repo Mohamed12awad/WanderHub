@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { calcTotals } from '../finance/finance.math';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
@@ -53,7 +54,7 @@ export class PurchaseOrdersService {
     if (supplierId) where.supplierId = supplierId;
 
     if (!page) {
-      const pos = await this.prisma.purchaseOrder.findMany({ where, include: PO_INCLUDE, orderBy: { createdAt: 'desc' } });
+      const pos = await this.prisma.purchaseOrder.findMany({ where, include: PO_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(pos);
     }
 

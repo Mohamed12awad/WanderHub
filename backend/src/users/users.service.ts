@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -21,7 +22,7 @@ export class UsersService {
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, active, phone, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const users = await this.prisma.user.findMany({ include: this.userInclude, orderBy: { createdAt: 'desc' } });
+      const users = await this.prisma.user.findMany({ include: this.userInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(users);
     }
     const p = Math.max(1, parseInt(page) || 1);

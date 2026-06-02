@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
@@ -18,6 +19,7 @@ export class SuppliersService {
       const suppliers = await this.prisma.supplier.findMany({
         where,
         orderBy: { name: 'asc' },
+        take: UNPAGINATED_MAX,
       });
       return toClient(suppliers);
     }

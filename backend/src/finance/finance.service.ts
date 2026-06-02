@@ -11,6 +11,7 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
 import { calcTotals, deriveInvoiceStatus } from './finance.math';
+import { UNPAGINATED_MAX } from '../common/paginate';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -292,7 +293,7 @@ export class FinanceService {
     if (q) where.OR = [{ invoiceNumber: { contains: q, mode: 'insensitive' } }, { title: { contains: q, mode: 'insensitive' } }];
 
     if (!page) {
-      const invoices = await this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy: { createdAt: 'desc' } });
+      const invoices = await this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(invoices);
     }
     const p = Math.max(1, parseInt(page) || 1);
