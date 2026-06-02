@@ -14,6 +14,7 @@ const envSchema = z.object({
   SMTP_FROM:    z.string().optional(),
   APP_URL:      z.string().optional(),
   CRON_SECRET:  z.string().optional(),
+  UPLOAD_DIR:   z.string().optional(),
 });
 
 export function validateEnv(): void {

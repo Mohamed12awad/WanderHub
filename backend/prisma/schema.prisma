@@ -730,6 +730,22 @@ model NumberSequence {
   separator  String @default("-")
 }
 
+// Polymorphic file attachment (receipts, contracts, generated PDFs, …) linked
+// to any entity via linkedModel + linkedToId, mirroring the Note/Activity pattern.
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  storageKey   String
+  mimeType     String
+  size         Int
+  linkedModel  String
+  linkedToId   String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([linkedModel, linkedToId])
+}
+
 model WorkspaceConfig {
   id             String   @id @default(cuid())
   approvals      Json     @default("[]")
