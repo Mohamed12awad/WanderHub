@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import { PrismaService } from '../prisma/prisma.service';
-import { toClient } from '../common/serialize';
+import { Injectable, Logger } from "@nestjs/common";
+import * as nodemailer from "nodemailer";
+import { PrismaService } from "../prisma/prisma.service";
+import { toClient } from "../common/serialize";
 
 export interface NotificationPayload {
   userId: string;
@@ -13,14 +13,14 @@ export interface NotificationPayload {
 
 // Notification types that also warrant an email.
 const EMAIL_TYPES = new Set([
-  'approval_requested',
-  'approval_approved',
-  'approval_rejected',
-  'invoice_overdue',
-  'bill_overdue',
-  'task_assigned',
-  'lead_assigned',
-  'deal_assigned',
+  "approval_requested",
+  "approval_approved",
+  "approval_rejected",
+  "invoice_overdue",
+  "bill_overdue",
+  "task_assigned",
+  "lead_assigned",
+  "deal_assigned",
 ]);
 
 // Outbox delivery: stop retrying after this many failed attempts.
@@ -36,13 +36,15 @@ export class NotificationDispatcher {
     if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
       this.transporter = nodemailer.createTransport({
         host: SMTP_HOST,
-        port: parseInt(SMTP_PORT ?? '587'),
-        secure: parseInt(SMTP_PORT ?? '587') === 465,
+        port: parseInt(SMTP_PORT ?? "587"),
+        secure: parseInt(SMTP_PORT ?? "587") === 465,
         auth: { user: SMTP_USER, pass: SMTP_PASS },
       });
-      this.logger.log('Email transport configured');
+      this.logger.log("Email transport configured");
     } else {
-      this.logger.warn('SMTP_HOST/SMTP_USER/SMTP_PASS not set — email notifications disabled');
+      this.logger.warn(
+        "SMTP_HOST/SMTP_USER/SMTP_PASS not set — email notifications disabled",
+      );
     }
   }
 
@@ -59,13 +61,18 @@ export class NotificationDispatcher {
         select: { email: true, name: true },
       });
       if (user?.email) {
-        const appUrl = process.env.APP_URL ?? '';
+        const appUrl = process.env.APP_URL ?? "";
         const actionUrl = payload.link ? `${appUrl}${payload.link}` : appUrl;
         await this.prisma.emailOutbox.create({
           data: {
             to: user.email,
             subject: payload.title,
-            html: buildEmailHtml({ name: user.name, title: payload.title, body: payload.body, actionUrl }),
+            html: buildEmailHtml({
+              name: user.name,
+              title: payload.title,
+              body: payload.body,
+              actionUrl,
+            }),
           },
         });
       }
@@ -75,7 +82,9 @@ export class NotificationDispatcher {
   /** Fire-and-forget variant — callers that don't need to await dispatch. */
   dispatchBackground(payload: NotificationPayload): void {
     this.dispatch(payload).catch((err) =>
-      this.logger.error(`Background dispatch failed: ${(err as Error).message}`),
+      this.logger.error(
+        `Background dispatch failed: ${(err as Error).message}`,
+      ),
     );
   }
 
@@ -87,21 +96,31 @@ export class NotificationDispatcher {
     if (!this.transporter) return { sent: 0, failed: 0 };
 
     const due = await this.prisma.emailOutbox.findMany({
-      where: { status: 'pending', sendAfter: { lte: new Date() } },
-      orderBy: { createdAt: 'asc' },
+      where: { status: "pending", sendAfter: { lte: new Date() } },
+      orderBy: { createdAt: "asc" },
       take: batchSize,
     });
 
-    const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@wanderhub.app';
+    const from =
+      process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "noreply@nawahub.app";
     let sent = 0;
     let failed = 0;
 
     for (const email of due) {
       try {
-        await this.transporter.sendMail({ from, to: email.to, subject: email.subject, html: email.html });
+        await this.transporter.sendMail({
+          from,
+          to: email.to,
+          subject: email.subject,
+          html: email.html,
+        });
         await this.prisma.emailOutbox.update({
           where: { id: email.id },
-          data: { status: 'sent', sentAt: new Date(), attempts: email.attempts + 1 },
+          data: {
+            status: "sent",
+            sentAt: new Date(),
+            attempts: email.attempts + 1,
+          },
         });
         sent++;
       } catch (err) {
@@ -114,12 +133,14 @@ export class NotificationDispatcher {
           data: {
             attempts,
             lastError: (err as Error).message,
-            status: giveUp ? 'failed' : 'pending',
+            status: giveUp ? "failed" : "pending",
             ...(giveUp ? {} : { sendAfter }),
           },
         });
         failed++;
-        this.logger.error(`Outbox email ${email.id} attempt ${attempts} failed: ${(err as Error).message}`);
+        this.logger.error(
+          `Outbox email ${email.id} attempt ${attempts} failed: ${(err as Error).message}`,
+        );
       }
     }
     return { sent, failed };
@@ -128,7 +149,12 @@ export class NotificationDispatcher {
 
 // ─── Minimal email template ───────────────────────────────────────────────────
 
-function buildEmailHtml(opts: { name: string; title: string; body?: string; actionUrl: string }) {
+function buildEmailHtml(opts: {
+  name: string;
+  title: string;
+  body?: string;
+  actionUrl: string;
+}) {
   const { name, title, body, actionUrl } = opts;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -143,8 +169,8 @@ function buildEmailHtml(opts: { name: string; title: string; body?: string; acti
         <tr><td style="padding:32px">
           <p style="margin:0 0 8px;font-size:14px;color:#71717a">Hi ${escHtml(name)},</p>
           <h1 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#09090b">${escHtml(title)}</h1>
-          ${body ? `<p style="margin:0 0 24px;font-size:14px;color:#52525b;line-height:1.6">${escHtml(body)}</p>` : ''}
-          ${actionUrl ? `<a href="${escHtml(actionUrl)}" style="display:inline-block;padding:10px 20px;background:#0f172a;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:500">View in NawaHub</a>` : ''}
+          ${body ? `<p style="margin:0 0 24px;font-size:14px;color:#52525b;line-height:1.6">${escHtml(body)}</p>` : ""}
+          ${actionUrl ? `<a href="${escHtml(actionUrl)}" style="display:inline-block;padding:10px 20px;background:#0f172a;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:500">View in NawaHub</a>` : ""}
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #f4f4f5">
           <p style="margin:0;font-size:12px;color:#a1a1aa">NawaHub CRM &mdash; you received this because you have notifications enabled.</p>
@@ -156,7 +182,11 @@ function buildEmailHtml(opts: { name: string; title: string; body?: string; acti
 }
 
 function escHtml(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // Re-export for convenience so callers import from one place.

@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
-import "./index.scss";
+import "./index.css";
 
 const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (dsn) {
@@ -17,5 +17,5 @@ if (dsn) {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

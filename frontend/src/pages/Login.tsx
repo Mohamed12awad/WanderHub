@@ -20,10 +20,10 @@ const Login = () => {
     error === "network"
       ? tr.auth.errorNetwork
       : error === "blocked"
-      ? tr.auth.errorBlocked
-      : error === "credentials"
-      ? tr.auth.errorCredentials
-      : null;
+        ? tr.auth.errorBlocked
+        : error === "credentials"
+          ? tr.auth.errorCredentials
+          : null;
 
   return (
     <div className="min-h-screen bg-[hsl(220_20%_97%)] dark:bg-[hsl(222_28%_8%)] flex">
@@ -38,10 +38,13 @@ const Login = () => {
 
         <div>
           <blockquote className="text-white/70 text-sm leading-relaxed italic">
-            "NawaHub keeps our pipeline clear, our invoices on time, and our team in sync — every day."
+            "NawaHub keeps our pipeline clear, our invoices on time, and our
+            team in sync — every day."
           </blockquote>
           <div className="mt-4 flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white">SA</div>
+            <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white">
+              SA
+            </div>
             <div>
               <p className="text-xs font-semibold text-white/80">Sales Admin</p>
               <p className="text-[11px] text-white/40">NawaHub Team</p>
@@ -49,7 +52,9 @@ const Login = () => {
           </div>
         </div>
 
-        <p className="text-[11px] text-white/25">NawaHub CRM · {new Date().getFullYear()}</p>
+        <p className="text-[11px] text-white/25">
+          NawaHub CRM · {new Date().getFullYear()}
+        </p>
       </div>
 
       {/* Right panel — form */}
@@ -69,14 +74,18 @@ const Login = () => {
               <img src="/logo.png" className="h-7 w-7" alt="NawaHub" />
             </div>
             <h1 className="text-xl font-bold">NawaHub</h1>
-            <p className="text-sm text-muted-foreground mt-1">{tr.auth.subtitle}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tr.auth.subtitle}
+            </p>
           </div>
 
           {/* Form card */}
           <div className="bg-card rounded-2xl shadow-xl shadow-black/[0.06] dark:shadow-black/30 border border-border/60 p-8">
             <div className="mb-6">
               <h2 className="text-xl font-bold">{tr.auth.signIn}</h2>
-              <p className="text-sm text-muted-foreground mt-1 hidden lg:block">{tr.auth.subtitle}</p>
+              <p className="text-sm text-muted-foreground mt-1 hidden lg:block">
+                {tr.auth.subtitle}
+              </p>
             </div>
 
             {errorMessage && (
@@ -116,7 +125,11 @@ const Login = () => {
                 />
               </div>
 
-              <Button type="submit" className="w-full h-10 mt-1 font-semibold shadow-sm shadow-primary/20" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full h-10 mt-1 font-semibold shadow-sm shadow-primary/20"
+                disabled={loading}
+              >
                 {loading ? tr.common.loading : tr.auth.submit}
               </Button>
             </form>
