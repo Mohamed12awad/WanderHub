@@ -23,7 +23,8 @@ function buildMocks() {
 function makeService(prisma: any) {
   const numberSequence: any = { nextNumber: jest.fn() };
   const timeline: any = { log: jest.fn() };
-  return new FinanceService(prisma, numberSequence, timeline);
+  const inventory: any = { applyMovement: jest.fn() };
+  return new FinanceService(prisma, numberSequence, timeline, inventory);
 }
 
 describe('FinanceService — approval separation of duties', () => {

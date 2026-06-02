@@ -33,6 +33,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LeadsModule } from './leads/leads.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   providers: [
@@ -81,6 +82,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     SettingsModule,
     AccountsModule,
     SchedulerModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

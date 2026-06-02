@@ -10,6 +10,8 @@ export interface RawLineItem {
    *  rate passed to calcTotals is applied instead (legacy behaviour). */
   taxRate?: number;
   taxCode?: string;
+  /** Optional link to a catalog product, used for stock movements. */
+  productId?: string;
 }
 
 export interface ComputedLineItem {
@@ -19,6 +21,7 @@ export interface ComputedLineItem {
   discount: number;
   taxRate: number;
   taxCode?: string;
+  productId?: string;
   /** Line net of discount, EXCLUDING tax. */
   total: number;
 }
@@ -54,6 +57,7 @@ export function calcTotals(items: RawLineItem[], docTaxRate = 0): Totals {
       discount: i.discount ?? 0,
       taxRate: rate,
       ...(i.taxCode !== undefined ? { taxCode: i.taxCode } : {}),
+      ...(i.productId !== undefined ? { productId: i.productId } : {}),
       total: net,
     };
   });

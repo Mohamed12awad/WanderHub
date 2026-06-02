@@ -12,6 +12,7 @@ import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
 import { calcTotals, deriveInvoiceStatus } from './finance.math';
 import { UNPAGINATED_MAX } from '../common/paginate';
+import { InventoryService } from '../inventory/inventory.service';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -37,6 +38,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly numberSequence: NumberSequenceService,
     private readonly timeline: TimelineService,
+    private readonly inventory: InventoryService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -259,6 +261,7 @@ export class FinanceService {
                 discount: it.discount,
                 taxRate: it.taxRate,
                 taxCode: it.taxCode,
+                productId: it.productId,
                 total: it.total,
                 order: it.order,
               })),
@@ -340,6 +343,20 @@ export class FinanceService {
       } as any,
       include: INVOICE_INCLUDE,
     });
+    // A sale draws product-linked items out of stock.
+    for (const it of totals.items) {
+      if (it.productId) {
+        await this.inventory.applyMovement({
+          productId: it.productId,
+          qty: -it.quantity,
+          type: 'out',
+          refType: 'Invoice',
+          refId: invoice.id,
+          userId,
+        });
+      }
+    }
+
     await this.timeline.log('invoice.created', `Invoice ${invoice.invoiceNumber} created`, invoice.id, 'Invoice', { total: invoice.total, currency: invoice.currency }, userId);
     return toClient(invoice);
   }

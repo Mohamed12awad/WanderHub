@@ -288,6 +288,7 @@ export class VendorBillsService {
             discount: it.discount,
             taxRate: it.taxRate,
             taxCode: it.taxCode,
+            productId: it.productId,
             total: it.total,
             order: idx,
           })),

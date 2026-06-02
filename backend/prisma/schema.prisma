@@ -341,7 +341,37 @@ model Product {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  productNotes Note[]
+  productNotes   Note[]
+  stockItem      StockItem?
+  stockMovements StockMovement[]
+}
+
+// Current on-hand stock per product (one row per product).
+model StockItem {
+  id             String   @id @default(cuid())
+  productId      String   @unique
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityOnHand Float    @default(0)
+  reorderLevel   Float    @default(0)
+  location       String?
+  updatedAt      DateTime @updatedAt
+}
+
+// Append-only ledger of stock changes (audit trail). `qty` is signed:
+// positive = stock in (e.g. PO receipt), negative = stock out (e.g. sale).
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty         Float
+  type        String // in | out | adjustment
+  refType     String?
+  refId       String?
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
 }
 
 // ─── Finance — Quotes ────────────────────────────────────────────────────────
@@ -388,6 +418,7 @@ model QuoteLineItem {
   id          String  @id @default(cuid())
   quoteId     String
   quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float
@@ -448,6 +479,7 @@ model InvoiceLineItem {
   id          String  @id @default(cuid())
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float
@@ -805,6 +837,7 @@ model PurchaseOrderItem {
   id              String        @id @default(cuid())
   purchaseOrderId String
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String?
   description     String
   quantity        Float
   unitPrice       Float
@@ -861,6 +894,7 @@ model VendorBillItem {
   id          String     @id @default(cuid())
   billId      String
   bill        VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float

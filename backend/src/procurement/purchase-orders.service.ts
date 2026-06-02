@@ -8,6 +8,7 @@ import { UNPAGINATED_MAX } from '../common/paginate';
 import { calcTotals } from '../finance/finance.math';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
+import { InventoryService } from '../inventory/inventory.service';
 
 const PO_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -22,6 +23,7 @@ export class PurchaseOrdersService {
     private readonly prisma: PrismaService,
     private readonly numberSequence: NumberSequenceService,
     private readonly timeline: TimelineService,
+    private readonly inventory: InventoryService,
   ) {}
 
   private async getApprovalConfig() {
@@ -131,13 +133,33 @@ export class PurchaseOrdersService {
   }
 
   async updateStatus(id: string, status: string, userId: string) {
-    const existing = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
-    const po = await this.prisma.purchaseOrder.update({
-      where: { id },
-      data: { status: status as any },
-      include: PO_INCLUDE,
+    const existing = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null },
+      include: { items: true },
     });
+    if (!existing) return null;
+
+    const po = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.purchaseOrder.update({
+        where: { id },
+        data: { status: status as any },
+        include: PO_INCLUDE,
+      });
+      // Receiving the PO brings product-linked items into stock — once, on the
+      // transition into 'received'.
+      if (status === 'received' && existing.status !== 'received') {
+        for (const item of existing.items) {
+          if (item.productId) {
+            await this.inventory.applyMovement(
+              { productId: item.productId, qty: item.quantity, type: 'in', refType: 'PurchaseOrder', refId: id, userId },
+              tx,
+            );
+          }
+        }
+      }
+      return updated;
+    });
+
     await this.timeline.log('po.status', `PO status changed to ${status}`, id, 'PurchaseOrder', { status }, userId);
     return toClient(po);
   }

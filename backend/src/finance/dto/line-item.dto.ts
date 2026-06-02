@@ -24,4 +24,8 @@ export class LineItemDto {
   @IsOptional()
   @IsString()
   taxCode?: string;
+
+  @IsOptional()
+  @IsString()
+  productId?: string;
 }
