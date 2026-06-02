@@ -432,6 +432,17 @@ export class FinanceService {
     const currency = body.currency ?? invoice.currency;
 
     const { payment, updatedInvoice } = await this.prisma.$transaction(async (tx) => {
+      // Reject payments that would push totalPaid past the invoice total.
+      // Only enforceable when the payment shares the invoice's currency.
+      const agg = await tx.invoicePayment.aggregate({ where: { invoiceId }, _sum: { amount: true } });
+      const alreadyPaid = agg._sum.amount ?? 0;
+      const outstanding = invoice.total - alreadyPaid;
+      if (currency === invoice.currency && amount > outstanding + 0.005) {
+        throw new BadRequestException(
+          `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
+        );
+      }
+
       const payment = await tx.invoicePayment.create({
         data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as any,
         include: { createdBy: { select: { id: true, name: true } } },
@@ -466,12 +477,27 @@ export class FinanceService {
   async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto) {
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
     if (!payment) throw new NotFoundException('Payment not found');
+    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
 
     const newAmount = Number(body.amount);
     const newCurrency = body.currency ?? payment.currency;
     const newAccountId = body.accountId !== undefined ? body.accountId : payment.accountId;
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Reject edits that would push totalPaid (excluding this payment) past the
+      // invoice total. Only enforceable when the payment shares the invoice's currency.
+      const agg = await tx.invoicePayment.aggregate({
+        where: { invoiceId, id: { not: paymentId } },
+        _sum: { amount: true },
+      });
+      const outstanding = invoice.total - (agg._sum.amount ?? 0);
+      if (newCurrency === invoice.currency && newAmount > outstanding + 0.005) {
+        throw new BadRequestException(
+          `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
+        );
+      }
+
       // Reverse the old payment's effect on its account, then apply the new one.
       // Handles amount, currency, and account changes (including moving between
       // accounts) without double-counting.

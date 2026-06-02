@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -101,10 +101,26 @@ export class CustomersService {
     const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Customer not found');
 
-    // Delegate deal cascade to DealsService so deal-lifecycle side effects run.
+    // Block deletion while the customer still has financially-open invoices —
+    // soft-deleting would orphan live receivables from every list view.
+    const openInvoices = await this.prisma.invoice.count({
+      where: { customerId: id, deletedAt: null, status: { notIn: ['paid', 'cancelled'] } },
+    });
+    if (openInvoices > 0) {
+      throw new BadRequestException(
+        `Cannot delete customer with ${openInvoices} open invoice(s). Settle or cancel them first.`,
+      );
+    }
+
+    // Cascade the soft-delete to the customer's deals, quotes and (settled)
+    // invoices in one transaction so nothing is left pointing at a deleted parent.
     const now = new Date();
-    await this.deals.softDeleteByCustomer(id, now);
-    await this.prisma.customer.update({ where: { id }, data: { deletedAt: now } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.deal.updateMany({ where: { customerId: id, deletedAt: null }, data: { deletedAt: now } });
+      await tx.quote.updateMany({ where: { customerId: id, deletedAt: null }, data: { deletedAt: now } });
+      await tx.invoice.updateMany({ where: { customerId: id, deletedAt: null }, data: { deletedAt: now } });
+      await tx.customer.update({ where: { id }, data: { deletedAt: now } });
+    });
     return true;
   }
 }

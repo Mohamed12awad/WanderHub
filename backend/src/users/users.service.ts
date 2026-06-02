@@ -5,6 +5,9 @@ import { toClient } from '../common/serialize';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+// Explicit bcrypt cost factor (overrides the library default of 10).
+const BCRYPT_ROUNDS = 12;
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -49,7 +52,7 @@ export class UsersService {
 
   async create(body: CreateUserDto) {
     const { password, role, reportsTo, ...rest } = body;
-    const hashed = await bcrypt.hash(password, await bcrypt.genSalt());
+    const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
       data: {
         ...rest,
@@ -82,7 +85,7 @@ export class UsersService {
     }
 
     if (password) {
-      data.password = await bcrypt.hash(password, await bcrypt.genSalt());
+      data.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
     }
 
     const user = await this.prisma.user.update({ where: { id }, data, include: this.userInclude });
