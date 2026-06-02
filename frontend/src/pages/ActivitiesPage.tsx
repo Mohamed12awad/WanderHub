@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { ExternalLink, PlusCircle, Search } from "lucide-react";
+import { ExternalLink, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActivityDetailDialog } from "@/components/Activities/ActivityDetailDialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -64,12 +64,12 @@ export function ActivitiesPage() {
     (a: Activity) => updateActivity(a._id, {
       status: a.status === "completed" ? "pending" : "completed",
     } as any),
-    { onSuccess: invalidate, onError: () => toast({ title: "Failed to update.", variant: "destructive" }) },
+    { onSuccess: invalidate, onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); } },
   );
 
   const deleteMut = useMutation(
     (id: string) => deleteActivity(id),
-    { onSuccess: invalidate, onError: () => toast({ title: "Failed to delete.", variant: "destructive" }) },
+    { onSuccess: invalidate, onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); } },
   );
 
   const filtered = activities.filter((a) => {

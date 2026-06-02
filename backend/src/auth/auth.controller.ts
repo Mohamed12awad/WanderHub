@@ -1,6 +1,25 @@
-import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+
+const REFRESH_COOKIE = 'refresh_token';
+const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000; // mirrors AuthService refresh TTL
+
+// The refresh token lives in an httpOnly cookie scoped to the auth endpoints.
+// SameSite=Strict means it is never sent on cross-site requests, which is the
+// CSRF mitigation for /refresh and /logout. API calls authenticate with the
+// short-lived access token via the Authorization header (not a cookie), so the
+// rest of the API is not CSRF-exposed.
+function refreshCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict' as const,
+    path: '/api/auth',
+    maxAge: REFRESH_TTL_MS,
+  };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -11,24 +30,33 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signin')
   @HttpCode(200)
-  signin(@Body() body: { email: string; password: string }) {
-    return this.authService.signin(body.email, body.password);
+  async signin(@Body() body: { email: string; password: string }, @Res({ passthrough: true }) res: Response) {
+    const { token, refreshToken, user } = await this.authService.signin(body.email, body.password);
+    res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions());
+    return { token, user };
   }
 
-  // Exchanges a valid refresh token for a new access token, rotating the
-  // refresh token in the process.
+  // Exchanges the refresh cookie for a new access token, rotating the refresh
+  // token (and its cookie) in the process.
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('refresh')
-  async refresh(@Body() body: { refreshToken?: string }) {
-    const result = await this.authService.refresh(body?.refreshToken);
-    if (!result) throw new UnauthorizedException('Invalid or expired session');
-    return result;
+  @HttpCode(200)
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const presented = req.cookies?.[REFRESH_COOKIE];
+    const result = await this.authService.refresh(presented);
+    if (!result) {
+      res.clearCookie(REFRESH_COOKIE, refreshCookieOptions());
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+    res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions());
+    return { token: result.token, user: result.user };
   }
 
   @Post('logout')
   @HttpCode(200)
-  async logout(@Body() body: { refreshToken?: string }) {
-    await this.authService.logout(body?.refreshToken);
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(req.cookies?.[REFRESH_COOKIE]);
+    res.clearCookie(REFRESH_COOKIE, refreshCookieOptions());
     return { success: true };
   }
 }

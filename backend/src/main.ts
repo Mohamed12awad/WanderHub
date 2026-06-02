@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import * as Sentry from '@sentry/node';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
@@ -17,6 +18,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: true, bufferLogs: true });
   app.useLogger(app.get(Logger));
   app.use(helmet());
+  app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.enableCors({ origin: process.env.FRONTEND_URL, credentials: true });
   app.useGlobalPipes(
