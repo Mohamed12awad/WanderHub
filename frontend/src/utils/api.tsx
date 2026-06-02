@@ -419,4 +419,39 @@ export const updateMilestone = (projectId: string, milestoneId: string, data: an
 export const deleteMilestone = (projectId: string, milestoneId: string): Promise<void> =>
   api.delete(`/projects/${projectId}/milestones/${milestoneId}`);
 
+// ── Inventory ─────────────────────────────────────────────────────────────────
+export const getInventory = () => api.get("/inventory");
+export const getLowStock = () => api.get("/inventory/low-stock");
+export const getInventoryMovements = (productId?: string) =>
+  api.get("/inventory/movements", { params: productId ? { productId } : {} });
+export const adjustInventory = (productId: string, data: { qty: number; note?: string }) =>
+  api.post(`/inventory/${productId}/adjust`, data);
+export const setReorderLevel = (productId: string, reorderLevel: number) =>
+  api.patch(`/inventory/${productId}/reorder-level`, { reorderLevel });
+
+// ── Attachments ───────────────────────────────────────────────────────────────
+export const getAttachments = (linkedModel: string, linkedToId: string) =>
+  api.get("/attachments", { params: { linkedModel, linkedToId } });
+export const uploadAttachment = (file: File, linkedModel: string, linkedToId: string) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api.post("/attachments", form, {
+    params: { linkedModel, linkedToId },
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+export const downloadAttachment = (id: string) =>
+  api.get(`/attachments/${id}/download`, { responseType: "blob" });
+export const deleteAttachment = (id: string): Promise<void> =>
+  api.delete(`/attachments/${id}`);
+
+// ── Exchange rates ────────────────────────────────────────────────────────────
+export const getExchangeRates = () => api.get("/settings/exchange-rates");
+export const upsertExchangeRate = (data: { currency: string; rate: number; asOf?: string }) =>
+  api.put("/settings/exchange-rates", data);
+
+// ── Approval chain steps ──────────────────────────────────────────────────────
+export const getApprovalSteps = (entityType: string, entityId: string) =>
+  api.get(`/approvals/${entityType}/${entityId}/steps`);
+
 

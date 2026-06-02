@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import LineItemsTable, { LineItemRow } from "@/components/Finance/LineItemsTable";
+import LineItemsTable, { LineItemRow, computeTotals } from "@/components/Finance/LineItemsTable";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
@@ -96,9 +96,7 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
       return;
     }
     
-    const subtotal = formData.items.reduce((s, it) => s + it.quantity * it.unitPrice * (1 - (it.discount ?? 0) / 100), 0);
-    const tax = subtotal * (formData.taxRate / 100);
-    const total = subtotal + tax;
+    const { subtotal, tax, total } = computeTotals(formData.items, formData.taxRate);
     const payload = { ...formData, supplier: formData.supplierId, subtotal, tax, total };
     mutation.mutate(payload);
   };

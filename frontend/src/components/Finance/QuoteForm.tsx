@@ -12,7 +12,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getQuoteById, createQuote, updateQuote } from "@/utils/api";
-import LineItemsTable, { LineItemRow } from "./LineItemsTable";
+import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { QuoteStatus } from "@/types/types";
@@ -107,9 +107,7 @@ const QuoteForm: React.FC = () => {
     })));
   }, [quoteData]);
 
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice * (1 - i.discount / 100), 0);
-  const tax = subtotal * (taxRate / 100);
-  const total = subtotal + tax;
+  const { subtotal, tax, total } = computeTotals(items, taxRate);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
