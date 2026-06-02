@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { SentryExceptionFilter } from './common/sentry.filter';
 import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
@@ -31,6 +32,7 @@ import { SettingsModule } from './settings/settings.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LeadsModule } from './leads/leads.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
   providers: [
@@ -51,6 +53,7 @@ import { LeadsModule } from './leads/leads.module';
       },
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     WorkspaceConfigModule,
     VisibilityModule,
@@ -77,6 +80,7 @@ import { LeadsModule } from './leads/leads.module';
     ReportsModule,
     SettingsModule,
     AccountsModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

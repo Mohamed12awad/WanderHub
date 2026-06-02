@@ -705,6 +705,24 @@ model WorkspaceConfig {
   updatedAt      DateTime @updatedAt
 }
 
+// Durable email queue. Notification emails are enqueued here and delivered by
+// the scheduler with retry/backoff, so a transient SMTP failure is retried
+// instead of silently dropped.
+model EmailOutbox {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  html      String
+  status    String    @default("pending") // pending | sent | failed
+  attempts  Int       @default(0)
+  lastError String?
+  sendAfter DateTime  @default(now())
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([status, sendAfter])
+}
+
 // Manual exchange rates used to consolidate multi-currency figures to the
 // workspace base currency. `rate` = value of 1 unit of `currency` expressed in
 // `baseCurrency`. The latest row (by asOf) per currency is authoritative.
