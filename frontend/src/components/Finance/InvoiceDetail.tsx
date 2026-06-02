@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -140,6 +142,8 @@ const InvoiceDetail: React.FC = () => {
 
   return (
     <main className="p-4 max-w-7xl mx-auto space-y-5">
+      <ApprovalStepsTimeline entityType="Invoice" entityId={id!} />
+      <AttachmentsPanel linkedModel="Invoice" linkedToId={id!} />
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}

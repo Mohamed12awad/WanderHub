@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getVendorBillById, approveVendorBill, rejectVendorBill, deleteVendorBill,
@@ -139,6 +140,7 @@ export default function ViewVendorBill() {
 
   return (
     <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+      <ApprovalStepsTimeline entityType="VendorBill" entityId={id!} />
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
 
       {isPending && (

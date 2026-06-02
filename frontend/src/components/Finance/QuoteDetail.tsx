@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -125,6 +126,7 @@ const QuoteDetail: React.FC = () => {
 
   return (
     <main className="p-4 max-w-7xl mx-auto space-y-5">
+      <ApprovalStepsTimeline entityType="Quote" entityId={id!} />
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}

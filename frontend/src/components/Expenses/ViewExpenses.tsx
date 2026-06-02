@@ -14,6 +14,8 @@ import {
   getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense, getNotes,
 } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "../common/spinner";
@@ -147,6 +149,8 @@ const ViewExpense = () => {
 
   return (
     <main className="p-4 space-y-5">
+      <ApprovalStepsTimeline entityType="ExpenseReport" entityId={expenseId!} />
+      <AttachmentsPanel linkedModel="ExpenseReport" linkedToId={expenseId!} />
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
