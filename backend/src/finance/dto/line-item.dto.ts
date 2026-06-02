@@ -16,4 +16,16 @@ export class LineItemDto {
   @IsOptional()
   @IsNumber()
   discount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  taxRate?: number;
+
+  @IsOptional()
+  @IsString()
+  taxCode?: string;
+
+  @IsOptional()
+  @IsString()
+  productId?: string;
 }

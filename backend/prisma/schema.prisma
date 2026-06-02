@@ -341,7 +341,37 @@ model Product {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  productNotes Note[]
+  productNotes   Note[]
+  stockItem      StockItem?
+  stockMovements StockMovement[]
+}
+
+// Current on-hand stock per product (one row per product).
+model StockItem {
+  id             String   @id @default(cuid())
+  productId      String   @unique
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityOnHand Float    @default(0)
+  reorderLevel   Float    @default(0)
+  location       String?
+  updatedAt      DateTime @updatedAt
+}
+
+// Append-only ledger of stock changes (audit trail). `qty` is signed:
+// positive = stock in (e.g. PO receipt), negative = stock out (e.g. sale).
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty         Float
+  type        String // in | out | adjustment
+  refType     String?
+  refId       String?
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
 }
 
 // ─── Finance — Quotes ────────────────────────────────────────────────────────
@@ -385,15 +415,18 @@ model Quote {
 }
 
 model QuoteLineItem {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   quoteId     String
-  quote       Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float
-  discount    Float  @default(0)
+  discount    Float   @default(0)
+  taxRate     Float   @default(0)
+  taxCode     String?
   total       Float
-  order       Int    @default(0)
+  order       Int     @default(0)
 }
 
 // ─── Finance — Invoices ──────────────────────────────────────────────────────
@@ -446,10 +479,13 @@ model InvoiceLineItem {
   id          String  @id @default(cuid())
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float
   discount    Float   @default(0)
+  taxRate     Float   @default(0)
+  taxCode     String?
   total       Float
   order       Int     @default(0)
 }
@@ -694,6 +730,40 @@ model NumberSequence {
   separator  String @default("-")
 }
 
+// Polymorphic file attachment (receipts, contracts, generated PDFs, …) linked
+// to any entity via linkedModel + linkedToId, mirroring the Note/Activity pattern.
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  storageKey   String
+  mimeType     String
+  size         Int
+  linkedModel  String
+  linkedToId   String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([linkedModel, linkedToId])
+}
+
+// One step in an entity's approval chain. Steps are generated from the module's
+// approval config when the entity is submitted; the entity is fully approved
+// only once every step is approved, and rejected if any step is rejected.
+model ApprovalStep {
+  id            String    @id @default(cuid())
+  entityType    String // Invoice | Quote | ExpenseReport | PurchaseOrder | VendorBill
+  entityId      String
+  sequence      Int
+  approverRoles String[]
+  status        String    @default("pending") // pending | approved | rejected
+  actedById     String?
+  actedAt       DateTime?
+  comment       String?
+  createdAt     DateTime  @default(now())
+
+  @@index([entityType, entityId])
+}
+
 model WorkspaceConfig {
   id             String   @id @default(cuid())
   approvals      Json     @default("[]")
@@ -703,6 +773,38 @@ model WorkspaceConfig {
   locale         String   @default("en-US")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Durable email queue. Notification emails are enqueued here and delivered by
+// the scheduler with retry/backoff, so a transient SMTP failure is retried
+// instead of silently dropped.
+model EmailOutbox {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  html      String
+  status    String    @default("pending") // pending | sent | failed
+  attempts  Int       @default(0)
+  lastError String?
+  sendAfter DateTime  @default(now())
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([status, sendAfter])
+}
+
+// Manual exchange rates used to consolidate multi-currency figures to the
+// workspace base currency. `rate` = value of 1 unit of `currency` expressed in
+// `baseCurrency`. The latest row (by asOf) per currency is authoritative.
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  currency     String
+  baseCurrency String
+  rate         Float
+  asOf         DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([currency, asOf])
 }
 
 // ─── Procurement — Suppliers ──────────────────────────────────────────────────
@@ -769,10 +871,13 @@ model PurchaseOrderItem {
   id              String        @id @default(cuid())
   purchaseOrderId String
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String?
   description     String
   quantity        Float
   unitPrice       Float
   discount        Float         @default(0)
+  taxRate         Float         @default(0)
+  taxCode         String?
   total           Float
   order           Int           @default(0)
 }
@@ -823,10 +928,13 @@ model VendorBillItem {
   id          String     @id @default(cuid())
   billId      String
   bill        VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  productId   String?
   description String
   quantity    Float
   unitPrice   Float
   discount    Float      @default(0)
+  taxRate     Float      @default(0)
+  taxCode     String?
   total       Float
   order       Int        @default(0)
 }

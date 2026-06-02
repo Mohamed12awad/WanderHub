@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -12,7 +13,7 @@ export class ProductsService {
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, type, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const products = await this.prisma.product.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' } });
+      const products = await this.prisma.product.findMany({ where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(products);
     }
     const p = Math.max(1, parseInt(page) || 1);

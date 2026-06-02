@@ -17,10 +17,14 @@ const EMAIL_TYPES = new Set([
   'approval_approved',
   'approval_rejected',
   'invoice_overdue',
+  'bill_overdue',
   'task_assigned',
   'lead_assigned',
   'deal_assigned',
 ]);
+
+// Outbox delivery: stop retrying after this many failed attempts.
+const MAX_EMAIL_ATTEMPTS = 6;
 
 @Injectable()
 export class NotificationDispatcher {
@@ -46,28 +50,24 @@ export class NotificationDispatcher {
     // Always save to DB (in-app notification).
     await this.prisma.notification.create({ data: payload as any });
 
-    // Optionally send email for high-signal event types.
+    // Enqueue an email for high-signal event types. Actual delivery is handled
+    // by the scheduler draining the outbox, so a slow/failing SMTP server never
+    // blocks or breaks the in-app flow.
     if (this.transporter && EMAIL_TYPES.has(payload.type)) {
       const user = await this.prisma.user.findUnique({
         where: { id: payload.userId },
         select: { email: true, name: true },
       });
       if (user?.email) {
-        const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@wanderhub.app';
         const appUrl = process.env.APP_URL ?? '';
         const actionUrl = payload.link ? `${appUrl}${payload.link}` : appUrl;
-
-        try {
-          await this.transporter.sendMail({
-            from,
+        await this.prisma.emailOutbox.create({
+          data: {
             to: user.email,
             subject: payload.title,
             html: buildEmailHtml({ name: user.name, title: payload.title, body: payload.body, actionUrl }),
-          });
-        } catch (err) {
-          // Never let email failure break the in-app flow.
-          this.logger.error(`Email delivery failed for user ${payload.userId}: ${(err as Error).message}`);
-        }
+          },
+        });
       }
     }
   }
@@ -77,6 +77,52 @@ export class NotificationDispatcher {
     this.dispatch(payload).catch((err) =>
       this.logger.error(`Background dispatch failed: ${(err as Error).message}`),
     );
+  }
+
+  /**
+   * Delivers pending outbox emails that are due, with exponential backoff on
+   * failure. Returns a small summary so callers (cron endpoint) can report.
+   */
+  async drainOutbox(batchSize = 50): Promise<{ sent: number; failed: number }> {
+    if (!this.transporter) return { sent: 0, failed: 0 };
+
+    const due = await this.prisma.emailOutbox.findMany({
+      where: { status: 'pending', sendAfter: { lte: new Date() } },
+      orderBy: { createdAt: 'asc' },
+      take: batchSize,
+    });
+
+    const from = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'noreply@wanderhub.app';
+    let sent = 0;
+    let failed = 0;
+
+    for (const email of due) {
+      try {
+        await this.transporter.sendMail({ from, to: email.to, subject: email.subject, html: email.html });
+        await this.prisma.emailOutbox.update({
+          where: { id: email.id },
+          data: { status: 'sent', sentAt: new Date(), attempts: email.attempts + 1 },
+        });
+        sent++;
+      } catch (err) {
+        const attempts = email.attempts + 1;
+        const giveUp = attempts >= MAX_EMAIL_ATTEMPTS;
+        // Exponential backoff: 2^attempts minutes before the next try.
+        const sendAfter = new Date(Date.now() + Math.pow(2, attempts) * 60_000);
+        await this.prisma.emailOutbox.update({
+          where: { id: email.id },
+          data: {
+            attempts,
+            lastError: (err as Error).message,
+            status: giveUp ? 'failed' : 'pending',
+            ...(giveUp ? {} : { sendAfter }),
+          },
+        });
+        failed++;
+        this.logger.error(`Outbox email ${email.id} attempt ${attempts} failed: ${(err as Error).message}`);
+      }
+    }
+    return { sent, failed };
   }
 }
 

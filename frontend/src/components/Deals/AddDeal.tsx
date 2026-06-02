@@ -7,6 +7,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeal, getCustomers, getUsers } from "@/utils/api";
+import { dealSchema, zodFieldErrors } from "@/validations/schemas";
 import { CURRENCIES } from "@/utils/constants";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
@@ -91,13 +92,7 @@ const AddDeal = () => {
     setErrors((prev: FormErrors) => ({ ...prev, [name]: "" }));
   };
 
-  const validate = (): FormErrors => {
-    const errs: FormErrors = {};
-    if (!formData.title) errs.title = "Deal title is required";
-    if (!formData.customer) errs.customer = "Customer is required";
-    if (!formData.price || Number(formData.price) <= 0) errs.price = "Valid amount is required";
-    return errs;
-  };
+  const validate = (): FormErrors => zodFieldErrors(dealSchema, formData);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  JWT_SECRET:   z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET:   z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   FRONTEND_URL: z.string().optional().default('http://localhost:5173'),
   PORT:         z.coerce.number().optional().default(3000),
   NODE_ENV:     z.enum(['development', 'production', 'test']).optional().default('development'),
@@ -13,6 +13,8 @@ const envSchema = z.object({
   SMTP_PASS:    z.string().optional(),
   SMTP_FROM:    z.string().optional(),
   APP_URL:      z.string().optional(),
+  CRON_SECRET:  z.string().optional(),
+  UPLOAD_DIR:   z.string().optional(),
 });
 
 export function validateEnv(): void {

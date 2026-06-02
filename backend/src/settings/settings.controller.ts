@@ -44,4 +44,16 @@ export class SettingsController {
   updateOrganization(@Body() body: { baseCurrency?: string; locale?: string }) {
     return this.settings.updateOrganization(body);
   }
+
+  @Get('exchange-rates')
+  @RequirePermission('settings:view')
+  getExchangeRates() {
+    return this.settings.getExchangeRates();
+  }
+
+  @Put('exchange-rates')
+  @RequirePermission('settings:manage')
+  upsertExchangeRate(@Body() body: { currency: string; rate: number; asOf?: string }) {
+    return this.settings.upsertExchangeRate(body);
+  }
 }

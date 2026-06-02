@@ -1,5 +1,12 @@
 import { toClient } from './serialize';
 
+/**
+ * Hard cap for "unpaginated" list endpoints (callers that omit `?page`, e.g.
+ * dropdown data sources). Bounds the worst-case payload so a growing table can
+ * never return an unbounded result set.
+ */
+export const UNPAGINATED_MAX = 1000;
+
 export interface PaginateOptions {
   where: any;
   include?: any;

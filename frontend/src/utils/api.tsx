@@ -13,13 +13,17 @@ import {
   InvoiceFormData,
 } from "@/types/types";
 
+import { getAccessToken, setAccessToken, clearAccessToken } from "./tokenStore";
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
+  // Send the httpOnly refresh cookie on requests that need it (refresh/logout).
+  withCredentials: true,
 });
-// Add a request interceptor to include the token in headers
+// Add a request interceptor to include the in-memory access token in headers.
 api.interceptors.request.use(
   async (config) => {
-    const token = localStorage.getItem("token");
+    const token = getAccessToken();
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
     }
@@ -34,17 +38,18 @@ api.interceptors.request.use(
 // call should run; the rest await its result.
 let refreshPromise: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem("refreshToken");
-  if (!refreshToken) return null;
+export async function refreshAccessToken(): Promise<string | null> {
   try {
-    // Bare axios (no interceptors) so a 401 here can't recurse.
-    const resp = await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh`, { refreshToken });
-    const { token, refreshToken: rotated, user } = resp.data;
-    localStorage.setItem("token", token);
-    if (rotated) localStorage.setItem("refreshToken", rotated);
+    // Bare axios (no interceptors) so a 401 here can't recurse. The refresh
+    // token is read from the httpOnly cookie, so no body is sent.
+    const resp = await axios.post(
+      `${import.meta.env.VITE_API_URL}/auth/refresh`,
+      {},
+      { withCredentials: true }
+    );
+    const { token, user } = resp.data;
+    setAccessToken(token);
     if (user) localStorage.setItem("user", JSON.stringify(user));
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     return token;
   } catch {
     return null;
@@ -53,9 +58,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 function clearSessionAndRedirect() {
   localStorage.removeItem("user");
-  localStorage.removeItem("token");
-  localStorage.removeItem("refreshToken");
-  delete axios.defaults.headers.common["Authorization"];
+  clearAccessToken();
   window.location.href = "/login";
 }
 

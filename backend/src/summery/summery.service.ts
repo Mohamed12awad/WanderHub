@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CurrencyService } from '../common/currency.service';
 
 @Injectable()
 export class SummeryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly currency: CurrencyService,
+  ) {}
 
   private async getRevenue(start: Date, end: Date) {
     const rows = await this.prisma.deal.groupBy({
@@ -103,9 +107,23 @@ export class SummeryService {
       this.getExpenses(previousStart, previousEnd),
     ]);
 
+    // Consolidate the per-currency maps into single base-currency totals so the
+    // dashboard can show a meaningful headline figure and compute MoM deltas.
+    const baseCurrency = await this.currency.getBaseCurrency();
+    const [
+      currentRevenueBase, previousRevenueBase,
+      currentUnderCollectionBase, previousUnderCollectionBase,
+    ] = await Promise.all([
+      this.currency.sumToBase(currentRevenue),
+      this.currency.sumToBase(previousRevenue),
+      this.currency.sumToBase(currentUnderCollection),
+      this.currency.sumToBase(previousUnderCollection),
+    ]);
+
     return {
-      currentPeriod: { startDate: currentStart, endDate: currentEnd, revenue: currentRevenue, newCustomers: currentNewCustomers, underCollection: currentUnderCollection, expenses: currentExpenses },
-      previousPeriod: { startDate: previousStart, endDate: previousEnd, revenue: previousRevenue, newCustomers: previousNewCustomers, underCollection: previousUnderCollection, expenses: previousExpenses },
+      baseCurrency,
+      currentPeriod: { startDate: currentStart, endDate: currentEnd, revenue: currentRevenue, revenueBase: currentRevenueBase, newCustomers: currentNewCustomers, underCollection: currentUnderCollection, underCollectionBase: currentUnderCollectionBase, expenses: currentExpenses },
+      previousPeriod: { startDate: previousStart, endDate: previousEnd, revenue: previousRevenue, revenueBase: previousRevenueBase, newCustomers: previousNewCustomers, underCollection: previousUnderCollection, underCollectionBase: previousUnderCollectionBase, expenses: previousExpenses },
     };
   }
 

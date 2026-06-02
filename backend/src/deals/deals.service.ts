@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { buildCfConditions } from '../common/customFields';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
@@ -63,6 +64,7 @@ export class DealsService {
         where: { deletedAt: null, ...scopeWhere },
         include: { customer: customerSelect, owner: ownerSelect },
         orderBy: { createdAt: 'desc' },
+        take: UNPAGINATED_MAX,
       });
       return toClient(deals);
     }
@@ -242,7 +244,24 @@ export class DealsService {
   async remove(id: string) {
     const deal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null } });
     if (!deal) throw new NotFoundException('deal not found');
-    await this.prisma.deal.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    // Block deletion while the deal still has financially-open invoices.
+    const openInvoices = await this.prisma.invoice.count({
+      where: { dealId: id, deletedAt: null, status: { notIn: ['paid', 'cancelled'] } },
+    });
+    if (openInvoices > 0) {
+      throw new BadRequestException(
+        `Cannot delete deal with ${openInvoices} open invoice(s). Settle or cancel them first.`,
+      );
+    }
+
+    // Cascade the soft-delete to the deal's quotes and (settled) invoices.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.quote.updateMany({ where: { dealId: id, deletedAt: null }, data: { deletedAt: now } });
+      await tx.invoice.updateMany({ where: { dealId: id, deletedAt: null }, data: { deletedAt: now } });
+      await tx.deal.update({ where: { id }, data: { deletedAt: now } });
+    });
     return true;
   }
 

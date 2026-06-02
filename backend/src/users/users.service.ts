@@ -2,8 +2,12 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+
+// Explicit bcrypt cost factor (overrides the library default of 10).
+const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class UsersService {
@@ -18,7 +22,7 @@ export class UsersService {
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, active, phone, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const users = await this.prisma.user.findMany({ include: this.userInclude, orderBy: { createdAt: 'desc' } });
+      const users = await this.prisma.user.findMany({ include: this.userInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(users);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -49,7 +53,7 @@ export class UsersService {
 
   async create(body: CreateUserDto) {
     const { password, role, reportsTo, ...rest } = body;
-    const hashed = await bcrypt.hash(password, await bcrypt.genSalt());
+    const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
       data: {
         ...rest,
@@ -82,7 +86,7 @@ export class UsersService {
     }
 
     if (password) {
-      data.password = await bcrypt.hash(password, await bcrypt.genSalt());
+      data.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
     }
 
     const user = await this.prisma.user.update({ where: { id }, data, include: this.userInclude });

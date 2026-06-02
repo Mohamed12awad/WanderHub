@@ -23,7 +23,15 @@ function buildMocks() {
 function makeService(prisma: any) {
   const numberSequence: any = { nextNumber: jest.fn() };
   const timeline: any = { log: jest.fn() };
-  return new FinanceService(prisma, numberSequence, timeline);
+  const inventory: any = { applyMovement: jest.fn() };
+  // Default: no persisted chain, so approve/reject take the legacy single-step path.
+  const approvals: any = {
+    isEnabled: jest.fn().mockResolvedValue(false),
+    initSteps: jest.fn().mockResolvedValue('approved'),
+    listSteps: jest.fn().mockResolvedValue([]),
+    act: jest.fn(),
+  };
+  return new FinanceService(prisma, numberSequence, timeline, inventory, approvals);
 }
 
 describe('FinanceService — approval separation of duties', () => {

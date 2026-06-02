@@ -7,6 +7,8 @@ import React, {
   useEffect,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { setAccessToken, clearAccessToken } from "../utils/tokenStore";
+import { refreshAccessToken } from "../utils/api";
 
 interface User {
   id: string;
@@ -46,19 +48,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL}/auth/signin`,
-        { email, password }
+        { email, password },
+        { withCredentials: true }
       );
       if (response.status === 200) {
+        // Access token kept in memory only; refresh token is an httpOnly cookie.
+        setAccessToken(response.data.token);
         setIsLoggedIn(true);
         setUser(response.data.user);
         localStorage.setItem("user", JSON.stringify(response.data.user));
-        localStorage.setItem("token", response.data.token);
-        if (response.data.refreshToken) {
-          localStorage.setItem("refreshToken", response.data.refreshToken);
-        }
-        axios.defaults.headers.common[
-          "Authorization"
-        ] = `Bearer ${response.data.token}`;
         navigate("/dashboard");
       }
     } catch (err) {
@@ -89,32 +87,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const logout = () => {
-    // Revoke the refresh token server-side (best effort), then clear locally.
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (refreshToken) {
-      axios
-        .post(`${import.meta.env.VITE_API_URL}/auth/logout`, { refreshToken })
-        .catch(() => undefined);
-    }
+    // Revoke the refresh token server-side (reads the httpOnly cookie), then
+    // clear local state.
+    axios
+      .post(`${import.meta.env.VITE_API_URL}/auth/logout`, {}, { withCredentials: true })
+      .catch(() => undefined);
     setIsLoggedIn(false);
     setUser(null);
     localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    delete axios.defaults.headers.common["Authorization"];
+    clearAccessToken();
     navigate("/login");
   };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = localStorage.getItem("token");
-
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setIsLoggedIn(true);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
-    }
-    setLoading(false); // Set loading to false after checking localStorage
+    // No access token survives a reload (it's in memory only), so restore the
+    // session from the httpOnly refresh cookie.
+    (async () => {
+      const token = await refreshAccessToken();
+      if (token) {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) setUser(JSON.parse(storedUser));
+        setIsLoggedIn(true);
+      } else {
+        localStorage.removeItem("user");
+        clearAccessToken();
+      }
+      setLoading(false);
+    })();
   }, []);
 
   return (

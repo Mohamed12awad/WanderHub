@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { VisibilityService } from '../common/visibility.service';
 import { toClient } from '../common/serialize';
+import { UNPAGINATED_MAX } from '../common/paginate';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -47,7 +48,7 @@ export class ProjectsService {
     if (customerId) where.customerId = customerId;
 
     if (!page) {
-      const projects = await this.prisma.project.findMany({ where, include: PROJECT_INCLUDE, orderBy: { createdAt: 'desc' } });
+      const projects = await this.prisma.project.findMany({ where, include: PROJECT_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(projects);
     }
 

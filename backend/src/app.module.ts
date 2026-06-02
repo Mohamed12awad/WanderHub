@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { SentryExceptionFilter } from './common/sentry.filter';
 import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { WorkspaceConfigModule } from './common/workspace-config.module';
 import { VisibilityModule } from './common/visibility.module';
 import { AuthModule } from './auth/auth.module';
 import { TimelineModule } from './timeline/timeline.module';
@@ -30,6 +32,10 @@ import { SettingsModule } from './settings/settings.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LeadsModule } from './leads/leads.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { AttachmentsModule } from './attachments/attachments.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 
 @Module({
   providers: [
@@ -50,7 +56,9 @@ import { LeadsModule } from './leads/leads.module';
       },
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ScheduleModule.forRoot(),
     PrismaModule,
+    WorkspaceConfigModule,
     VisibilityModule,
     TimelineModule,
     NumberSequenceModule,
@@ -75,6 +83,10 @@ import { LeadsModule } from './leads/leads.module';
     ReportsModule,
     SettingsModule,
     AccountsModule,
+    SchedulerModule,
+    InventoryModule,
+    AttachmentsModule,
+    ApprovalsModule,
   ],
 })
 export class AppModule {}

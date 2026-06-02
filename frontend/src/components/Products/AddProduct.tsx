@@ -7,6 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createProduct } from "@/utils/api";
+import { productSchema, zodFieldErrors } from "@/validations/schemas";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
@@ -48,12 +49,7 @@ const AddProduct = () => {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const validate = () => {
-    const errs: FormErrors = {};
-    if (!formData.name) errs.name = "Product name is required";
-    if (!formData.type) errs.type = "Product type is required";
-    return errs;
-  };
+  const validate = (): FormErrors => zodFieldErrors(productSchema, formData);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { UNPAGINATED_MAX } from '../common/paginate';
+import { ApprovalService } from '../common/approval.service';
 import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
 import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
@@ -11,6 +13,7 @@ export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly approvals: ApprovalService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -30,7 +33,7 @@ export class ExpensesService {
     const { page, limit: limitRaw, q, approvalStatus, createdAt_from, createdAt_to } = query;
     const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
-      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' } });
+      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(reports);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -62,7 +65,8 @@ export class ExpensesService {
 
   async create(body: CreateExpenseReportDto, userId: string) {
     const { title, expenses } = body;
-    const { enabled } = await this.getApprovalConfig('expenses');
+    const total = (expenses ?? []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const enabled = await this.approvals.isEnabled('expenses');
     const report = await this.prisma.expenseReport.create({
       data: {
         title,
@@ -80,7 +84,13 @@ export class ExpensesService {
       },
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
-    const total = (expenses ?? []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    if (enabled) {
+      const overall = await this.approvals.initSteps(this.prisma, 'ExpenseReport', report.id, 'expenses', total);
+      if (overall === 'approved') {
+        await this.prisma.expenseReport.update({ where: { id: report.id }, data: { approvalStatus: 'approved' } });
+        (report as any).approvalStatus = 'approved';
+      }
+    }
     await this.timeline.log('expense.created', `Expense report "${report.title}" created`, report.id, 'Expense', { total }, userId);
     return toClient(report);
   }
@@ -117,6 +127,20 @@ export class ExpensesService {
     const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!report) throw new NotFoundException('expense report not found');
     if (report.approvalStatus === 'approved') return toClient(report);
+
+    const steps = await this.approvals.listSteps('ExpenseReport', id);
+    if (steps.length) {
+      const result = await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'approve');
+      const finalApproved = result.status === 'approved';
+      const updated = await this.prisma.expenseReport.update({
+        where: { id },
+        data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
+        include: { user: { select: { id: true, name: true } }, expenses: true },
+      });
+      await this.timeline.log('expense.approved', `Expense report "${report.title}" approval advanced (${result.status})`, id, 'Expense', {}, userId);
+      return toClient(updated);
+    }
+
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve expense reports');
     // Separation of duties: the report owner cannot approve their own report.
@@ -134,6 +158,19 @@ export class ExpensesService {
     const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!report) throw new NotFoundException('expense report not found');
     if (report.approvalStatus === 'rejected') return toClient(report);
+
+    const steps = await this.approvals.listSteps('ExpenseReport', id);
+    if (steps.length) {
+      await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'reject', reason);
+      const updated = await this.prisma.expenseReport.update({
+        where: { id },
+        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        include: { user: { select: { id: true, name: true } }, expenses: true },
+      });
+      await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
+      return toClient(updated);
+    }
+
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject expense reports');
     if (report.userId === userId) throw new ForbiddenException('You cannot reject an expense report you created');
