@@ -57,7 +57,7 @@ const ViewProduct: React.FC = () => {
 
   const handleClone = () => {
     if (!product) return;
-    const { _id, id: _, createdAt, updatedAt, ...rest } = product as any;
+    const { _id, id: _, createdAt, updatedAt, deletedAt, ...rest } = product as any;
     navigate("/products/add", { state: { clone: { ...rest, name: `Copy of ${product.name}` } } });
   };
 

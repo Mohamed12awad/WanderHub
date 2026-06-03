@@ -11,7 +11,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote, getActivities } from "@/utils/api";
 import { ActivityList } from "@/components/Activities/ActivityList";
@@ -114,6 +114,28 @@ const QuoteDetail: React.FC = () => {
     } finally { setActionLoading(false); }
   };
 
+  const handleClone = () => {
+    if (!quote) return;
+    navigate("/finance/quotes/new", {
+      state: {
+        clone: {
+          title: `Copy of ${quote.title}`,
+          customer: quote.customer._id,
+          deal: quote.deal?._id ?? "none",
+          currency: quote.currency,
+          taxRate: quote.taxRate,
+          notes: quote.notes ?? "",
+          terms: quote.terms ?? "",
+          validUntil: "",
+          status: "draft",
+          items: quote.items.map(({ description, quantity, unitPrice, discount }: any) => ({
+            description, quantity, unitPrice, discount,
+          })),
+        },
+      },
+    });
+  };
+
   const handleDelete = async () => {
     if (!confirm("Delete this quote?")) return;
     try {
@@ -201,6 +223,10 @@ const QuoteDetail: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => window.print()}>
                   <Printer className="h-3.5 w-3.5 me-2" />Print
                 </DropdownMenuItem>

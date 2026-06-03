@@ -454,4 +454,64 @@ export const upsertExchangeRate = (data: { currency: string; rate: number; asOf?
 export const getApprovalSteps = (entityType: string, entityId: string) =>
   api.get(`/approvals/${entityType}/${entityId}/steps`);
 
+// ── Number Sequences ──────────────────────────────────────────────────────────
+export const getNumberSequences = () => api.get("/settings/number-sequences");
+export const updateNumberSequence = (
+  key: string,
+  data: { prefix?: string; padLength?: number; separator?: string },
+) => api.put(`/settings/number-sequences/${key}`, data);
+
+// ── Invoice Defaults ──────────────────────────────────────────────────────────
+export const getInvoiceDefaults = () => api.get("/settings/invoice-defaults");
+export const updateInvoiceDefaults = (data: {
+  paymentTermsDays?: number;
+  notes?: string;
+  terms?: string;
+  quotesValidDays?: number;
+}) => api.put("/settings/invoice-defaults", data);
+
+// ── Tax Rates ─────────────────────────────────────────────────────────────────
+export const getTaxRates = () => api.get("/settings/tax-rates");
+export const createTaxRate = (data: { name: string; rate: number; isDefault?: boolean }) =>
+  api.post("/settings/tax-rates", data);
+export const updateTaxRate = (id: string, data: { name?: string; rate?: number; isDefault?: boolean }) =>
+  api.patch(`/settings/tax-rates/${id}`, data);
+export const deleteTaxRate = (id: string): Promise<void> =>
+  api.delete(`/settings/tax-rates/${id}`);
+
+// ── Notification Preferences ──────────────────────────────────────────────────
+export const getNotificationPreferences = () =>
+  api.get("/users/me/notification-preferences");
+export const updateNotificationPreferences = (data: Record<string, { inApp: boolean; email: boolean }>) =>
+  api.put("/users/me/notification-preferences", data);
+
+// ── Password Policy ───────────────────────────────────────────────────────────
+export const getPasswordPolicy = () => api.get("/settings/password-policy");
+export const updatePasswordPolicy = (data: {
+  minLength?: number;
+  requireUppercase?: boolean;
+  requireNumber?: boolean;
+  requireSymbol?: boolean;
+}) => api.put("/settings/password-policy", data);
+
+// ── Email / SMTP Config ───────────────────────────────────────────────────────
+export const getEmailConfig = () => api.get("/settings/email-config");
+export const updateEmailConfig = (data: {
+  host?: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  fromName?: string;
+  fromEmail?: string;
+}) => api.put("/settings/email-config", data);
+export const testEmailConfig = () => api.post("/settings/email-config/test");
+
+// ── Security — sessions, login history, change password ───────────────────────
+export const getSessions = () => api.get("/users/me/sessions");
+export const revokeSession = (sessionId: string) =>
+  api.delete(`/users/me/sessions/${sessionId}`);
+export const getLoginHistory = () => api.get("/users/me/login-history");
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api.post("/users/me/change-password", { currentPassword, newPassword });
+
 

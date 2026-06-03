@@ -35,6 +35,7 @@ function makeService(prisma: any) {
 }
 
 describe('FinanceService — approval separation of duties', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('throws ForbiddenException when the creator tries to approve their own invoice', async () => {
     const { prisma } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'user1', deletedAt: null });
@@ -72,6 +73,7 @@ describe('FinanceService — approval separation of duties', () => {
 });
 
 describe('FinanceService — recordPayment', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('recomputes totalPaid as the SUM of payments inside the transaction', async () => {
     const { prisma, tx } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', total: 100, currency: 'EGP', approvalStatus: 'approved', dealId: null, dueDate: null, deletedAt: null });

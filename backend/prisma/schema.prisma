@@ -155,10 +155,11 @@ model User {
   email       String   @unique
   phone       String
   password    String
-  active      Boolean  @default(true)
-  roleId      String
-  role        Role     @relation(fields: [roleId], references: [id])
-  reportsToId String?
+  active                  Boolean  @default(true)
+  notificationPreferences Json?
+  roleId                  String
+  role                    Role     @relation(fields: [roleId], references: [id])
+  reportsToId             String?
   reportsTo   User?    @relation("ReportsTo", fields: [reportsToId], references: [id])
   directReports User[] @relation("ReportsTo")
   createdAt   DateTime @default(now())
@@ -716,6 +717,8 @@ model RefreshToken {
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
+  userAgent String?
+  ipAddress String?
 
   @@index([userId])
 }
@@ -764,14 +767,38 @@ model ApprovalStep {
 }
 
 model WorkspaceConfig {
-  id             String   @id @default(cuid())
-  approvals      Json     @default("[]")
-  fieldGroups    Json     @default("[]")
-  moduleSettings Json     @default("[]")
-  baseCurrency   String   @default("EGP")
-  locale         String   @default("en-US")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  approvals       Json     @default("[]")
+  fieldGroups     Json     @default("[]")
+  moduleSettings  Json     @default("[]")
+  pipelineStages  Json     @default("[]")
+  invoiceDefaults Json     @default("{}")
+  passwordPolicy  Json     @default("{}")
+  baseCurrency    String   @default("EGP")
+  locale          String   @default("en-US")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  name      String
+  rate      Float
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SmtpConfig {
+  id        String   @id @default(cuid())
+  host      String
+  port      Int      @default(587)
+  user      String
+  encPass   String
+  fromName  String?
+  fromEmail String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Durable email queue. Notification emails are enqueued here and delivered by

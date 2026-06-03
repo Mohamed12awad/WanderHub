@@ -20,7 +20,7 @@ export class AccountsService {
   }
 
   async update(id: string, body: UpdateAccountDto) {
-    const existing = await this.prisma.account.findUnique({ where: { id } });
+    const existing = await this.prisma.account.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('account not found');
     const { _id, id: _id2, createdAt, updatedAt, ...data } = body as any;
     const account = await this.prisma.account.update({ where: { id }, data: data as any });

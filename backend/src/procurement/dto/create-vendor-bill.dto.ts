@@ -7,9 +7,9 @@ import { LineItemDto } from '../../finance/dto/line-item.dto';
 export class CreateVendorBillDto {
   @IsString() @IsNotEmpty() title: string;
 
-  @IsNotEmpty() supplier: any;
+  @IsString() @IsNotEmpty() supplier: string;
 
-  @IsOptional() purchaseOrder?: any;
+  @IsOptional() @IsString() purchaseOrder?: string;
 
   @IsOptional()
   @IsIn(['draft', 'received', 'partially_paid', 'paid', 'overdue', 'cancelled'])

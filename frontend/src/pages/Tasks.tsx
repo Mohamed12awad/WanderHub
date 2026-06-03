@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { AddTaskPanel } from "@/components/Tasks/AddTaskPanel";
 import {
   PlusCircle, List, LayoutGrid, Check,
-  Pencil, Trash2, CalendarDays, User,
+  Pencil, Trash2, CalendarDays, User, Copy,
 } from "lucide-react";
 
 const PRIORITY_STYLE: Record<TaskPriority, string> = {
@@ -35,12 +35,14 @@ function TaskCard({
   onEdit,
   onDelete,
   onComplete,
+  onClone,
   priorities,
 }: {
   task: Task;
   onEdit: () => void;
   onDelete: () => void;
   onComplete: () => void;
+  onClone: () => void;
   statuses: Record<string, string>;
   priorities: Record<string, string>;
 }) {
@@ -121,16 +123,13 @@ function TaskCard({
         </div>
 
         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button
-            onClick={onEdit}
-            className="p-1 rounded hover:bg-muted transition-colors"
-          >
+          <button onClick={onEdit} className="p-1 rounded hover:bg-muted transition-colors" title="Edit">
             <Pencil className="h-3 w-3 text-muted-foreground" />
           </button>
-          <button
-            onClick={onDelete}
-            className="p-1 rounded hover:bg-muted hover:text-destructive transition-colors"
-          >
+          <button onClick={onClone} className="p-1 rounded hover:bg-muted transition-colors" title="Clone">
+            <Copy className="h-3 w-3 text-muted-foreground" />
+          </button>
+          <button onClick={onDelete} className="p-1 rounded hover:bg-muted hover:text-destructive transition-colors" title="Delete">
             <Trash2 className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
@@ -152,6 +151,7 @@ export function Tasks() {
   const [search, setSearch] = useState("");
   const [panelOpen, setPanelOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [cloneTask, setCloneTask] = useState<Task | null>(null);
 
   const params: Record<string, string> = {};
   if (filter === "mine") params.mine = "true";
@@ -185,13 +185,21 @@ export function Tasks() {
   });
 
   const openEdit = (task: Task) => {
+    setCloneTask(null);
     setEditTask(task);
+    setPanelOpen(true);
+  };
+
+  const openClone = (task: Task) => {
+    setEditTask(null);
+    setCloneTask(task);
     setPanelOpen(true);
   };
 
   const closePanel = () => {
     setPanelOpen(false);
     setEditTask(null);
+    setCloneTask(null);
   };
 
   const FILTERS: { key: FilterKey; label: string }[] = [
@@ -276,6 +284,7 @@ export function Tasks() {
         <ListView
           tasks={filtered}
           onEdit={openEdit}
+          onClone={openClone}
           onDelete={(id) => deleteMut.mutate(id)}
           onComplete={(id) => completeMut.mutate(id)}
           statuses={t.statuses}
@@ -285,6 +294,7 @@ export function Tasks() {
         <BoardView
           tasks={filtered}
           onEdit={openEdit}
+          onClone={openClone}
           onDelete={(id) => deleteMut.mutate(id)}
           onComplete={(id) => completeMut.mutate(id)}
           statuses={t.statuses}
@@ -295,16 +305,24 @@ export function Tasks() {
         open={panelOpen}
         onClose={closePanel}
         task={editTask}
+        cloneData={cloneTask ? {
+          title: `Copy of ${cloneTask.title}`,
+          description: cloneTask.description ?? "",
+          priority: cloneTask.priority,
+          assignedTo: cloneTask.assignedTo?._id ?? "",
+          tags: cloneTask.tags ?? [],
+        } : null}
       />
     </div>
   );
 }
 
 function ListView({
-  tasks, onEdit, onDelete, onComplete, statuses, priorities,
+  tasks, onEdit, onClone, onDelete, onComplete, statuses, priorities,
 }: {
   tasks: Task[];
   onEdit: (t: Task) => void;
+  onClone: (t: Task) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
   statuses: Record<string, string>;
@@ -317,6 +335,7 @@ function ListView({
           key={task._id}
           task={task}
           onEdit={() => onEdit(task)}
+          onClone={() => onClone(task)}
           onDelete={() => onDelete(task._id)}
           onComplete={() => onComplete(task._id)}
           statuses={statuses}
@@ -328,10 +347,11 @@ function ListView({
 }
 
 function BoardView({
-  tasks, onEdit, onDelete, onComplete, statuses, priorities,
+  tasks, onEdit, onClone, onDelete, onComplete, statuses, priorities,
 }: {
   tasks: Task[];
   onEdit: (t: Task) => void;
+  onClone: (t: Task) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
   statuses: Record<string, string>;
@@ -363,6 +383,7 @@ function BoardView({
                   key={task._id}
                   task={task}
                   onEdit={() => onEdit(task)}
+                  onClone={() => onClone(task)}
                   onDelete={() => onDelete(task._id)}
                   onComplete={() => onComplete(task._id)}
                   statuses={statuses}

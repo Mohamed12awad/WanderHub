@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   createVendorBill, updateVendorBill, getVendorBillById,
@@ -19,19 +19,23 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const cloneData = mode === "add" ? (location.state as any)?.clone : undefined;
   const poParam = searchParams.get("po");
   const { tr } = useLanguage();
   const { toast } = useToast();
 
-  const [title, setTitle] = useState("");
-  const [supplier, setSupplier] = useState("");
+  const [title, setTitle] = useState(cloneData?.title ?? "");
+  const [supplier, setSupplier] = useState(cloneData?.supplier ?? "");
   const [purchaseOrder, setPurchaseOrder] = useState("");
-  const [currency, setCurrency] = useState("EGP");
+  const [currency, setCurrency] = useState(cloneData?.currency ?? "EGP");
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
-  const [taxRate, setTaxRate] = useState(0);
-  const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<LineItemRow[]>([{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]);
+  const [taxRate, setTaxRate] = useState<number>(cloneData?.taxRate ?? 0);
+  const [notes, setNotes] = useState(cloneData?.notes ?? "");
+  const [items, setItems] = useState<LineItemRow[]>(
+    cloneData?.items?.length ? cloneData.items : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]
+  );
 
   const { data: suppliersData } = useQuery({
     queryKey: ["suppliers-all"],

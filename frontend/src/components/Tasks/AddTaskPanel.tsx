@@ -14,6 +14,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   task?: Task | null;
+  cloneData?: Partial<TaskFormData> | null;
 }
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
@@ -26,7 +27,7 @@ const PRIORITY_COLORS: Record<TaskPriority, string> = {
   urgent: "bg-red-50 text-red-700 border-red-300",
 };
 
-export function AddTaskPanel({ open, onClose, task }: Props) {
+export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
   const { tr } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -55,11 +56,21 @@ export function AddTaskPanel({ open, onClose, task }: Props) {
         assignedTo: task.assignedTo?._id ?? "",
         tags: task.tags ?? [],
       });
+    } else if (cloneData) {
+      setForm({
+        title: cloneData.title ?? "",
+        description: cloneData.description ?? "",
+        priority: cloneData.priority ?? "medium",
+        status: "todo",
+        dueDate: "",
+        assignedTo: cloneData.assignedTo ?? "",
+        tags: cloneData.tags ?? [],
+      });
     } else {
       setForm({ title: "", description: "", priority: "medium", status: "todo", dueDate: "", assignedTo: "", tags: [] });
     }
     setTagInput("");
-  }, [task, open]);
+  }, [task, cloneData, open]);
 
   const { data: usersData } = useQuery({
     queryKey: ["users"],

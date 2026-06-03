@@ -14,6 +14,7 @@ function makeService(opts?: { base?: string; rows?: { currency: string; rate: nu
 }
 
 describe('CurrencyService.toBase', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('passes through an amount already in the base currency', async () => {
     expect(await makeService().toBase(100, 'EGP')).toBe(100);
   });
@@ -32,6 +33,7 @@ describe('CurrencyService.toBase', () => {
 });
 
 describe('CurrencyService.sumToBase', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('collapses a multi-currency map into one base total', async () => {
     // 100 EGP + (10 USD * 50) + (2 EUR * 55) = 100 + 500 + 110 = 710
     const total = await makeService().sumToBase({ EGP: 100, USD: 10, EUR: 2 });
@@ -51,6 +53,7 @@ describe('CurrencyService.sumToBase', () => {
 });
 
 describe('CurrencyService caching', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('caches rate lookups and clears them on invalidate()', async () => {
     const svc = makeService();
     const prisma: any = (svc as any).prisma;

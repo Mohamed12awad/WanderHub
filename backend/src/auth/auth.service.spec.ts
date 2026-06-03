@@ -28,6 +28,7 @@ const roleUser = {
 };
 
 describe('AuthService.signin', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('throws BadRequestException for an unknown email (no enumeration)', async () => {
     const prisma = buildPrisma();
     prisma.user.findUnique.mockResolvedValue(null);
@@ -72,6 +73,7 @@ describe('AuthService.signin', () => {
 });
 
 describe('AuthService.refresh', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('returns null for a missing token', async () => {
     const svc = new AuthService(buildPrisma(), jwtMock);
     expect(await svc.refresh(undefined)).toBeNull();
@@ -122,6 +124,7 @@ describe('AuthService.refresh', () => {
 });
 
 describe('AuthService.logout', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('revokes the presented token', async () => {
     const prisma = buildPrisma();
     const svc = new AuthService(prisma, jwtMock);

@@ -7,8 +7,7 @@ import { LineItemDto } from '../../finance/dto/line-item.dto';
 export class CreatePurchaseOrderDto {
   @IsString() @IsNotEmpty() title: string;
 
-  // Mapped to supplierId by the service.
-  @IsNotEmpty() supplier: any;
+  @IsString() @IsNotEmpty() supplier: string;
 
   @IsOptional()
   @IsIn(['draft', 'sent', 'confirmed', 'received', 'cancelled'])

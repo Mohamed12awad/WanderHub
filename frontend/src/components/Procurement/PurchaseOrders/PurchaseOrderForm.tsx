@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createPurchaseOrder, updatePurchaseOrder, getPurchaseOrderById, getSuppliers } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -16,19 +16,21 @@ const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
+  const cloneData = mode === "add" ? (location.state as any)?.clone : undefined;
   const { tr } = useLanguage();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    supplierId: "",
+    supplierId: cloneData?.supplierId ?? "",
     status: "draft",
-    currency: "EGP",
+    currency: cloneData?.currency ?? "EGP",
     issueDate: new Date().toISOString().split("T")[0],
     expectedDeliveryDate: "",
-    notes: "",
-    items: [] as LineItemRow[],
+    notes: cloneData?.notes ?? "",
+    items: (cloneData?.items ?? []) as LineItemRow[],
     subtotal: 0,
-    taxRate: 14,
+    taxRate: cloneData?.taxRate ?? 14,
     tax: 0,
     total: 0,
   });
@@ -72,8 +74,8 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
       navigate("/procurement/purchase-orders");
     },
 
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save Purchase Order.", variant: "destructive" });
+    onError: (e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Failed to save Purchase Order.", variant: "destructive" });
     }
   });
 

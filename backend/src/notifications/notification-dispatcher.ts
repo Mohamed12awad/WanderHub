@@ -49,33 +49,43 @@ export class NotificationDispatcher {
   }
 
   async dispatch(payload: NotificationPayload): Promise<void> {
-    // Always save to DB (in-app notification).
-    await this.prisma.notification.create({ data: payload as any });
+    // Fetch user once for both preference check and email.
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { email: true, name: true, notificationPreferences: true },
+    });
+
+    // Per-channel preference check. A missing/null pref defaults to enabled.
+    const prefs = user?.notificationPreferences as
+      | Record<string, { inApp?: boolean; email?: boolean }>
+      | null
+      | undefined;
+    const typePref = prefs?.[payload.type];
+    const inAppEnabled = typePref?.inApp !== false;
+    const emailEnabled = typePref?.email !== false;
+
+    if (inAppEnabled) {
+      await this.prisma.notification.create({ data: payload as any });
+    }
 
     // Enqueue an email for high-signal event types. Actual delivery is handled
     // by the scheduler draining the outbox, so a slow/failing SMTP server never
     // blocks or breaks the in-app flow.
-    if (this.transporter && EMAIL_TYPES.has(payload.type)) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: { email: true, name: true },
+    if (emailEnabled && this.transporter && EMAIL_TYPES.has(payload.type) && user?.email) {
+      const appUrl = process.env.APP_URL ?? "";
+      const actionUrl = payload.link ? `${appUrl}${payload.link}` : appUrl;
+      await this.prisma.emailOutbox.create({
+        data: {
+          to: user.email,
+          subject: payload.title,
+          html: buildEmailHtml({
+            name: user.name,
+            title: payload.title,
+            body: payload.body,
+            actionUrl,
+          }),
+        },
       });
-      if (user?.email) {
-        const appUrl = process.env.APP_URL ?? "";
-        const actionUrl = payload.link ? `${appUrl}${payload.link}` : appUrl;
-        await this.prisma.emailOutbox.create({
-          data: {
-            to: user.email,
-            subject: payload.title,
-            html: buildEmailHtml({
-              name: user.name,
-              title: payload.title,
-              body: payload.body,
-              actionUrl,
-            }),
-          },
-        });
-      }
     }
   }
 

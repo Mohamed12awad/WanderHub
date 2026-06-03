@@ -1,6 +1,7 @@
 import { calcTotals, deriveInvoiceStatus } from './finance.math';
 
 describe('calcTotals', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('computes line totals, subtotal, tax and grand total', () => {
     const r = calcTotals(
       [
@@ -46,6 +47,7 @@ describe('calcTotals', () => {
 });
 
 describe('deriveInvoiceStatus', () => {
+  beforeEach(() => jest.clearAllMocks());
   const now = new Date('2026-05-29T00:00:00Z');
   const past = new Date('2026-01-01T00:00:00Z');
   const future = new Date('2026-12-31T00:00:00Z');

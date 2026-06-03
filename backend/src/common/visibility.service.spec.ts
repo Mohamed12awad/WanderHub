@@ -1,6 +1,7 @@
 import { resolveScope, VisibilityService } from './visibility.service';
 
 describe('resolveScope', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('grants "all" for the wildcard or the plain view permission', () => {
     expect(resolveScope(['*'], 'deals')).toBe('all');
     expect(resolveScope(['deals:view'], 'deals')).toBe('all');
@@ -45,6 +46,7 @@ function subtree(tree: Record<string, string[]>, root: string): string[] {
 }
 
 describe('VisibilityService.getSubtreeUserIds', () => {
+  beforeEach(() => jest.clearAllMocks());
   const tree: Record<string, string[]> = { A: ['B', 'C'], B: ['D'], C: [], D: [] };
 
   function makeService() {
@@ -71,6 +73,7 @@ describe('VisibilityService.getSubtreeUserIds', () => {
 });
 
 describe('VisibilityService.ownershipWhere', () => {
+  beforeEach(() => jest.clearAllMocks());
   function makeService(children: Record<string, string[]> = {}) {
     const prisma: any = {
       $queryRaw: jest.fn((_strings: TemplateStringsArray, userId: string) =>

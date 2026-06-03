@@ -19,12 +19,13 @@ export class CreateInvoiceDto {
   @IsNotEmpty()
   title: string;
 
-  // Mapped to customerId by the service (accepts an id or { _id }).
+  @IsString()
   @IsNotEmpty()
-  customer: any;
+  customer: string;
 
   @IsOptional()
-  deal?: any;
+  @IsString()
+  deal?: string;
 
   @IsOptional()
   @IsIn(['draft', 'sent', 'partially_paid', 'paid', 'overdue', 'cancelled'])

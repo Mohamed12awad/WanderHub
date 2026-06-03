@@ -29,6 +29,7 @@ users.txt
 subabase.txt
 
 # plans and reviews
+plans/
 PLAN.md
 ROADMAP.md
 PLAN0.md

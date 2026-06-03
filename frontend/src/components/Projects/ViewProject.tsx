@@ -19,7 +19,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CircleArrowLeft, Edit, Plus, Trash2, CheckCircle2, Circle, Clock } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CircleArrowLeft, Edit, Plus, Trash2, CheckCircle2, Circle, Clock, Copy, MoreHorizontal } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/common/spinner";
@@ -121,6 +124,25 @@ export default function ViewProject() {
     onSuccess: () => refresh("project-members")
   });
 
+  const handleClone = () => {
+    if (!project) return;
+    navigate("/projects/new", {
+      state: {
+        clone: {
+          name: `Copy of ${project.name}`,
+          description: project.description ?? "",
+          status: "planning",
+          priority: project.priority ?? "medium",
+          budget: project.budget?.toString() ?? "",
+          currency: project.currency ?? "EGP",
+          customer: project.customer?._id ?? "",
+          deal: "",
+          manager: project.manager?._id ?? "",
+        },
+      },
+    });
+  };
+
   const handleDelete = async () => {
     if (!confirm("Delete this project?")) return;
     try { await deleteProject(id!); navigate("/projects"); }
@@ -148,7 +170,16 @@ export default function ViewProject() {
         </div>
         <div className="flex gap-2">
           <Link to={`/projects/${id}/edit`}><Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button></Link>
-          <Button size="sm" variant="outline" className="text-destructive" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5" /></Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleClone}><Copy className="h-3.5 w-3.5 me-2" />Clone</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

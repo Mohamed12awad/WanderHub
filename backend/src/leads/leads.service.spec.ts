@@ -49,6 +49,7 @@ const sampleLead = {
 };
 
 describe('LeadsService.create', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('creates a lead and returns the serialized record', async () => {
     const prisma = buildPrisma();
     prisma.lead.create.mockResolvedValue(sampleLead);
@@ -103,6 +104,7 @@ describe('LeadsService.create', () => {
 });
 
 describe('LeadsService.convertToCustomer', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('throws 400 if the lead is already converted', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue({ ...sampleLead, status: 'converted' });
@@ -136,6 +138,7 @@ describe('LeadsService.convertToCustomer', () => {
 });
 
 describe('LeadsService.remove', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('throws NotFoundException when lead is not found', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null);

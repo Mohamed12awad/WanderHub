@@ -88,7 +88,7 @@ const ViewCustomer: React.FC = () => {
 
   const handleClone = () => {
     if (!customerData) return;
-    const { phone: _p, email: _e, _id, deals: _d, createdAt: _c, updatedAt: _u, owner, ...rest } = customerData as any;
+    const { phone: _p, email: _e, _id, deals: _d, createdAt: _c, updatedAt: _u, deletedAt: _del, owner, ...rest } = customerData as any;
     navigate("/customers/add", {
       state: {
         clone: {

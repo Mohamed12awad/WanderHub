@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProfileSettings() {
@@ -19,8 +19,6 @@ export default function ProfileSettings() {
 
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   const { data: userData, isPending } = useQuery({
     queryKey: ["user-profile", user?.id],
@@ -41,8 +39,6 @@ export default function ProfileSettings() {
 
     onSuccess: () => {
       updateCurrentUser({ name });
-      setNewPassword("");
-      setConfirmPassword("");
       toast({ title: s.saved });
     },
 
@@ -53,13 +49,8 @@ export default function ProfileSettings() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword && newPassword !== confirmPassword) {
-      toast({ title: "Passwords do not match.", variant: "destructive" });
-      return;
-    }
     const roleId = userData?.data?.role?._id ?? userData?.data?.role ?? "";
     const payload: any = { name, phone, email: user!.email, role: roleId };
-    if (newPassword) payload.password = newPassword;
     mutation.mutate(payload);
   };
 
@@ -125,38 +116,6 @@ export default function ProfileSettings() {
                   <div className="flex items-center h-10">
                     <Badge variant="outline" className="capitalize">{user?.role}</Badge>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Change password ── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Change Password</CardTitle>
-              <CardDescription className="text-xs">Leave blank to keep your current password.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
                 </div>
               </div>
             </CardContent>

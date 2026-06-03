@@ -31,13 +31,18 @@ export class AuthService {
   }
 
   /** Issues a new opaque refresh token and stores only its hash. */
-  private async issueRefreshToken(userId: string): Promise<string> {
+  private async issueRefreshToken(
+    userId: string,
+    meta?: { userAgent?: string; ipAddress?: string },
+  ): Promise<string> {
     const raw = crypto.randomBytes(48).toString('base64url');
     await this.prisma.refreshToken.create({
       data: {
         userId,
         tokenHash: hashToken(raw),
         expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        userAgent: meta?.userAgent,
+        ipAddress: meta?.ipAddress,
       },
     });
     return raw;
@@ -53,7 +58,7 @@ export class AuthService {
     };
   }
 
-  async signin(email: string, password: string) {
+  async signin(email: string, password: string, meta?: { userAgent?: string; ipAddress?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { role: true },
@@ -71,7 +76,7 @@ export class AuthService {
     if (user.active === false) throw new ForbiddenException('This account has been blocked');
 
     const token = this.signAccessToken(user.id);
-    const refreshToken = await this.issueRefreshToken(user.id);
+    const refreshToken = await this.issueRefreshToken(user.id, meta);
 
     return { token, refreshToken, user: this.publicUser(user as any) };
   }

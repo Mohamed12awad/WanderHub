@@ -86,7 +86,7 @@ export interface DealData {
   customFields?: Record<string, string>;
 }
 
-export type ActivityType = "call" | "meeting" | "task" | "note" | "email";
+export type ActivityType = "call" | "meeting" | "task" | "email";
 export type ActivityStatus = "pending" | "completed";
 
 export interface Activity {
@@ -98,11 +98,11 @@ export interface Activity {
   status: ActivityStatus;
   linkedTo: string;
   linkedModel: string;
-  customer?:   { _id: string; name: string };
-  deal?:       { _id: string; title: string };
-  project?:    { _id: string; name: string };
+  customer?: { _id: string; name: string };
+  deal?: { _id: string; title: string };
+  project?: { _id: string; name: string };
   assignedTo?: { _id: string; name: string };
-  createdBy?:  { _id: string; name: string };
+  createdBy?: { _id: string; name: string };
   createdAt: string;
 }
 
@@ -179,7 +179,17 @@ export interface Product {
   customFields?: Record<string, string>;
 }
 
-export type NoteLinkedModel = "Customer" | "Deal" | "Product" | "Expense" | "Quote" | "Invoice" | "Lead" | "Project" | "Supplier" | "PurchaseOrder";
+export type NoteLinkedModel =
+  | "Customer"
+  | "Deal"
+  | "Product"
+  | "Expense"
+  | "Quote"
+  | "Invoice"
+  | "Lead"
+  | "Project"
+  | "Supplier"
+  | "PurchaseOrder";
 
 export interface Note {
   _id: string;
@@ -192,14 +202,25 @@ export interface Note {
 }
 
 export type TimelineEventType =
-  | "deal.created" | "deal.updated" | "deal.stage_changed" | "deal.won" | "deal.lost"
-  | "payment.received" | "payment.deleted"
-  | "task.created" | "task.completed"
+  | "deal.created"
+  | "deal.updated"
+  | "deal.stage_changed"
+  | "deal.won"
+  | "deal.lost"
+  | "payment.received"
+  | "payment.deleted"
+  | "task.created"
+  | "task.completed"
   | "note.added"
-  | "contact.created" | "contact.updated"
-  | "quote.created" | "invoice.created"
-  | "expense.created" | "expense.approved" | "expense.rejected"
-  | "activity.logged" | "custom";
+  | "contact.created"
+  | "contact.updated"
+  | "quote.created"
+  | "invoice.created"
+  | "expense.created"
+  | "expense.approved"
+  | "expense.rejected"
+  | "activity.logged"
+  | "custom";
 
 export interface TimelineItem {
   _id: string;
@@ -209,7 +230,14 @@ export interface TimelineItem {
   title: string;
   payload?: Record<string, unknown>;
   linkedTo: string;
-  linkedModel: "Customer" | "Deal" | "Quote" | "Invoice" | "Expense" | "Product" | "Task";
+  linkedModel:
+    | "Customer"
+    | "Deal"
+    | "Quote"
+    | "Invoice"
+    | "Expense"
+    | "Product"
+    | "Task";
   triggeredBy?: { _id: string; name: string };
   isSystem?: boolean;
   createdAt: string;
@@ -223,7 +251,12 @@ export interface TimelineItem {
 }
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
-export type TaskStatus = "todo" | "in_progress" | "review" | "done" | "cancelled";
+export type TaskStatus =
+  | "todo"
+  | "in_progress"
+  | "review"
+  | "done"
+  | "cancelled";
 
 export interface Task {
   _id: string;
@@ -264,9 +297,25 @@ export interface LineItem {
   total: number;
 }
 
-export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
-export type InvoiceStatus = "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "cancelled";
-export type PaymentMethod = "cash" | "bank_transfer" | "card" | "cheque" | "other";
+export type QuoteStatus =
+  | "draft"
+  | "sent"
+  | "accepted"
+  | "rejected"
+  | "expired";
+export type InvoiceStatus =
+  | "draft"
+  | "sent"
+  | "partially_paid"
+  | "paid"
+  | "overdue"
+  | "cancelled";
+export type PaymentMethod =
+  | "cash"
+  | "bank_transfer"
+  | "card"
+  | "cheque"
+  | "other";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -391,7 +440,12 @@ export interface Supplier {
   createdAt: string;
 }
 
-export type PurchaseOrderStatus = "draft" | "sent" | "confirmed" | "received" | "cancelled";
+export type PurchaseOrderStatus =
+  | "draft"
+  | "sent"
+  | "confirmed"
+  | "received"
+  | "cancelled";
 
 export interface PurchaseOrder {
   _id: string;
@@ -414,7 +468,13 @@ export interface PurchaseOrder {
   createdAt: string;
 }
 
-export type BillStatus = "draft" | "received" | "partially_paid" | "paid" | "overdue" | "cancelled";
+export type BillStatus =
+  | "draft"
+  | "received"
+  | "partially_paid"
+  | "paid"
+  | "overdue"
+  | "cancelled";
 
 export interface VendorBill {
   _id: string;
@@ -456,7 +516,12 @@ export interface VendorBillPayment {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
-export type ProjectStatus = "planning" | "active" | "on_hold" | "completed" | "cancelled";
+export type ProjectStatus =
+  | "planning"
+  | "active"
+  | "on_hold"
+  | "completed"
+  | "cancelled";
 export type MilestoneStatus = "pending" | "in_progress" | "completed";
 
 export interface ProjectMilestone {
@@ -515,4 +580,3 @@ export interface ProjectFormData {
   budget: number;
   currency: string;
 }
-

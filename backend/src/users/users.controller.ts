@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
@@ -11,6 +13,48 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UsersController {
   constructor(private readonly users: UsersService) {}
+
+  // ── Self-service "me" routes — must come before ":id" ────────────────────────
+
+  @Post('me/change-password')
+  @HttpCode(200)
+  changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return this.users.changePassword(user.id, body.currentPassword, body.newPassword);
+  }
+
+  @Get('me/sessions')
+  getSessions(@CurrentUser() user: AuthUser) {
+    return this.users.getSessions(user.id);
+  }
+
+  @Delete('me/sessions/:sessionId')
+  @HttpCode(200)
+  revokeSession(@CurrentUser() user: AuthUser, @Param('sessionId') sessionId: string) {
+    return this.users.revokeSession(user.id, sessionId);
+  }
+
+  @Get('me/login-history')
+  getLoginHistory(@CurrentUser() user: AuthUser) {
+    return this.users.getLoginHistory(user.id);
+  }
+
+  @Get('me/notification-preferences')
+  getNotificationPreferences(@CurrentUser() user: AuthUser) {
+    return this.users.getNotificationPreferences(user.id);
+  }
+
+  @Put('me/notification-preferences')
+  updateNotificationPreferences(
+    @CurrentUser() user: AuthUser,
+    @Body() body: Record<string, { inApp: boolean; email: boolean }>,
+  ) {
+    return this.users.updateNotificationPreferences(user.id, body);
+  }
+
+  // ── Admin CRUD ────────────────────────────────────────────────────────────────
 
   @Get()
   @RequirePermission('users:view')

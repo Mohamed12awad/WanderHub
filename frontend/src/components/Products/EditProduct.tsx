@@ -40,7 +40,8 @@ const EditProduct = () => {
   useEffect(() => {
     if (!id) return;
     getProductById(id).then(({ data }) => {
-      const loaded = { ...data, customFields: data.customFields ?? {} };
+      const { _id, createdAt, updatedAt, deletedAt, ...fields } = data as any;
+      const loaded = { ...fields, customFields: fields.customFields ?? {} };
       setFormData(loaded);
       originalRef.current = JSON.stringify(loaded);
     }).catch(console.error);

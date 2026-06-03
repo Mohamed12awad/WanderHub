@@ -18,9 +18,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Plus, Trash2, Copy } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -120,6 +120,24 @@ export default function ViewVendorBill() {
     catch (e: any) { toast({ title: e?.response?.data?.message ?? "Rejection failed", variant: "destructive" }); }
     finally { setBusy(false); }
   };
+  const handleClone = () => {
+    if (!bill) return;
+    navigate("/procurement/bills/new", {
+      state: {
+        clone: {
+          title: `Copy of ${bill.title ?? bill.billNumber}`,
+          supplier: typeof bill.supplier === "object" ? bill.supplier?._id : bill.supplier,
+          currency: bill.currency,
+          taxRate: bill.taxRate,
+          notes: bill.notes ?? "",
+          items: (bill.items ?? []).map(({ description, quantity, unitPrice, discount }: any) => ({
+            description, quantity, unitPrice, discount: discount ?? 0,
+          })),
+        },
+      },
+    });
+  };
+
   const handleDelete = async () => {
     if (!confirm("Delete this bill?")) return;
     try { await deleteVendorBill(id!); navigate("/procurement/bills"); }
@@ -175,7 +193,11 @@ export default function ViewVendorBill() {
             <Link to={`/procurement/bills/${id}/edit`}><Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button></Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end"><DropdownMenuItem className="text-destructive" onClick={handleDelete}>{tr.common.delete}</DropdownMenuItem></DropdownMenuContent>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}><Copy className="h-3.5 w-3.5 me-2" />Clone</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={handleDelete}>{tr.common.delete}</DropdownMenuItem>
+              </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </CardHeader>

@@ -8,7 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { ExternalLink, Search } from "lucide-react";
@@ -20,27 +24,40 @@ import { updateActivity, deleteActivity } from "@/utils/api";
 import { CheckCircle2, Circle, Trash2 } from "lucide-react";
 
 const TYPE_EMOJIS: Record<ActivityType, string> = {
-  call: "📞", meeting: "🤝", task: "✅", note: "📝", email: "📧",
+  call: "📞",
+  meeting: "🤝",
+  task: "✅",
+  email: "📧",
 };
 
 const TYPE_BORDER: Record<string, string> = {
-  call: "border-l-blue-400", meeting: "border-l-purple-400",
-  task: "border-l-yellow-400", note: "border-l-slate-300", email: "border-l-emerald-400",
+  call: "border-l-blue-400",
+  meeting: "border-l-purple-400",
+  task: "border-l-yellow-400",
+  note: "border-l-slate-300",
+  email: "border-l-emerald-400",
 };
 
 const ENTITY_ROUTES: Record<string, string> = {
-  Customer: "/customers", Deal: "/deals", Project: "/projects",
-  Lead: "/leads", Supplier: "/procurement/suppliers",
+  Customer: "/customers",
+  Deal: "/deals",
+  Project: "/projects",
+  Lead: "/leads",
+  Supplier: "/procurement/suppliers",
   PurchaseOrder: "/procurement/purchase-orders",
-  Invoice: "/finance/invoices", Quote: "/finance/quotes",
+  Invoice: "/finance/invoices",
+  Quote: "/finance/quotes",
 };
 
 function entityLink(a: Activity): { label: string; href: string } | null {
-  if (a.customer) return { label: a.customer.name, href: `/customers/${a.customer._id}` };
-  if (a.deal)     return { label: a.deal.title,    href: `/deals/${a.deal._id}` };
-  if (a.project)  return { label: a.project.name,  href: `/projects/${a.project._id}` };
+  if (a.customer)
+    return { label: a.customer.name, href: `/customers/${a.customer._id}` };
+  if (a.deal) return { label: a.deal.title, href: `/deals/${a.deal._id}` };
+  if (a.project)
+    return { label: a.project.name, href: `/projects/${a.project._id}` };
   const base = ENTITY_ROUTES[a.linkedModel];
-  if (base && a.linkedTo) return { label: a.linkedModel, href: `${base}/${a.linkedTo}` };
+  if (base && a.linkedTo)
+    return { label: a.linkedModel, href: `${base}/${a.linkedTo}` };
   return null;
 }
 
@@ -48,40 +65,46 @@ export function ActivitiesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [search,      setSearch]     = useState("");
-  const [typeFilter,  setTypeFilter] = useState<string>("all");
-  const [statusFilter,setStatus]     = useState<string>("all");
-  const [detail,      setDetail]     = useState<Activity | null>(null);
-  const [detailOpen,  setDetailOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatus] = useState<string>("all");
+  const [detail, setDetail] = useState<Activity | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const queryKey = ["activities-all"];
   const { data, isPending } = useQuery({
     queryKey: queryKey,
-    queryFn: () => getAllActivities({})
+    queryFn: () => getAllActivities({}),
   });
   const activities: Activity[] = Array.isArray(data?.data) ? data.data : [];
 
-  const invalidate = () => queryClient.invalidateQueries({
-    queryKey: queryKey
-  });
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: queryKey,
+    });
 
   const toggleMut = useMutation({
-    mutationFn: (a: Activity) => updateActivity(a._id, {
-      status: a.status === "completed" ? "pending" : "completed",
-    } as any),
+    mutationFn: (a: Activity) =>
+      updateActivity(a._id, {
+        status: a.status === "completed" ? "pending" : "completed",
+      } as any),
 
     onSuccess: invalidate,
-    onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); }
+    onError: () => {
+      toast({ title: "Failed to update.", variant: "destructive" });
+    },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteActivity(id),
     onSuccess: invalidate,
-    onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); }
+    onError: () => {
+      toast({ title: "Failed to delete.", variant: "destructive" });
+    },
   });
 
   const filtered = activities.filter((a) => {
-    if (typeFilter !== "all"   && a.type   !== typeFilter)  return false;
+    if (typeFilter !== "all" && a.type !== typeFilter) return false;
     if (statusFilter !== "all" && a.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -90,7 +113,8 @@ export function ActivitiesPage() {
         !a.title.toLowerCase().includes(q) &&
         !a.description?.toLowerCase().includes(q) &&
         !entity?.label.toLowerCase().includes(q)
-      ) return false;
+      )
+        return false;
     }
     return true;
   });
@@ -101,7 +125,9 @@ export function ActivitiesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold">Activities</h1>
-          <p className="text-sm text-muted-foreground">{activities.length} total</p>
+          <p className="text-sm text-muted-foreground">
+            {activities.length} total
+          </p>
         </div>
       </div>
       {/* Filters */}
@@ -121,7 +147,9 @@ export function ActivitiesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            {(["call", "meeting", "task", "note", "email"] as ActivityType[]).map((t) => (
+            {(
+              ["call", "meeting", "task", "note", "email"] as ActivityType[]
+            ).map((t) => (
               <SelectItem key={t} value={t} className="capitalize">
                 {TYPE_EMOJIS[t]} {t}
               </SelectItem>
@@ -140,8 +168,14 @@ export function ActivitiesPage() {
         </Select>
         {(typeFilter !== "all" || statusFilter !== "all" || search) && (
           <Button
-            size="sm" variant="ghost" className="h-8 text-xs"
-            onClick={() => { setTypeFilter("all"); setStatus("all"); setSearch(""); }}
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs"
+            onClick={() => {
+              setTypeFilter("all");
+              setStatus("all");
+              setSearch("");
+            }}
           >
             Clear
           </Button>
@@ -154,7 +188,10 @@ export function ActivitiesPage() {
       {isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-muted/30 animate-pulse" />
+            <div
+              key={i}
+              className="h-16 rounded-lg bg-muted/30 animate-pulse"
+            />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -175,23 +212,33 @@ export function ActivitiesPage() {
                   TYPE_BORDER[a.type] ?? "border-l-slate-300",
                   a.status === "completed" && "opacity-70",
                 )}
-                onClick={() => { setDetail(a); setDetailOpen(true); }}
+                onClick={() => {
+                  setDetail(a);
+                  setDetailOpen(true);
+                }}
               >
                 <div className="flex-1 min-w-0 p-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xl shrink-0">{TYPE_EMOJIS[a.type as ActivityType]}</span>
-                    <span className={cn(
-                      "font-medium text-sm",
-                      a.status === "completed" && "line-through text-muted-foreground",
-                    )}>
+                    <span className="text-xl shrink-0">
+                      {TYPE_EMOJIS[a.type as ActivityType]}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-medium text-sm",
+                        a.status === "completed" &&
+                          "line-through text-muted-foreground",
+                      )}
+                    >
                       {a.title}
                     </span>
                     <Badge
                       variant="outline"
-                      className={cn("text-[10px] capitalize",
+                      className={cn(
+                        "text-[10px] capitalize",
                         a.status === "completed"
                           ? "border-emerald-500 text-emerald-600"
-                          : "border-amber-500 text-amber-600")}
+                          : "border-amber-500 text-amber-600",
+                      )}
                     >
                       {a.status}
                     </Badge>
@@ -201,35 +248,53 @@ export function ActivitiesPage() {
                         onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline ms-auto shrink-0"
                       >
-                        {entity.label}<ExternalLink className="h-2.5 w-2.5" />
+                        {entity.label}
+                        <ExternalLink className="h-2.5 w-2.5" />
                       </Link>
                     )}
                   </div>
                   {a.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                      {a.description}
+                    </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {format(new Date(a.date), "dd MMM yyyy")}
                     {a.createdBy && ` · by ${a.createdBy.name}`}
                   </p>
                 </div>
-                <div className="flex flex-col gap-0.5 p-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex flex-col gap-0.5 p-2 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button
-                    size="icon" variant="ghost"
-                    className={cn("h-7 w-7", a.status === "completed" && "text-emerald-600")}
-                    title={a.status === "completed" ? "Mark pending" : "Mark done"}
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "h-7 w-7",
+                      a.status === "completed" && "text-emerald-600",
+                    )}
+                    title={
+                      a.status === "completed" ? "Mark pending" : "Mark done"
+                    }
                     onClick={() => toggleMut.mutate(a)}
                     disabled={toggleMut.isPending}
                   >
-                    {a.status === "completed"
-                      ? <CheckCircle2 className="h-4 w-4" />
-                      : <Circle className="h-4 w-4 text-muted-foreground" />}
+                    {a.status === "completed" ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </Button>
                   <Button
-                    size="icon" variant="ghost"
+                    size="icon"
+                    variant="ghost"
                     className="h-7 w-7 text-destructive hover:text-destructive"
                     title="Delete"
-                    onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(a._id); }}
+                    onClick={() => {
+                      if (confirm("Delete this activity?"))
+                        deleteMut.mutate(a._id);
+                    }}
                     disabled={deleteMut.isPending}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -243,7 +308,10 @@ export function ActivitiesPage() {
       <ActivityDetailDialog
         activity={detail}
         open={detailOpen}
-        onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetail(null); }}
+        onOpenChange={(v) => {
+          setDetailOpen(v);
+          if (!v) setDetail(null);
+        }}
         invalidateKeys={["activities-all"]}
       />
     </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation, Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
 const QuoteForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const cloneData = !id ? (location.state as any)?.clone : undefined;
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -29,20 +31,22 @@ const QuoteForm: React.FC = () => {
   const f = tr.finance;
 
   const dealParam = searchParams.get("deal");
-  const [title, setTitle] = useState("");
-  const [customer, setCustomer] = useState(searchParams.get("customer") ?? "");
+  const [title, setTitle] = useState(cloneData?.title ?? "");
+  const [customer, setCustomer] = useState(cloneData?.customer ?? searchParams.get("customer") ?? "");
   const [customerLabel, setCustomerLabel] = useState("");
-  const [deal, setDeal] = useState(dealParam ?? "none");
+  const [deal, setDeal] = useState(cloneData?.deal ?? dealParam ?? "none");
   const [dealLabel, setDealLabel] = useState("");
   const [status, setStatus] = useState<QuoteStatus>("draft");
-  const [currency, setCurrency] = useState("USD");
-  const [taxRate, setTaxRate] = useState(0);
-  const [validUntil, setValidUntil] = useState("");
-  const [notes, setNotes] = useState("");
-  const [terms, setTerms] = useState("");
-  const [items, setItems] = useState<LineItemRow[]>([
-    { description: "", quantity: 1, unitPrice: 0, discount: 0 },
-  ]);
+  const [currency, setCurrency] = useState(cloneData?.currency ?? "USD");
+  const [taxRate, setTaxRate] = useState<number>(cloneData?.taxRate ?? 0);
+  const [validUntil, setValidUntil] = useState(cloneData?.validUntil ?? "");
+  const [notes, setNotes] = useState(cloneData?.notes ?? "");
+  const [terms, setTerms] = useState(cloneData?.terms ?? "");
+  const [items, setItems] = useState<LineItemRow[]>(
+    cloneData?.items?.length
+      ? cloneData.items
+      : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]
+  );
   const [saving, setSaving] = useState(false);
 
   const fetchCustomers = useCallback(

@@ -30,8 +30,19 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signin')
   @HttpCode(200)
-  async signin(@Body() body: { email: string; password: string }, @Res({ passthrough: true }) res: Response) {
-    const { token, refreshToken, user } = await this.authService.signin(body.email, body.password);
+  async signin(
+    @Body() body: { email: string; password: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const userAgent = (req.headers as Record<string, string>)['user-agent'];
+    const forwarded = (req.headers as Record<string, string>)['x-forwarded-for'];
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : (req as any).ip;
+    const { token, refreshToken, user } = await this.authService.signin(
+      body.email,
+      body.password,
+      { userAgent, ipAddress },
+    );
     res.cookie(REFRESH_COOKIE, refreshToken, refreshCookieOptions());
     return { token, user };
   }

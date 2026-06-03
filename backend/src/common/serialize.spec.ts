@@ -1,6 +1,7 @@
 import { toClient } from './serialize';
 
 describe('toClient', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('renames id -> _id', () => {
     expect(toClient({ id: 'abc', name: 'x' })).toEqual({ _id: 'abc', name: 'x' });
   });

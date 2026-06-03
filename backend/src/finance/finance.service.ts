@@ -141,8 +141,8 @@ export class FinanceService {
         tax: totals.tax,
         total: totals.total,
         approvalStatus: enabled ? 'pending' : 'approved',
-        customerId: typeof customer === 'object' ? customer?._id : customer,
-        ...(deal ? { dealId: typeof deal === 'object' ? deal?._id : deal } : {}),
+        customerId: customer,
+        ...(deal ? { dealId: deal } : {}),
         createdById: userId,
         items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
       } as any,
@@ -260,7 +260,11 @@ export class FinanceService {
     });
     if (!quote) throw new NotFoundException('Quote not found');
     if (quote.convertedToInvoiceId) throw new BadRequestException('Quote already converted to invoice');
-    if (quote.approvalStatus !== 'approved') throw new BadRequestException('Quote must be approved before conversion to invoice');
+
+    const { enabled: quotesApprovalEnabled } = await this.getApprovalConfig('quotes');
+    if (quotesApprovalEnabled && quote.approvalStatus !== 'approved') {
+      throw new BadRequestException('Quote must be approved before conversion to invoice');
+    }
 
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
     const { enabled: invoiceApprovalEnabled } = await this.getApprovalConfig('invoices');
@@ -370,8 +374,8 @@ export class FinanceService {
         total: totals.total,
         approvalStatus: enabled ? 'pending' : 'approved',
         issueDate: rest.issueDate ? new Date(rest.issueDate) : new Date(),
-        customerId: typeof customer === 'object' ? customer?._id : customer,
-        ...(deal ? { dealId: typeof deal === 'object' ? deal?._id : deal } : {}),
+        customerId: customer,
+        ...(deal ? { dealId: deal } : {}),
         createdById: userId,
         items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
       } as any,

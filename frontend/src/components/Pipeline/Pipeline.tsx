@@ -4,6 +4,7 @@ import { getDeals, updateDeal } from "@/utils/api";
 import { Link } from "react-router-dom";
 import { DealData } from "@/types/types";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, GripVertical, TrendingUp, Calendar, User } from "lucide-react";
@@ -163,12 +164,14 @@ function Column({
   status,
   deals,
   label,
+  customColor,
   isLoading,
   onAddDeal,
 }: {
   status: DealStatus;
   deals: Deal[];
   label: string;
+  customColor?: string;
   isLoading: boolean;
   onAddDeal: (status: string) => void;
 }) {
@@ -181,7 +184,10 @@ function Column({
   return (
     <div className="flex-shrink-0 w-64 flex flex-col">
       {/* Column header */}
-      <div className={cn("rounded-t-xl px-3 py-2.5 flex items-center justify-between", meta.bg)}>
+      <div
+        className={cn("rounded-t-xl px-3 py-2.5 flex items-center justify-between", !customColor && meta.bg)}
+        style={customColor ? { background: customColor } : undefined}
+      >
         <div className="flex items-center gap-2">
           <span className="text-white font-semibold text-sm">{label}</span>
           <span className="bg-white/25 text-white text-xs font-medium rounded-full px-2 py-0.5">
@@ -213,7 +219,10 @@ function Column({
 
         {!isLoading && deals.length === 0 && (
           <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <div className={cn("h-2 w-2 rounded-full", meta.dot, "opacity-40")} />
+            <div
+              className={cn("h-2 w-2 rounded-full opacity-40", !customColor && meta.dot)}
+              style={customColor ? { background: customColor } : undefined}
+            />
             <p className="text-[11px] text-muted-foreground/60">No deals</p>
           </div>
         )}
@@ -237,6 +246,13 @@ export function Pipeline() {
   const { tr } = useLanguage();
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { data: wsData } = useWorkspaceSettings();
+
+  // Build a lookup of key → {label, color} from saved pipeline stages
+  const stageOverrides = useMemo(() => {
+    const saved: { key: string; label: string; color: string }[] = wsData?.pipelineStages ?? [];
+    return Object.fromEntries(saved.map((s) => [s.key, s]));
+  }, [wsData]);
 
   const { data, isPending, error } = useQuery({
     queryKey: ["deals"],
@@ -323,7 +339,8 @@ export function Pipeline() {
                 key={status}
                 status={status}
                 deals={grouped[status]}
-                label={tr.pipeline.stages[status] ?? status}
+                label={stageOverrides[status]?.label ?? tr.pipeline.stages[status] ?? status}
+                customColor={stageOverrides[status]?.color}
                 isLoading={isPending}
                 onAddDeal={handleAddDeal}
               />

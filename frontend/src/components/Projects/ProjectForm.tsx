@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   createProject, updateProject, getProjectById, getCustomers, getDeals, getUsers,
@@ -17,13 +17,23 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const cloneData = mode === "add" ? (location.state as any)?.clone : undefined;
   const { tr } = useLanguage();
   const { toast } = useToast();
 
   const [form, setForm] = useState({
-    name: "", description: "", status: "planning", priority: "medium",
-    budget: "", currency: "EGP", startDate: "", endDate: "",
-    customer: "", deal: searchParams.get("deal") ?? "", manager: "",
+    name: cloneData?.name ?? "",
+    description: cloneData?.description ?? "",
+    status: "planning",
+    priority: cloneData?.priority ?? "medium",
+    budget: cloneData?.budget ?? "",
+    currency: cloneData?.currency ?? "EGP",
+    startDate: "",
+    endDate: "",
+    customer: cloneData?.customer ?? "",
+    deal: cloneData?.deal ?? searchParams.get("deal") ?? "",
+    manager: cloneData?.manager ?? "",
   });
 
   const { data: customersData } = useQuery({

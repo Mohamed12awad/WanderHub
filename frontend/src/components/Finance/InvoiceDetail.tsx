@@ -12,7 +12,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, MoreHorizontal } from "lucide-react";
+import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, MoreHorizontal, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice, sendInvoice, getActivities } from "@/utils/api";
 import { ActivityList } from "@/components/Activities/ActivityList";
@@ -115,6 +115,27 @@ const InvoiceDetail: React.FC = () => {
     } catch {
       toast({ title: "Rejection failed", variant: "destructive" });
     } finally { setActionLoading(false); }
+  };
+
+  const handleClone = () => {
+    if (!invoice) return;
+    navigate("/finance/invoices/new", {
+      state: {
+        clone: {
+          title: `Copy of ${invoice.title}`,
+          customer: invoice.customer._id,
+          deal: invoice.deal?._id ?? "none",
+          currency: invoice.currency,
+          taxRate: invoice.taxRate,
+          notes: invoice.notes ?? "",
+          terms: invoice.terms ?? "",
+          status: "draft",
+          items: invoice.items.map(({ description, quantity, unitPrice, discount }: any) => ({
+            description, quantity, unitPrice, discount,
+          })),
+        },
+      },
+    });
   };
 
   const handleDelete = async () => {
@@ -220,6 +241,10 @@ const InvoiceDetail: React.FC = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => window.print()}>
                   <Printer className="h-3.5 w-3.5 me-2" />Print
                 </DropdownMenuItem>

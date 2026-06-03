@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
@@ -106,5 +106,64 @@ export class UsersService {
     if (user.role.name === 'super admin') throw new ForbiddenException('Cannot delete super admin');
     await this.prisma.user.delete({ where: { id } });
     return true;
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) throw new BadRequestException('Current password is incorrect');
+    const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+    return { success: true };
+  }
+
+  async getSessions(userId: string) {
+    const tokens = await this.prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, userAgent: true, ipAddress: true, expiresAt: true },
+    });
+    return tokens;
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const token = await this.prisma.refreshToken.findUnique({ where: { id: sessionId } });
+    if (!token || token.userId !== userId) throw new NotFoundException('Session not found');
+    await this.prisma.refreshToken.update({ where: { id: sessionId }, data: { revokedAt: new Date() } });
+    return { success: true };
+  }
+
+  async getLoginHistory(userId: string) {
+    const logs = await this.prisma.log.findMany({
+      where: {
+        userId,
+        OR: [
+          { action: { startsWith: 'Logged', mode: 'insensitive' } },
+          { action: { startsWith: 'Authentication', mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 30,
+      select: { id: true, action: true, endpoint: true, timestamp: true, success: true },
+    });
+    return logs;
+  }
+
+  async getNotificationPreferences(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { notificationPreferences: true } });
+    return (user?.notificationPreferences as Record<string, unknown>) ?? {};
+  }
+
+  async updateNotificationPreferences(
+    id: string,
+    prefs: Record<string, { inApp: boolean; email: boolean }>,
+  ) {
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { notificationPreferences: prefs as any },
+      select: { notificationPreferences: true },
+    });
+    return updated.notificationPreferences;
   }
 }

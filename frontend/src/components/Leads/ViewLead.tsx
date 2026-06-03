@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, ArrowRightCircle, Edit, MoreHorizontal, Trash2, Flame, Thermometer, Snowflake } from "lucide-react";
+import { CircleArrowLeft, ArrowRightCircle, Edit, MoreHorizontal, Trash2, Copy, Flame, Thermometer, Snowflake } from "lucide-react";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
@@ -94,6 +94,30 @@ export function ViewLead() {
     } finally {
       setConverting(false);
     }
+  };
+
+  const handleClone = () => {
+    if (!lead) return;
+    navigate("/leads/add", {
+      state: {
+        clone: {
+          name: `Copy of ${lead.name}`,
+          company: lead.company,
+          jobTitle: lead.jobTitle,
+          website: lead.website,
+          city: lead.city,
+          country: lead.country,
+          source: lead.source,
+          campaign: lead.campaign,
+          rating: lead.rating,
+          budget: lead.budget?.toString() ?? "",
+          currency: lead.currency,
+          notes: lead.notes,
+          owner: typeof lead.owner === "object" ? lead.owner?._id : lead.owner,
+          status: "new",
+        },
+      },
+    });
   };
 
   const handleDelete = async () => {
@@ -181,6 +205,10 @@ export function ViewLead() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 {canDelete ? (
                   <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
                     <Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}

@@ -16,6 +16,7 @@ function build(approvals: any[]) {
 }
 
 describe('ApprovalService', () => {
+  beforeEach(() => jest.clearAllMocks());
   it('auto-approves when the module has no approval config', async () => {
     const { svc } = build([]);
     expect(await svc.initSteps({} as any, 'Invoice', 'i1', 'invoices', 100)).toBe('approved');

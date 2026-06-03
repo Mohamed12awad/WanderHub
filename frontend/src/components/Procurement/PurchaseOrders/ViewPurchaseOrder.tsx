@@ -15,9 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Receipt } from "lucide-react";
+import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Receipt, Copy } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -88,6 +88,24 @@ export default function ViewPurchaseOrder() {
     try { await rejectPurchaseOrder(id!, reason); setRejectOpen(false); refresh(); toast({ title: "Purchase order rejected" }); }
     catch (e: any) { toast({ title: e?.response?.data?.message ?? "Rejection failed", variant: "destructive" }); }
     finally { setBusy(false); }
+  };
+
+  const handleClone = () => {
+    if (!po) return;
+    navigate("/procurement/purchase-orders/new", {
+      state: {
+        clone: {
+          supplierId: typeof po.supplier === "object" ? po.supplier?._id : po.supplier,
+          currency: po.currency,
+          taxRate: po.taxRate,
+          notes: po.notes ?? "",
+          status: "draft",
+          items: (po.items ?? []).map(({ description, quantity, unitPrice, discount }: any) => ({
+            description, quantity, unitPrice, discount: discount ?? 0,
+          })),
+        },
+      },
+    });
   };
 
   const handleDelete = async () => {
@@ -166,6 +184,10 @@ export default function ViewPurchaseOrder() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleClone}>
+                  <Copy className="h-3.5 w-3.5 me-2" />Clone
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={handleDelete}>{tr.common.delete}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

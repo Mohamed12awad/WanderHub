@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -63,6 +64,13 @@ body {
 }
 
 @layer base {
+  /* Restore Tailwind v3 default: bare `border` uses the design-token color */
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+
   /* ── Default (blue) light ─────────────────────────────── */
   :root {
     --background: 220 20% 97%;
