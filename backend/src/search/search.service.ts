@@ -15,16 +15,17 @@ export class SearchService {
 
   async search(q: string, user: AuthUser) {
     if (!q || q.length < 2) {
-      return { customers: [], deals: [], products: [], expenses: [], invoices: [] };
+      return { customers: [], deals: [], leads: [], products: [], expenses: [], invoices: [], quotes: [], purchaseOrders: [], vendorBills: [], projects: [], tasks: [] };
     }
 
     const contains = { contains: q, mode: 'insensitive' as const };
 
-    const [customerScope, dealScope, expenseScope, invoiceScope] = await Promise.all([
+    const [customerScope, dealScope, expenseScope, invoiceScope, leadScope] = await Promise.all([
       this.visibility.ownershipWhere(user, 'contacts', 'ownerId'),
       this.visibility.ownershipWhere(user, 'deals', 'ownerId'),
       this.visibility.ownershipWhere(user, 'expenses', 'userId'),
       this.visibility.ownershipWhere(user, 'finance', 'createdById'),
+      this.visibility.ownershipWhere(user, 'leads', 'ownerId'),
     ]);
 
     const customers = await this.prisma.customer.findMany({
@@ -34,19 +35,19 @@ export class SearchService {
     });
     const customerIds = customers.map((c) => c.id);
 
-    const [deals, products, expenses, invoices] = await Promise.all([
+    const [deals, leads, products, expenses, invoices, quotes, purchaseOrders, vendorBills, projects, tasks] = await Promise.all([
       this.prisma.deal.findMany({
         where: {
           deletedAt: null,
           ...dealScope,
-          OR: [
-            { title: contains },
-            { notes: contains },
-            { source: contains },
-            { customerId: { in: customerIds } },
-          ],
+          OR: [{ title: contains }, { notes: contains }, { source: contains }, { customerId: { in: customerIds } }],
         },
         select: { id: true, title: true, status: true, price: true, currency: true, customer: { select: { id: true, name: true } } },
+        take: LIMIT,
+      }),
+      this.prisma.lead.findMany({
+        where: { deletedAt: null, ...leadScope, OR: [{ name: contains }, { email: contains }, { phone: contains }, { company: contains }] },
+        select: { id: true, name: true, email: true, phone: true, status: true, company: true },
         take: LIMIT,
       }),
       this.prisma.product.findMany({
@@ -64,14 +65,45 @@ export class SearchService {
         select: { id: true, invoiceNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
         take: LIMIT,
       }),
+      this.prisma.quote.findMany({
+        where: { deletedAt: null, OR: [{ quoteNumber: contains }, { title: contains }] },
+        select: { id: true, quoteNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
+        take: LIMIT,
+      }),
+      this.prisma.purchaseOrder.findMany({
+        where: { deletedAt: null, OR: [{ poNumber: contains }, { title: contains }] },
+        select: { id: true, poNumber: true, title: true, status: true, total: true, currency: true, supplier: { select: { id: true, name: true } } },
+        take: LIMIT,
+      }),
+      this.prisma.vendorBill.findMany({
+        where: { deletedAt: null, OR: [{ billNumber: contains }, { title: contains }] },
+        select: { id: true, billNumber: true, title: true, status: true, total: true, currency: true, supplier: { select: { id: true, name: true } } },
+        take: LIMIT,
+      }),
+      this.prisma.project.findMany({
+        where: { deletedAt: null, OR: [{ name: contains }, { description: contains }] },
+        select: { id: true, name: true, status: true, priority: true },
+        take: LIMIT,
+      }),
+      this.prisma.task.findMany({
+        where: { deletedAt: null, OR: [{ title: contains }, { description: contains }] },
+        select: { id: true, title: true, status: true, priority: true },
+        take: LIMIT,
+      }),
     ]);
 
     return {
       customers: toClient(customers),
       deals: toClient(deals),
+      leads: toClient(leads),
       products: toClient(products),
       expenses: toClient(expenses),
       invoices: toClient(invoices),
+      quotes: toClient(quotes),
+      purchaseOrders: toClient(purchaseOrders),
+      vendorBills: toClient(vendorBills),
+      projects: toClient(projects),
+      tasks: toClient(tasks),
     };
   }
 }
