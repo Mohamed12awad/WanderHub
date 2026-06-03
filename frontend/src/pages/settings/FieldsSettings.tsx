@@ -397,7 +397,7 @@ interface FieldRowProps {
   field: FieldDef;
   isSystem: boolean;
   editingId: string | null;
-  editRef: React.RefObject<HTMLInputElement | null>;
+  editRef: React.RefObject<HTMLInputElement>;
   onStartEdit: () => void;
   onLabelChange: (v: string) => void;
   onLabelSave: (v: string) => void;
