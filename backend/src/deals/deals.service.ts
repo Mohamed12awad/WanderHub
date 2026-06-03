@@ -124,6 +124,7 @@ export class DealsService {
           },
         },
         owner: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true, status: true } },
       },
     });
     if (!deal) throw new NotFoundException('deal not found');

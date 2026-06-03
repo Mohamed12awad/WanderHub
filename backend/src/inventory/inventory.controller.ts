@@ -5,8 +5,6 @@ import { RequirePermission } from '../auth/decorators/require-permission.decorat
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { InventoryService } from './inventory.service';
 
-// Reuses the existing `products` permission resource so roles that can manage
-// products can manage stock without introducing a new permission scope.
 @Controller('inventory')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class InventoryController {
@@ -26,18 +24,31 @@ export class InventoryController {
 
   @Get('movements')
   @RequirePermission('products:view')
-  movements(@Query('productId') productId?: string) {
-    return this.inventory.movements(productId);
+  movements(
+    @Query('productId') productId?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.inventory.movements(productId, skip ? parseInt(skip, 10) : 0, take ? parseInt(take, 10) : 50);
   }
 
   @Post(':productId/adjust')
   @RequirePermission('products:edit')
   adjust(
     @Param('productId') productId: string,
-    @Body() body: { qty: number; note?: string },
+    @Body() body: { qty: number; note?: string; reason?: string },
     @CurrentUser() user: AuthUser,
   ) {
     return this.inventory.adjust(productId, body, user.id);
+  }
+
+  @Patch(':productId/details')
+  @RequirePermission('products:edit')
+  updateDetails(
+    @Param('productId') productId: string,
+    @Body() body: { reorderLevel?: number; location?: string },
+  ) {
+    return this.inventory.updateDetails(productId, body);
   }
 
   @Patch(':productId/reorder-level')

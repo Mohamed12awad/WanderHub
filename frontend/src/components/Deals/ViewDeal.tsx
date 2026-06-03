@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getDealById, deleteDeal, getNotes, getActivities, getQuotes, getInvoices } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2, Copy } from "lucide-react";
+import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2, Copy, FolderKanban } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
@@ -175,6 +175,23 @@ const ViewDeal = () => {
     }
   };
 
+  const handleCreateProject = () => {
+    if (!formData) return;
+    navigate("/projects/new", {
+      state: {
+        clone: {
+          name: formData.title,
+          description: formData.notes ?? "",
+          customer: formData.customerID,
+          deal: dealId,
+          budget: String(formData.price),
+          currency: formData.currency,
+          priority: formData.priority,
+        },
+      },
+    });
+  };
+
   if (isPending || !formData) {
     return (
       <main className="p-4 space-y-4">
@@ -262,6 +279,18 @@ const ViewDeal = () => {
                 <DropdownMenuItem onClick={handleClone}>
                   <Copy className="h-3.5 w-3.5 me-2" />Clone
                 </DropdownMenuItem>
+                {(() => {
+                  const linkedProject = dealData?.data?.deal?.project;
+                  return linkedProject ? (
+                    <DropdownMenuItem onClick={() => navigate(`/projects/${linkedProject._id}`)}>
+                      <FolderKanban className="h-3.5 w-3.5 me-2" />View Project
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={handleCreateProject}>
+                      <FolderKanban className="h-3.5 w-3.5 me-2" />Create Project
+                    </DropdownMenuItem>
+                  );
+                })()}
                 {canDelete && (
                   <>
                     <DropdownMenuSeparator />

@@ -10,6 +10,7 @@ interface MovementInput {
   refType?: string;
   refId?: string;
   note?: string;
+  adjustmentReason?: string;
   userId?: string;
 }
 
@@ -25,6 +26,18 @@ export class InventoryService {
   async applyMovement(input: MovementInput, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma;
     if (!input.qty) return;
+
+    // Guard: prevent stock going negative on out/adjustment moves.
+    if (input.qty < 0) {
+      const current = await (db as any).stockItem.findUnique({ where: { productId: input.productId } });
+      const onHand: number = current?.quantityOnHand ?? 0;
+      if (onHand + input.qty < 0) {
+        throw new BadRequestException(
+          `Insufficient stock for product ${input.productId}: ${onHand} on hand, requested ${Math.abs(input.qty)}`,
+        );
+      }
+    }
+
     await db.stockItem.upsert({
       where: { productId: input.productId },
       create: { productId: input.productId, quantityOnHand: input.qty },
@@ -38,6 +51,7 @@ export class InventoryService {
         refType: input.refType,
         refId: input.refId,
         note: input.note,
+        adjustmentReason: input.adjustmentReason,
         createdById: input.userId,
       },
     });
@@ -66,18 +80,21 @@ export class InventoryService {
     return toClient(rows);
   }
 
-  async movements(productId?: string) {
-    return toClient(
-      await this.prisma.stockMovement.findMany({
+  async movements(productId?: string, skip = 0, take = 50) {
+    const [data, total] = await Promise.all([
+      this.prisma.stockMovement.findMany({
         where: productId ? { productId } : {},
         orderBy: { createdAt: 'desc' },
-        take: 1000,
+        skip,
+        take,
       }),
-    );
+      this.prisma.stockMovement.count({ where: productId ? { productId } : {} }),
+    ]);
+    return { data: toClient(data), total };
   }
 
-  /** Manual stock adjustment (recount, write-off, correction). */
-  async adjust(productId: string, body: { qty: number; note?: string }, userId: string) {
+  /** Manual stock adjustment (recount, write-off, correction, damage, etc.). */
+  async adjust(productId: string, body: { qty: number; note?: string; reason?: string }, userId: string) {
     const product = await this.prisma.product.findFirst({ where: { id: productId, deletedAt: null } });
     if (!product) throw new NotFoundException('Product not found');
     if (!body.qty) throw new BadRequestException('qty is required and must be non-zero');
@@ -87,9 +104,25 @@ export class InventoryService {
       type: 'adjustment',
       refType: 'manual',
       note: body.note,
+      adjustmentReason: body.reason,
       userId,
     });
     return toClient(await this.prisma.stockItem.findUnique({ where: { productId } }));
+  }
+
+  async updateDetails(productId: string, body: { reorderLevel?: number; location?: string }) {
+    const existing = await this.prisma.stockItem.findUnique({ where: { productId } });
+    const data: any = {};
+    if (body.reorderLevel !== undefined) data.reorderLevel = body.reorderLevel;
+    if (body.location !== undefined) data.location = body.location;
+    if (!Object.keys(data).length) return existing;
+    return toClient(
+      await this.prisma.stockItem.upsert({
+        where: { productId },
+        create: { productId, ...data },
+        update: data,
+      }),
+    );
   }
 
   async setReorderLevel(productId: string, reorderLevel: number) {

@@ -360,16 +360,17 @@ model StockItem {
 // Append-only ledger of stock changes (audit trail). `qty` is signed:
 // positive = stock in (e.g. PO receipt), negative = stock out (e.g. sale).
 model StockMovement {
-  id          String   @id @default(cuid())
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  qty         Float
-  type        String // in | out | adjustment
-  refType     String?
-  refId       String?
-  note        String?
-  createdById String?
-  createdAt   DateTime @default(now())
+  id               String   @id @default(cuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty              Float
+  type             String // in | out | adjustment
+  refType          String?
+  refId            String?
+  note             String?
+  adjustmentReason String?  // recount | damage | theft | expiry | write_off | return | correction
+  createdById      String?
+  createdAt        DateTime @default(now())
 
   @@index([productId, createdAt])
 }
@@ -633,31 +634,34 @@ model Note {
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 model Task {
-  id           String       @id @default(cuid())
+  id           String            @id @default(cuid())
   title        String
   description  String?
-  priority     TaskPriority @default(medium)
-  status       TaskStatus   @default(todo)
+  priority     TaskPriority      @default(medium)
+  status       TaskStatus        @default(todo)
   dueDate      DateTime?
   assignedToId String?
-  assignedTo   User?        @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   linkedToId   String?
   linkedModel  String?
   dealId       String?
-  deal         Deal?        @relation(fields: [dealId], references: [id])
+  deal         Deal?             @relation(fields: [dealId], references: [id])
   projectId    String?
-  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project      Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  milestoneId  String?
+  milestone    ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   completedAt  DateTime?
   tags         String[]
   createdById  String
-  createdBy    User         @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdBy    User              @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   deletedAt    DateTime?
 
   @@index([assignedToId])
   @@index([status])
   @@index([projectId])
+  @@index([milestoneId])
   @@index([linkedToId, linkedModel])
   @@index([deletedAt])
 }
@@ -1039,6 +1043,8 @@ model ProjectMilestone {
   order       Int             @default(0)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+
+  tasks       Task[]
 
   @@index([projectId])
   @@index([status])

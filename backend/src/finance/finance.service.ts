@@ -439,7 +439,10 @@ export class FinanceService {
   }
 
   async sendInvoice(id: string, userId: string) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
+      include: { items: true },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before sending');
     if (invoice.status !== 'draft') return this.getInvoiceById(id);
@@ -449,6 +452,29 @@ export class FinanceService {
       include: INVOICE_INCLUDE,
     });
     await this.timeline.log('invoice.sent', `Invoice ${invoice.invoiceNumber} sent`, id, 'Invoice', {}, userId);
+
+    // Deduct stock for product-linked line items (fire-and-forget; non-blocking on soft errors).
+    const alreadyDeducted = await this.prisma.stockMovement.findFirst({ where: { refType: 'Invoice', refId: id } });
+    if (!alreadyDeducted) {
+      for (const item of invoice.items as any[]) {
+        if (item.productId && item.quantity > 0) {
+          try {
+            await this.inventory.applyMovement({
+              productId: item.productId,
+              qty: -item.quantity,
+              type: 'out',
+              refType: 'Invoice',
+              refId: id,
+              note: `Invoice ${invoice.invoiceNumber}`,
+              userId,
+            });
+          } catch {
+            // Log but don't fail the send if stock is untracked for this product.
+          }
+        }
+      }
+    }
+
     return toClient(updated);
   }
 

@@ -48,6 +48,16 @@ export class CreateTaskDto {
   @IsString()
   linkedModel?: string;
 
+  // Project FK; maps to projectId in the service.
+  @IsOptional()
+  @IsString()
+  project?: string;
+
+  // Milestone FK; maps to milestoneId in the service.
+  @IsOptional()
+  @IsString()
+  milestone?: string;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

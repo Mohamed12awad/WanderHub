@@ -108,6 +108,7 @@ export const en = {
     headers: ["Title", "Contact", "Status", "Priority", "Owner", "Value", "Created"],
     empty: "No deals yet. Add one to get started.",
     noSearch: (q: string) => `No deals matching "${q}"`,
+    createProject: "Create Project",
   },
   expenses: {
     title: "Expenses",
@@ -625,6 +626,7 @@ export const ar: typeof en = {
     headers: ["العنوان", "جهة الاتصال", "الحالة", "الأولوية", "المالك", "القيمة", "تاريخ الإنشاء"],
     empty: "لا توجد صفقات بعد. أضف واحدة للبدء.",
     noSearch: (q: string) => `لا توجد صفقات تطابق "${q}"`,
+    createProject: "إنشاء مشروع",
   },
   expenses: {
     title: "المصروفات",

@@ -424,10 +424,14 @@ export const getInventory = () => api.get("/inventory");
 export const getLowStock = () => api.get("/inventory/low-stock");
 export const getInventoryMovements = (productId?: string) =>
   api.get("/inventory/movements", { params: productId ? { productId } : {} });
-export const adjustInventory = (productId: string, data: { qty: number; note?: string }) =>
+export const getInventoryMovementsPaged = (productId?: string, skip = 0, take = 50) =>
+  api.get("/inventory/movements", { params: { ...(productId ? { productId } : {}), skip, take } });
+export const adjustInventory = (productId: string, data: { qty: number; note?: string; reason?: string }) =>
   api.post(`/inventory/${productId}/adjust`, data);
 export const setReorderLevel = (productId: string, reorderLevel: number) =>
   api.patch(`/inventory/${productId}/reorder-level`, { reorderLevel });
+export const updateInventoryDetails = (productId: string, data: { reorderLevel?: number; location?: string }) =>
+  api.patch(`/inventory/${productId}/details`, data);
 
 // ── Attachments ───────────────────────────────────────────────────────────────
 export const getAttachments = (linkedModel: string, linkedToId: string) =>

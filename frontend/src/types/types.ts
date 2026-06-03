@@ -268,6 +268,8 @@ export interface Task {
   assignedTo?: { _id: string; name: string; email: string };
   linkedTo?: string;
   linkedModel?: "Customer" | "Deal";
+  project?: { _id: string; name: string } | null;
+  milestone?: { _id: string; title: string } | null;
   completedAt?: string;
   tags?: string[];
   createdBy?: { _id: string; name: string };
@@ -282,6 +284,8 @@ export interface TaskFormData {
   status?: TaskStatus;
   dueDate?: string;
   assignedTo?: string;
+  project?: string;
+  milestone?: string;
   linkedTo?: string;
   linkedModel?: "Customer" | "Deal";
   tags?: string[];

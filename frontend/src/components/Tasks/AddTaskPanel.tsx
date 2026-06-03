@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createTask, updateTask, getUsers } from "@/utils/api";
+import { createTask, updateTask, getUsers, getProjects, getProjectMilestones } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Task, TaskFormData, TaskPriority, TaskStatus } from "@/types/types";
 import { cn } from "@/lib/utils";
@@ -8,13 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { X } from "lucide-react";
+import { X, FolderKanban } from "lucide-react";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   task?: Task | null;
   cloneData?: Partial<TaskFormData> | null;
+  /** Pre-fills the project field and locks it when set. */
+  projectId?: string;
+  projectName?: string;
 }
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
@@ -27,7 +30,7 @@ const PRIORITY_COLORS: Record<TaskPriority, string> = {
   urgent: "bg-red-50 text-red-700 border-red-300",
 };
 
-export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
+export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projectName }: Props) {
   const { tr } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,6 +44,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
     status: "todo",
     dueDate: "",
     assignedTo: "",
+    project: projectId ?? "",
+    milestone: "",
     tags: [],
   });
   const [tagInput, setTagInput] = useState("");
@@ -54,6 +59,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
         status: task.status,
         dueDate: task.dueDate ? task.dueDate.substring(0, 10) : "",
         assignedTo: task.assignedTo?._id ?? "",
+        project: task.project?._id ?? projectId ?? "",
+        milestone: task.milestone?._id ?? "",
         tags: task.tags ?? [],
       });
     } else if (cloneData) {
@@ -64,36 +71,50 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
         status: "todo",
         dueDate: "",
         assignedTo: cloneData.assignedTo ?? "",
+        project: cloneData.project ?? projectId ?? "",
+        milestone: cloneData.milestone ?? "",
         tags: cloneData.tags ?? [],
       });
     } else {
-      setForm({ title: "", description: "", priority: "medium", status: "todo", dueDate: "", assignedTo: "", tags: [] });
+      setForm({
+        title: "", description: "", priority: "medium", status: "todo",
+        dueDate: "", assignedTo: "", project: projectId ?? "", milestone: "", tags: [],
+      });
     }
     setTagInput("");
-  }, [task, cloneData, open]);
+  }, [task, cloneData, open, projectId]);
 
-  const { data: usersData } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => getUsers()
+  const { data: usersData } = useQuery({ queryKey: ["users"], queryFn: () => getUsers() });
+  const users: { _id: string; name: string }[] = Array.isArray(usersData?.data) ? usersData.data : [];
+
+  // Only fetch projects when the panel is open and there's no locked projectId.
+  const { data: projectsData } = useQuery({
+    queryKey: ["projects-select"],
+    queryFn: () => getProjects({ limit: 200 }),
+    enabled: open && !projectId,
+    staleTime: 60000,
   });
-  const users: { _id: string; name: string }[] = Array.isArray(usersData?.data)
-    ? usersData.data
-    : [];
+  const projects: { _id: string; name: string }[] = projectsData?.data?.data ?? projectsData?.data ?? [];
+
+  // Fetch milestones whenever the selected project changes.
+  const activeProjectId = form.project || projectId;
+  const { data: milestonesData } = useQuery({
+    queryKey: ["milestones-select", activeProjectId],
+    queryFn: () => getProjectMilestones(activeProjectId!),
+    enabled: !!activeProjectId,
+    staleTime: 30000,
+  });
+  const milestones: { _id: string; title: string }[] = milestonesData?.data ?? [];
 
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    if (activeProjectId) queryClient.invalidateQueries({ queryKey: ["project-tasks", activeProjectId] });
     toast({ title: isEdit ? "Task updated." : "Task created." });
     onClose();
   };
 
-  const createMut = useMutation({
-    mutationFn: (data: TaskFormData) => createTask(data),
-    onSuccess
-  });
-  const updateMut = useMutation({
-    mutationFn: (data: Partial<TaskFormData>) => updateTask(task!._id, data),
-    onSuccess
-  });
+  const createMut = useMutation({ mutationFn: (data: TaskFormData) => createTask(data), onSuccess });
+  const updateMut = useMutation({ mutationFn: (data: Partial<TaskFormData>) => updateTask(task!._id, data), onSuccess });
 
   const saving = createMut.isPending || updateMut.isPending;
 
@@ -102,14 +123,11 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
 
   const addTag = () => {
     const tag = tagInput.trim();
-    if (tag && !form.tags?.includes(tag)) {
-      set("tags", [...(form.tags ?? []), tag]);
-    }
+    if (tag && !form.tags?.includes(tag)) set("tags", [...(form.tags ?? []), tag]);
     setTagInput("");
   };
 
-  const removeTag = (tag: string) =>
-    set("tags", (form.tags ?? []).filter((t) => t !== tag));
+  const removeTag = (tag: string) => set("tags", (form.tags ?? []).filter((t) => t !== tag));
 
   const handleSubmit = () => {
     if (!form.title.trim()) return;
@@ -117,6 +135,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
       ...form,
       assignedTo: form.assignedTo || undefined,
       dueDate: form.dueDate || undefined,
+      project: form.project || undefined,
+      milestone: form.milestone || undefined,
     };
     if (isEdit) updateMut.mutate(payload);
     else createMut.mutate(payload);
@@ -124,12 +144,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
 
   return (
     <>
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
-          onClick={onClose}
-        />
-      )}
+      {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />}
       <aside
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-full max-w-md bg-background border-l shadow-2xl flex flex-col transition-transform duration-300",
@@ -137,13 +152,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
         )}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold text-base">
-            {isEdit ? "Edit Task" : t.add}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-md p-1 hover:bg-muted transition-colors"
-          >
+          <h2 className="font-semibold text-base">{isEdit ? "Edit Task" : t.add}</h2>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -172,6 +182,50 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
               placeholder="Optional details…"
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
+          </div>
+
+          {/* Project + Milestone */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="task-project">
+                <FolderKanban className="inline h-3.5 w-3.5 me-1 text-muted-foreground" />
+                Project
+              </Label>
+              {projectId ? (
+                <div className="flex items-center gap-1.5 rounded-md border border-input bg-muted/50 px-3 py-1.5 text-sm">
+                  <FolderKanban className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate">{projectName ?? "Project"}</span>
+                </div>
+              ) : (
+                <select
+                  id="task-project"
+                  value={form.project}
+                  onChange={(e) => { set("project", e.target.value); set("milestone", ""); }}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">No project</option>
+                  {projects.map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="task-milestone">Milestone</Label>
+              <select
+                id="task-milestone"
+                value={form.milestone}
+                onChange={(e) => set("milestone", e.target.value)}
+                disabled={!activeProjectId}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+              >
+                <option value="">None</option>
+                {milestones.map((m) => (
+                  <option key={m._id} value={m._id}>{m.title}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Priority + Status */}
@@ -249,9 +303,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
                 placeholder="Add tag…"
                 className="flex-1"
               />
-              <Button type="button" variant="outline" size="sm" onClick={addTag}>
-                Add
-              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={addTag}>Add</Button>
             </div>
             {(form.tags ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -261,10 +313,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs"
                   >
                     {tag}
-                    <button
-                      onClick={() => removeTag(tag)}
-                      className="hover:text-destructive"
-                    >
+                    <button onClick={() => removeTag(tag)} className="hover:text-destructive">
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </span>
@@ -276,10 +325,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData }: Props) {
 
         <div className="px-5 py-4 border-t flex gap-2 justify-end">
           <Button variant="outline" onClick={onClose}>{tr.common.cancel}</Button>
-          <Button
-            disabled={!form.title.trim() || saving}
-            onClick={handleSubmit}
-          >
+          <Button disabled={!form.title.trim() || saving} onClick={handleSubmit}>
             {saving ? tr.common.loading : isEdit ? tr.common.save : "Create"}
           </Button>
         </div>
