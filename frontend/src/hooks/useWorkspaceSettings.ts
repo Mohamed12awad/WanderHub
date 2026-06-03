@@ -1,4 +1,4 @@
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getWorkspaceSettings } from "@/utils/api";
 
 export type FieldType = "text" | "number" | "date" | "select" | "boolean" | "email" | "phone" | "url";
@@ -21,14 +21,14 @@ export interface WorkspaceSettings {
 }
 
 export function useWorkspaceSettings() {
-  const { data, isLoading } = useQuery<WorkspaceSettings>(
-    ["workspaceSettings"],
-    async () => (await getWorkspaceSettings()).data,
-    { staleTime: 5 * 60 * 1000 }
-  );
+  const { data, isPending } = useQuery({
+    queryKey: ["workspaceSettings"],
+    queryFn: async () => (await getWorkspaceSettings()).data,
+    staleTime: 5 * 60 * 1000
+  });
 
   const getFieldsForModule = (module: string): FieldDef[] => {
-    return data?.fieldGroups?.find((g) => g.module === module)?.fields ?? [];
+    return data?.fieldGroups?.find((g: any) => g.module === module)?.fields ?? [];
   };
 
   /** Returns only custom (non-system) filterable fields for use in filter panels */
@@ -44,7 +44,7 @@ export function useWorkspaceSettings() {
   };
 
   const isModuleEnabled = (module: string): boolean => {
-    const setting = data?.moduleSettings.find((s) => s.module === module);
+    const setting = data?.moduleSettings.find((s: any) => s.module === module);
     if (!setting) {
       try {
         const stored = localStorage.getItem("crm-modules");
@@ -58,5 +58,5 @@ export function useWorkspaceSettings() {
     return setting.enabled;
   };
 
-  return { data, isLoading, getFieldsForModule, getFilterableCustomFields, getSystemFieldLabel, isModuleEnabled };
+  return { data, isPending, getFieldsForModule, getFilterableCustomFields, getSystemFieldLabel, isModuleEnabled };
 }

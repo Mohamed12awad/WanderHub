@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,11 +25,11 @@ export function NotificationBell() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
-  const { data } = useQuery(
-    "notifications",
-    () => getNotifications(),
-    { refetchInterval: 30000 },
-  );
+  const { data } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => getNotifications(),
+    refetchInterval: 30000
+  });
 
   const notifications: Notification[] = data?.data?.data ?? [];
   const unreadCount: number = data?.data?.unreadCount ?? 0;
@@ -38,19 +38,19 @@ export function NotificationBell() {
     e.stopPropagation();
     e.preventDefault();
     await markNotificationRead(id);
-    queryClient.invalidateQueries("notifications");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     await deleteNotification(id);
-    queryClient.invalidateQueries("notifications");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
   };
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead();
-    queryClient.invalidateQueries("notifications");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
   };
 
   return (

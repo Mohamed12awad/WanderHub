@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, format, isSameMonth, isSameDay, isToday,
@@ -87,14 +87,17 @@ function QuickAddDialog({ date, open, onOpenChange, onCreated }: QuickAddProps) 
   const [description, setDescription] = useState("");
   const [actDate,     setActDate]     = useState("");
 
-  const { mutate, isLoading } = useMutation(createActivity, {
+  const { mutate, isPending } = useMutation({
+    mutationFn: createActivity,
+
     onSuccess: () => {
       toast({ title: "Activity created." });
       setTitle(""); setDescription(""); setType("call");
       onCreated();
       onOpenChange(false);
     },
-    onError: () => { toast({ title: "Failed to create activity.", variant: "destructive" }); },
+
+    onError: () => { toast({ title: "Failed to create activity.", variant: "destructive" }); }
   });
 
   const handleOpen = (v: boolean) => {
@@ -167,8 +170,8 @@ function QuickAddDialog({ date, open, onOpenChange, onCreated }: QuickAddProps) 
           </div>
           <DialogFooter className="mt-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" size="sm" disabled={isLoading}>
-              {isLoading ? "Saving…" : "Create"}
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending ? "Saving…" : "Create"}
             </Button>
           </DialogFooter>
         </form>
@@ -193,33 +196,32 @@ export function ActivityCalendar() {
 
   const queryKey = ["activities-calendar", current.getFullYear(), current.getMonth()];
 
-  const { data, isLoading } = useQuery(
-    queryKey,
-    () => getAllActivities({ month: current.getMonth() + 1, year: current.getFullYear() }),
-    { keepPreviousData: true },
-  );
+  const { data, isPending } = useQuery({
+    queryKey: queryKey,
+    queryFn: () => getAllActivities({ month: current.getMonth() + 1, year: current.getFullYear() }),
+    placeholderData: keepPreviousData
+  });
 
   const activities: Activity[] = Array.isArray(data?.data) ? data.data : [];
 
-  const invalidate = () => queryClient.invalidateQueries(queryKey);
+  const invalidate = () => queryClient.invalidateQueries({
+    queryKey: queryKey
+  });
 
-  const toggleMut = useMutation(
-    (a: Activity) => updateActivity(a._id, {
+  const toggleMut = useMutation({
+    mutationFn: (a: Activity) => updateActivity(a._id, {
       status: a.status === "completed" ? "pending" : "completed",
     } as any),
-    {
-      onSuccess: invalidate,
-      onError:   () => { toast({ title: "Failed to update.", variant: "destructive" }); },
-    },
-  );
 
-  const deleteMut = useMutation(
-    (id: string) => deleteActivity(id),
-    {
-      onSuccess: invalidate,
-      onError:   () => { toast({ title: "Failed to delete.", variant: "destructive" }); },
-    },
-  );
+    onSuccess: invalidate,
+    onError:   () => { toast({ title: "Failed to update.", variant: "destructive" }); }
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteActivity(id),
+    onSuccess: invalidate,
+    onError:   () => { toast({ title: "Failed to delete.", variant: "destructive" }); }
+  });
 
   const monthStart = startOfMonth(current);
   const monthEnd   = endOfMonth(current);
@@ -264,7 +266,6 @@ export function ActivityCalendar() {
           </Button>
         </div>
       </div>
-
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         {/* Calendar grid */}
         <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -275,7 +276,7 @@ export function ActivityCalendar() {
           </div>
           <div className="grid grid-cols-7">
             {days.map((day) => {
-              const dayActs    = isLoading ? [] : getForDay(day);
+              const dayActs    = isPending ? [] : getForDay(day);
               const isSelected = selected ? isSameDay(day, selected) : false;
               const inMonth    = isSameMonth(day, current);
               const visible    = dayActs.slice(0, 3);
@@ -391,11 +392,9 @@ export function ActivityCalendar() {
                             {a.status}
                           </Badge>
                         </div>
-
                         {a.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>
                         )}
-
                         {entity && (
                           <Link
                             to={entity.href}
@@ -405,7 +404,6 @@ export function ActivityCalendar() {
                             {entity.label}<ExternalLink className="h-2.5 w-2.5" />
                           </Link>
                         )}
-
                         {/* Inline quick actions */}
                         <div className="flex items-center gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
                           <Button
@@ -413,7 +411,7 @@ export function ActivityCalendar() {
                             className={cn("h-6 w-6", a.status === "completed" && "text-emerald-600")}
                             title={a.status === "completed" ? "Mark pending" : "Mark done"}
                             onClick={() => toggleMut.mutate(a)}
-                            disabled={toggleMut.isLoading}
+                            disabled={toggleMut.isPending}
                           >
                             {a.status === "completed"
                               ? <CheckCircle2 className="h-3.5 w-3.5" />
@@ -424,7 +422,7 @@ export function ActivityCalendar() {
                             className="h-6 w-6 text-destructive hover:text-destructive"
                             title="Delete"
                             onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(a._id); }}
-                            disabled={deleteMut.isLoading}
+                            disabled={deleteMut.isPending}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -455,7 +453,6 @@ export function ActivityCalendar() {
           </div>
         </div>
       </div>
-
       {/* All-activities overlay for +N overflow */}
       {showAllDay && (
         <Dialog open={!!showAllDay} onOpenChange={() => setShowAllDay(null)}>
@@ -491,7 +488,6 @@ export function ActivityCalendar() {
           </DialogContent>
         </Dialog>
       )}
-
       {/* Detail dialog */}
       <ActivityDetailDialog
         activity={detail}
@@ -499,7 +495,6 @@ export function ActivityCalendar() {
         onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetail(null); }}
         invalidateKeys={["activities-calendar"]}
       />
-
       {/* Quick-add dialog */}
       <QuickAddDialog
         date={selected}

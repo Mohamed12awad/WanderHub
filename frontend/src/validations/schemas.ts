@@ -8,7 +8,7 @@ import { z } from "zod";
 export const dealSchema = z.object({
   title: z.string().trim().min(1, "Deal title is required"),
   customer: z.string().trim().min(1, "Customer is required"),
-  price: z.coerce.number({ invalid_type_error: "Valid amount is required" }).positive("Valid amount is required"),
+  price: z.coerce.number().positive("Valid amount is required"),
 });
 
 export const productSchema = z.object({

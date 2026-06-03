@@ -15,7 +15,7 @@ import { useLocation } from "react-router-dom";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
 import { Customer, ErrorResponse } from "@/types/types";
@@ -75,7 +75,10 @@ const AddCustomer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const { data: users } = useQuery("users", () => getUsers());
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => getUsers()
+  });
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

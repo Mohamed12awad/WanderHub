@@ -31,18 +31,28 @@ describe('resolveScope', () => {
   });
 });
 
+// Collects a node plus all transitive descendants — mirrors what the service's
+// recursive-CTE $queryRaw returns for a subtree root.
+function subtree(tree: Record<string, string[]>, root: string): string[] {
+  const out: string[] = [];
+  const stack = [root];
+  while (stack.length) {
+    const id = stack.pop()!;
+    out.push(id);
+    stack.push(...(tree[id] ?? []));
+  }
+  return out;
+}
+
 describe('VisibilityService.getSubtreeUserIds', () => {
   const tree: Record<string, string[]> = { A: ['B', 'C'], B: ['D'], C: [], D: [] };
 
   function makeService() {
     const prisma: any = {
-      user: {
-        findMany: jest.fn(({ where }: any) => {
-          const frontier: string[] = where.reportsToId.in;
-          const kids = frontier.flatMap((id) => (tree[id] ?? []).map((c) => ({ id: c })));
-          return Promise.resolve(kids);
-        }),
-      },
+      // $queryRaw is a tagged template: (stringsArray, ...values); values[0] = userId.
+      $queryRaw: jest.fn((_strings: TemplateStringsArray, userId: string) =>
+        Promise.resolve(subtree(tree, userId).map((id) => ({ id }))),
+      ),
     };
     return new VisibilityService(prisma);
   }
@@ -63,11 +73,9 @@ describe('VisibilityService.getSubtreeUserIds', () => {
 describe('VisibilityService.ownershipWhere', () => {
   function makeService(children: Record<string, string[]> = {}) {
     const prisma: any = {
-      user: {
-        findMany: jest.fn(({ where }: any) =>
-          Promise.resolve((where.reportsToId.in as string[]).flatMap((id) => (children[id] ?? []).map((c) => ({ id: c })))),
-        ),
-      },
+      $queryRaw: jest.fn((_strings: TemplateStringsArray, userId: string) =>
+        Promise.resolve(subtree(children, userId).map((id) => ({ id }))),
+      ),
     };
     return new VisibilityService(prisma);
   }

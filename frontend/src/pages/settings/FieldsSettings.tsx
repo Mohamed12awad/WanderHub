@@ -16,7 +16,7 @@ import { getWorkspaceSettings, updateWorkspaceSettings } from "@/utils/api";
 import { toast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import type { FieldDef, FieldType } from "@/hooks/useWorkspaceSettings";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 type FieldModule = "customers" | "deals" | "products" | "expenses" | "users" | "tasks" | "activities";
 
@@ -178,7 +178,9 @@ export default function FieldsSettings() {
       await updateWorkspaceSettings({
         fieldGroups: FIELD_MODULES.map((m) => ({ module: m, fields: updated[m] })),
       });
-      queryClient.invalidateQueries(["workspaceSettings"]);
+      queryClient.invalidateQueries({
+        queryKey: ["workspaceSettings"]
+      });
       toast({ title: "Saved." });
     } catch {
       toast({ title: "Failed to save", variant: "destructive" });
@@ -395,7 +397,7 @@ interface FieldRowProps {
   field: FieldDef;
   isSystem: boolean;
   editingId: string | null;
-  editRef: React.RefObject<HTMLInputElement>;
+  editRef: React.RefObject<HTMLInputElement | null>;
   onStartEdit: () => void;
   onLabelChange: (v: string) => void;
   onLabelSave: (v: string) => void;

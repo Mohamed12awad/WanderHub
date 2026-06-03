@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getTasks, deleteTask, completeTask } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Task, TaskPriority, TaskStatus } from "@/types/types";
@@ -157,24 +157,31 @@ export function Tasks() {
   if (filter === "mine") params.mine = "true";
   if (filter === "overdue") params.overdue = "true";
 
-  const { data, isLoading } = useQuery(["tasks", filter], () => getTasks(params));
+  const { data, isPending } = useQuery({
+    queryKey: ["tasks", filter],
+    queryFn: () => getTasks(params)
+  });
   const tasks: Task[] = data?.data?.data ?? [];
 
   const filtered = tasks.filter((t) =>
     t.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const deleteMut = useMutation((id: string) => deleteTask(id), {
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteTask(id),
+
     onSuccess: () => {
-      queryClient.invalidateQueries("tasks");
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast({ title: "Task deleted." });
     },
-    onError: () => { toast({ title: "Failed to delete task.", variant: "destructive" }); },
+
+    onError: () => { toast({ title: "Failed to delete task.", variant: "destructive" }); }
   });
 
-  const completeMut = useMutation((id: string) => completeTask(id), {
-    onSuccess: () => queryClient.invalidateQueries("tasks"),
-    onError: () => { toast({ title: "Failed to update task.", variant: "destructive" }); },
+  const completeMut = useMutation({
+    mutationFn: (id: string) => completeTask(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onError: () => { toast({ title: "Failed to update task.", variant: "destructive" }); }
   });
 
   const openEdit = (task: Task) => {
@@ -206,7 +213,6 @@ export function Tasks() {
           {t.add}
         </Button>
       </div>
-
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Filter tabs */}
@@ -255,9 +261,8 @@ export function Tasks() {
           </button>
         </div>
       </div>
-
       {/* Content */}
-      {isLoading ? (
+      {isPending ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
         </div>
@@ -286,7 +291,6 @@ export function Tasks() {
           priorities={t.priorities}
         />
       )}
-
       <AddTaskPanel
         open={panelOpen}
         onClose={closePanel}

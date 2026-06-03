@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery } from "react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   createVendorBill, updateVendorBill, getVendorBillById,
   getSuppliers, getPurchaseOrders, getPurchaseOrderById,
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import LineItemsTable, { LineItemRow } from "@/components/Finance/LineItemsTable";
+import LineItemsTable, { LineItemRow, computeTotals } from "@/components/Finance/LineItemsTable";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
@@ -33,15 +33,29 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItemRow[]>([{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]);
 
-  const { data: suppliersData } = useQuery("suppliers-all", () => getSuppliers());
+  const { data: suppliersData } = useQuery({
+    queryKey: ["suppliers-all"],
+    queryFn: () => getSuppliers()
+  });
   const suppliers = suppliersData?.data ?? [];
-  const { data: posData } = useQuery("pos-all", () => getPurchaseOrders());
+  const { data: posData } = useQuery({
+    queryKey: ["pos-all"],
+    queryFn: () => getPurchaseOrders()
+  });
   const pos = posData?.data ?? [];
 
-  const { data } = useQuery(["vendor-bill", id], () => getVendorBillById(id!), { enabled: mode === "edit" && !!id });
+  const { data } = useQuery({
+    queryKey: ["vendor-bill", id],
+    queryFn: () => getVendorBillById(id!),
+    enabled: mode === "edit" && !!id
+  });
 
   // Prefill from a PO when arriving via ?po=
-  const { data: poData } = useQuery(["po-prefill", poParam], () => getPurchaseOrderById(poParam!), { enabled: mode === "add" && !!poParam });
+  const { data: poData } = useQuery({
+    queryKey: ["po-prefill", poParam],
+    queryFn: () => getPurchaseOrderById(poParam!),
+    enabled: mode === "add" && !!poParam
+  });
   useEffect(() => {
     if (poData?.data && mode === "add") {
       const po = poData.data;
@@ -69,20 +83,17 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
     }
   }, [data]);
 
-  const subtotal = items.reduce((s, it) => s + it.quantity * it.unitPrice * (1 - (it.discount ?? 0) / 100), 0);
-  const tax = subtotal * (taxRate / 100);
-  const total = subtotal + tax;
+  const { subtotal, tax, total } = computeTotals(items, taxRate);
 
-  const mutation = useMutation(
-    () => {
+  const mutation = useMutation({
+    mutationFn: () => {
       const payload = { title, supplier, purchaseOrder: purchaseOrder || undefined, currency, issueDate, dueDate: dueDate || undefined, taxRate, notes, items };
       return mode === "edit" ? updateVendorBill(id!, payload) : createVendorBill(payload);
     },
-    {
-      onSuccess: () => { toast({ title: mode === "edit" ? "Bill updated" : "Bill created" }); navigate("/procurement/bills"); },
-      onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed to save", variant: "destructive" }); },
-    }
-  );
+
+    onSuccess: () => { toast({ title: mode === "edit" ? "Bill updated" : "Bill created" }); navigate("/procurement/bills"); },
+    onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed to save", variant: "destructive" }); }
+  });
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
@@ -151,7 +162,7 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/procurement/bills")}>{tr.common.cancel}</Button>
-              <Button type="submit" disabled={mutation.isLoading}>{mutation.isLoading ? tr.common.loading : tr.common.save}</Button>
+              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? tr.common.loading : tr.common.save}</Button>
             </div>
           </form>
         </CardContent>

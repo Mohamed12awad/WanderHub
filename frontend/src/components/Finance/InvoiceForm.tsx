@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/select";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice } from "@/utils/api";
-import LineItemsTable, { LineItemRow } from "./LineItemsTable";
+import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { InvoiceStatus } from "@/types/types";
@@ -101,14 +101,14 @@ const InvoiceForm: React.FC = () => {
     fetchExchangeRate(baseCurrency, currency).then((rate) => {
       setExchangeRate(rate ?? "");
     }).finally(() => setFetchingRate(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currency, isEdit, baseCurrency]);
 
-  const { data: invoiceData } = useQuery(
-    ["invoices", id],
-    () => getInvoiceById(id!),
-    { enabled: isEdit }
-  );
+  const { data: invoiceData } = useQuery({
+    queryKey: ["invoices", id],
+    queryFn: () => getInvoiceById(id!),
+    enabled: isEdit
+  });
 
   useEffect(() => {
     if (!invoiceData?.data?.invoice) return;
@@ -134,9 +134,7 @@ const InvoiceForm: React.FC = () => {
     setExchangeRate(inv.exchangeRate ?? "");
   }, [invoiceData]);
 
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice * (1 - i.discount / 100), 0);
-  const tax = subtotal * (taxRate / 100);
-  const total = subtotal + tax;
+  const { subtotal, tax, total } = computeTotals(items, taxRate);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -25,6 +25,7 @@ const Products         = lazy(() => import("@/components/Products/Products").the
 const AddProduct       = lazy(() => import("@/components/Products/AddProduct"));
 const EditProduct      = lazy(() => import("@/components/Products/EditProduct"));
 const ViewProduct      = lazy(() => import("@/components/Products/ViewProduct"));
+const Inventory        = lazy(() => import("@/components/Inventory/Inventory").then((m) => ({ default: m.Inventory })));
 const Expenses         = lazy(() => import("@/components/Expenses/Expenses").then((m) => ({ default: m.Expenses })));
 const AddExpenseReport = lazy(() => import("@/components/Expenses/AddExpenses"));
 const EditExpenseReport = lazy(() => import("@/components/Expenses/EditExpenses"));
@@ -96,6 +97,7 @@ const AppRoutes = () => (
       <Route path="/products/add"                 element={<AddProduct />} />
       <Route path="/products/:id"                 element={<ViewProduct />} />
       <Route path="/products/:id/edit"            element={<EditProduct />} />
+      <Route path="/inventory"                    element={<Inventory />} />
       <Route path="/expenses"                     element={<Expenses />} />
       <Route path="/expenses/add"                 element={<AddExpenseReport />} />
       <Route path="/expenses/:id"                 element={<ViewExpense />} />

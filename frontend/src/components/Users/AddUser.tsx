@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { createUser, getRoles, getUsers } from "@/utils/api";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/authContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,10 @@ const AddUser: React.FC = () => {
   const [reportsTo, setReportsTo] = useState("");
   const [reportsToLabel, setReportsToLabel] = useState("");
 
-  const { data: rolesData, isLoading: rolesLoading } = useQuery("roles", getRoles);
+  const { data: rolesData, isPending: rolesLoading } = useQuery({
+    queryKey: ["roles"],
+    queryFn: getRoles
+  });
 
   const fetchUsers = useCallback(
     (q: string) =>
@@ -43,17 +46,17 @@ const AddUser: React.FC = () => {
     []
   );
 
-  const mutation = useMutation(
-    () => createUser({ name, email, phone, password, role, ...(reportsTo ? { reportsTo } : {}) }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries("users");
-        toast({ title: "User created." });
-        navigate("/settings/users");
-      },
-      onError: () => { toast({ title: "Failed to create user.", variant: "destructive" }); },
-    }
-  );
+  const mutation = useMutation({
+    mutationFn: () => createUser({ name, email, phone, password, role, ...(reportsTo ? { reportsTo } : {}) }),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "User created." });
+      navigate("/settings/users");
+    },
+
+    onError: () => { toast({ title: "Failed to create user.", variant: "destructive" }); }
+  });
 
   if (!currentUser || !["admin", "super admin"].includes(currentUser.role)) {
     return <p className="p-8 text-center font-semibold">You do not have permission to add users.</p>;
@@ -141,8 +144,8 @@ const AddUser: React.FC = () => {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => navigate("/settings/users")}>Cancel</Button>
-              <Button type="submit" disabled={mutation.isLoading}>
-                {mutation.isLoading ? "Creating…" : "Create User"}
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? "Creating…" : "Create User"}
               </Button>
             </div>
           </form>

@@ -14,6 +14,10 @@ function buildPrisma() {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn(),
     },
+    // convertToCustomer seeds a deal from the lead inside the transaction.
+    deal: {
+      create: jest.fn().mockResolvedValue({ id: 'deal-new' }),
+    },
   };
   // Simulate $transaction by passing the prisma client as the tx argument
   prisma.$transaction = jest.fn().mockImplementation((fn: (tx: any) => Promise<any>) => fn(prisma));

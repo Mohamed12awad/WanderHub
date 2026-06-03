@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import type { JSX } from "react";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useSearchParams } from "react-router-dom";
 import { PlusCircle, Search, Download, SlidersHorizontal, X, Inbox, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
@@ -228,15 +229,16 @@ export function GenericTable<T extends DataItem>({
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading, error, isPreviousData } = useQuery(
-    [queryKey, page, limit, committedQ, JSON.stringify(activeFilters), sortBy, sortDir],
-    () => fetchData({ page, limit, q: committedQ, filters: activeFilters, ...(sortBy ? { sort: sortBy, dir: sortDir } : {}) }),
-    { keepPreviousData: true },
-  );
+  const { data, isPending, error, isPlaceholderData } = useQuery({
+    queryKey: [queryKey, page, limit, committedQ, JSON.stringify(activeFilters), sortBy, sortDir],
+    queryFn: () => fetchData({ page, limit, q: committedQ, filters: activeFilters, ...(sortBy ? { sort: sortBy, dir: sortDir } : {}) }),
+    placeholderData: keepPreviousData
+  });
 
-  const mutation = useMutation(deleteData, {
-    onSuccess: () => { queryClient.invalidateQueries(queryKey); toast({ title: tr.common.deleted }); },
-    onError:   () => { toast({ title: tr.common.deleteFailed, variant: "destructive" }); },
+  const mutation = useMutation({
+    mutationFn: deleteData,
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); toast({ title: tr.common.deleted }); },
+    onError:   () => { toast({ title: tr.common.deleteFailed, variant: "destructive" }); }
   });
 
   const handleDelete = (id: string) => setPendingDeleteId(id);
@@ -262,13 +264,12 @@ export function GenericTable<T extends DataItem>({
   return (
     <div className="flex flex-col pb-6 min-h-full bg-muted/30 dark:bg-muted/10">
       <ConfirmDialog open={!!pendingDeleteId} onConfirm={confirmDelete} onCancel={() => setPendingDeleteId(null)} />
-
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b bg-card shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <h1 className="text-lg font-semibold tracking-tight truncate">{title}</h1>
-            {!isLoading && (
+            {!isPending && (
               <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
                 {totalCount}
               </span>
@@ -302,14 +303,12 @@ export function GenericTable<T extends DataItem>({
           )}
         </div>
       </div>
-
       {/* ── Optional top content (e.g. summary bar) ── */}
       {topContent && (
         <div className="px-6 py-3 border-b bg-card shrink-0">
           {topContent}
         </div>
       )}
-
       {/* ── Toolbar: search + filters + active chips ── */}
       <div className="px-6 py-3 border-b bg-card shrink-0 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -437,7 +436,6 @@ export function GenericTable<T extends DataItem>({
           </div>
         )}
       </div>
-
       {/* ── Quick status tabs ── */}
       {quickStatusFilter && (
         <div
@@ -471,9 +469,8 @@ export function GenericTable<T extends DataItem>({
           })}
         </div>
       )}
-
       {/* ── Table ── */}
-      <Card className={cn("mx-6 mt-3 shadow-sm border-border/60 transition-opacity overflow-hidden", isPreviousData && !isLoading ? "opacity-60" : "opacity-100")}>
+      <Card className={cn("mx-6 mt-3 shadow-sm border-border/60 transition-opacity overflow-hidden", isPlaceholderData && !isPending ? "opacity-60" : "opacity-100")}>
         <CardContent className="p-0 overflow-auto">
         <Table>
           <TableHeader>
@@ -516,7 +513,7 @@ export function GenericTable<T extends DataItem>({
           </TableHeader>
 
           <TableBody className="[&>tr:nth-child(even)]:bg-muted/[0.03] dark:[&>tr:nth-child(even)]:bg-muted/[0.08]">
-            {isLoading &&
+            {isPending &&
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i} className="hover:bg-transparent animate-pulse">
                   {headers.map((h, hi) => (
@@ -528,7 +525,7 @@ export function GenericTable<T extends DataItem>({
                 </TableRow>
               ))}
 
-            {!isLoading && filtered.length === 0 && (
+            {!isPending && filtered.length === 0 && (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={headers.length + 1} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
@@ -565,7 +562,7 @@ export function GenericTable<T extends DataItem>({
               </TableRow>
             )}
 
-            {!isLoading && filtered.map((item) => renderRow(item, handleDelete))}
+            {!isPending && filtered.map((item) => renderRow(item, handleDelete))}
           </TableBody>
         </Table>
           {paginationInfo && (

@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getSupplierById, getPurchaseOrders, getNotes, getActivities } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -16,20 +16,31 @@ export default function ViewSupplier() {
   const navigate = useNavigate();
   const { tr } = useLanguage();
 
-  const { data, isLoading } = useQuery(["supplier", id], () => getSupplierById(id!));
+  const { data, isPending } = useQuery({
+    queryKey: ["supplier", id],
+    queryFn: () => getSupplierById(id!)
+  });
   const supplier = data?.data;
 
-  const { data: posData } = useQuery(
-    ["pos-by-supplier", id],
-    () => getPurchaseOrders({ limit: 5 }),
-    { enabled: !!id }
-  );
-  const { data: notesData }      = useQuery(["notes", id, "Supplier"],      () => getNotes({ linkedTo: id!, linkedModel: "Supplier" }),      { enabled: !!id });
-  const { data: activitiesData } = useQuery(["activities", id],             () => getActivities(id!, "Supplier"),                           { enabled: !!id });
+  const { data: posData } = useQuery({
+    queryKey: ["pos-by-supplier", id],
+    queryFn: () => getPurchaseOrders({ limit: 5 }),
+    enabled: !!id
+  });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", id, "Supplier"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Supplier" }),
+    enabled: !!id
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Supplier"),
+    enabled: !!id
+  });
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
-  if (isLoading) return <div className="p-6">Loading...</div>;
+  if (isPending) return <div className="p-6">Loading...</div>;
   if (!supplier) return <div className="p-6">Supplier not found</div>;
 
   const addressStr = [

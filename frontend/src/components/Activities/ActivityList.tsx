@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getActivities, updateActivity, deleteActivity } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
 import { format } from "date-fns";
@@ -34,25 +34,32 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
   const [detail, setDetail]     = useState<Activity | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const { data, isLoading } = useQuery(
-    ["activities", linkedTo],
-    () => getActivities(linkedTo, linkedModel),
-    { enabled: !!linkedTo },
-  );
+  const { data, isPending } = useQuery({
+    queryKey: ["activities", linkedTo],
+    queryFn: () => getActivities(linkedTo, linkedModel),
+    enabled: !!linkedTo
+  });
 
-  const toggleMutation = useMutation(
-    (activity: Activity) => updateActivity(activity._id, {
+  const toggleMutation = useMutation({
+    mutationFn: (activity: Activity) => updateActivity(activity._id, {
       status: activity.status === "completed" ? "pending" : "completed",
     } as any),
-    {
-      onSuccess: () => queryClient.invalidateQueries(["activities", linkedTo]),
-      onError:   () => { toast({ title: "Failed to update.", variant: "destructive" }); },
-    },
-  );
 
-  const deleteMutation = useMutation(deleteActivity, {
-    onSuccess: () => queryClient.invalidateQueries(["activities", linkedTo]),
-    onError:   () => { toast({ title: "Failed to delete.", variant: "destructive" }); },
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: ["activities", linkedTo]
+    }),
+
+    onError:   () => { toast({ title: "Failed to update.", variant: "destructive" }); }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteActivity,
+
+    onSuccess: () => queryClient.invalidateQueries({
+      queryKey: ["activities", linkedTo]
+    }),
+
+    onError:   () => { toast({ title: "Failed to delete.", variant: "destructive" }); }
   });
 
   const activities: Activity[] = data?.data ?? [];
@@ -65,15 +72,12 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
         <h2 className="text-lg font-semibold">Activities</h2>
         <ActivityDialog linkedTo={linkedTo} linkedModel={linkedModel} />
       </div>
-
-      {isLoading && <p className="text-sm text-muted-foreground">Loading activities…</p>}
-
-      {!isLoading && activities.length === 0 && (
+      {isPending && <p className="text-sm text-muted-foreground">Loading activities…</p>}
+      {!isPending && activities.length === 0 && (
         <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
           No activities yet. Log a call, meeting, or task to get started.
         </p>
       )}
-
       <ul className="space-y-2">
         {activities.map((activity) => (
           <li
@@ -146,7 +150,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
           </li>
         ))}
       </ul>
-
       <ActivityDetailDialog
         activity={detail}
         open={detailOpen}

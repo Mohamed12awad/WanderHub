@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getVendorBillById, approveVendorBill, rejectVendorBill, deleteVendorBill,
   recordVendorBillPayment, getAccounts,
@@ -35,16 +36,18 @@ function PaymentDialog({ billId, currency, outstanding, onDone }: { billId: stri
   const [method, setMethod] = useState("bank_transfer");
   const [accountId, setAccountId] = useState("");
   const { toast } = useToast();
-  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 60000
+  });
   const accounts = accountsData?.data ?? [];
 
-  const mutation = useMutation(
-    () => recordVendorBillPayment(billId, { amount, date, method, accountId: accountId || undefined, currency }),
-    {
-      onSuccess: () => { setOpen(false); onDone(); toast({ title: "Payment recorded" }); },
-      onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed", variant: "destructive" }); },
-    }
-  );
+  const mutation = useMutation({
+    mutationFn: () => recordVendorBillPayment(billId, { amount, date, method, accountId: accountId || undefined, currency }),
+    onSuccess: () => { setOpen(false); onDone(); toast({ title: "Payment recorded" }); },
+    onError: (e: any) => { toast({ title: e?.response?.data?.message ?? "Failed", variant: "destructive" }); }
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -75,7 +78,7 @@ function PaymentDialog({ billId, currency, outstanding, onDone }: { billId: stri
             </Select>
           </div>
         </div>
-        <DialogFooter><Button onClick={() => mutation.mutate()} disabled={mutation.isLoading}>{mutation.isLoading ? "Saving…" : "Record"}</Button></DialogFooter>
+        <DialogFooter><Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Record"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -91,9 +94,15 @@ export default function ViewVendorBill() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const { data, isLoading } = useQuery(["vendor-bill", id], () => getVendorBillById(id!), { enabled: !!id });
+  const { data, isLoading } = useQuery({
+    queryKey: ["vendor-bill", id],
+    queryFn: () => getVendorBillById(id!),
+    enabled: !!id
+  });
   const bill = data?.data;
-  const refresh = () => queryClient.invalidateQueries(["vendor-bill", id]);
+  const refresh = () => queryClient.invalidateQueries({
+    queryKey: ["vendor-bill", id]
+  });
 
   const canApprove = ["admin", "super admin", "manager"].includes(user?.role ?? "");
   const isPending = bill?.approvalStatus === "pending";
@@ -131,6 +140,7 @@ export default function ViewVendorBill() {
 
   return (
     <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+      <ApprovalStepsTimeline entityType="VendorBill" entityId={id!} />
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
 
       {isPending && (

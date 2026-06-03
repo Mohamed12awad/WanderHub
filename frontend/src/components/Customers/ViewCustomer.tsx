@@ -22,7 +22,7 @@ import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
 import FinanceTab from "@/components/Finance/FinanceTab";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -40,11 +40,11 @@ const ViewCustomer: React.FC = () => {
   const [dealLoading, setDealLoading] = useState(false);
   const [dealErrors, setDealErrors] = useState<{ title?: string; price?: string }>({});
 
-  const { data: response, isLoading, error } = useQuery(
-    ["customer", id],
-    () => getCustomerById(id!),
-    { enabled: !!id }
-  );
+  const { data: response, isPending, error } = useQuery({
+    queryKey: ["customer", id],
+    queryFn: () => getCustomerById(id!),
+    enabled: !!id
+  });
   const { getFieldsForModule } = useWorkspaceSettings();
   const _custFields = getFieldsForModule("customers");
   const fieldLabels = Object.fromEntries([
@@ -54,11 +54,31 @@ const ViewCustomer: React.FC = () => {
 
   const customerData: Customer | null = response?.data ?? null;
 
-  const { data: notesData }      = useQuery(["notes", id, "Customer"],       () => getNotes({ linkedTo: id!, linkedModel: "Customer" }),   { enabled: !!id });
-  const { data: activitiesData } = useQuery(["activities", id],               () => getActivities(id!, "Customer"),                        { enabled: !!id });
-  const { data: quotesData }     = useQuery(["quotes",    { customer: id }],  () => getQuotes({ customer: id }),                           { enabled: !!id });
-  const { data: invoicesData }   = useQuery(["invoices",  { customer: id }],  () => getInvoices({ customer: id }),                         { enabled: !!id });
-  const { data: dealsData }      = useQuery(["customer-deals", id],           () => getDeals({ customerId: id, page: 1, limit: 50 }),       { enabled: !!id });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", id, "Customer"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Customer" }),
+    enabled: !!id
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Customer"),
+    enabled: !!id
+  });
+  const { data: quotesData }     = useQuery({
+    queryKey: ["quotes",    { customer: id }],
+    queryFn: () => getQuotes({ customer: id }),
+    enabled: !!id
+  });
+  const { data: invoicesData }   = useQuery({
+    queryKey: ["invoices",  { customer: id }],
+    queryFn: () => getInvoices({ customer: id }),
+    enabled: !!id
+  });
+  const { data: dealsData }      = useQuery({
+    queryKey: ["customer-deals", id],
+    queryFn: () => getDeals({ customerId: id, page: 1, limit: 50 }),
+    enabled: !!id
+  });
 
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
@@ -120,7 +140,7 @@ const ViewCustomer: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <main className="p-4">
         <Card>
@@ -433,13 +453,13 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CustomerDealsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
-  const { data, isLoading } = useQuery(
-    ["customer-deals", customerId],
-    () => getDeals({ customerId, page: 1, limit: 50 }),
-  );
+  const { data, isPending } = useQuery({
+    queryKey: ["customer-deals", customerId],
+    queryFn: () => getDeals({ customerId, page: 1, limit: 50 })
+  });
   const deals: any[] = (data?.data as any)?.data ?? [];
 
-  if (isLoading) return (
+  if (isPending) return (
     <div className="space-y-2">
       {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
     </div>

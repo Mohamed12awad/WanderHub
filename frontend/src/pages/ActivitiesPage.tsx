@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getAllActivities } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
@@ -15,7 +15,7 @@ import { ExternalLink, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ActivityDetailDialog } from "@/components/Activities/ActivityDetailDialog";
 import { useToast } from "@/components/ui/use-toast";
-import { useMutation, useQueryClient } from "react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateActivity, deleteActivity } from "@/utils/api";
 import { CheckCircle2, Circle, Trash2 } from "lucide-react";
 
@@ -55,22 +55,30 @@ export function ActivitiesPage() {
   const [detailOpen,  setDetailOpen] = useState(false);
 
   const queryKey = ["activities-all"];
-  const { data, isLoading } = useQuery(queryKey, () => getAllActivities({}));
+  const { data, isPending } = useQuery({
+    queryKey: queryKey,
+    queryFn: () => getAllActivities({})
+  });
   const activities: Activity[] = Array.isArray(data?.data) ? data.data : [];
 
-  const invalidate = () => queryClient.invalidateQueries(queryKey);
+  const invalidate = () => queryClient.invalidateQueries({
+    queryKey: queryKey
+  });
 
-  const toggleMut = useMutation(
-    (a: Activity) => updateActivity(a._id, {
+  const toggleMut = useMutation({
+    mutationFn: (a: Activity) => updateActivity(a._id, {
       status: a.status === "completed" ? "pending" : "completed",
     } as any),
-    { onSuccess: invalidate, onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); } },
-  );
 
-  const deleteMut = useMutation(
-    (id: string) => deleteActivity(id),
-    { onSuccess: invalidate, onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); } },
-  );
+    onSuccess: invalidate,
+    onError: () => { toast({ title: "Failed to update.", variant: "destructive" }); }
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteActivity(id),
+    onSuccess: invalidate,
+    onError: () => { toast({ title: "Failed to delete.", variant: "destructive" }); }
+  });
 
   const filtered = activities.filter((a) => {
     if (typeFilter !== "all"   && a.type   !== typeFilter)  return false;
@@ -96,7 +104,6 @@ export function ActivitiesPage() {
           <p className="text-sm text-muted-foreground">{activities.length} total</p>
         </div>
       </div>
-
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -143,9 +150,8 @@ export function ActivitiesPage() {
           {filtered.length} result{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
-
       {/* List */}
-      {isLoading ? (
+      {isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-16 rounded-lg bg-muted/30 animate-pulse" />
@@ -213,7 +219,7 @@ export function ActivitiesPage() {
                     className={cn("h-7 w-7", a.status === "completed" && "text-emerald-600")}
                     title={a.status === "completed" ? "Mark pending" : "Mark done"}
                     onClick={() => toggleMut.mutate(a)}
-                    disabled={toggleMut.isLoading}
+                    disabled={toggleMut.isPending}
                   >
                     {a.status === "completed"
                       ? <CheckCircle2 className="h-4 w-4" />
@@ -224,7 +230,7 @@ export function ActivitiesPage() {
                     className="h-7 w-7 text-destructive hover:text-destructive"
                     title="Delete"
                     onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(a._id); }}
-                    disabled={deleteMut.isLoading}
+                    disabled={deleteMut.isPending}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -234,7 +240,6 @@ export function ActivitiesPage() {
           })}
         </div>
       )}
-
       <ActivityDetailDialog
         activity={detail}
         open={detailOpen}

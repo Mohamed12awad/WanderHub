@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { ReceiptText, CircleDollarSign, AlertCircle } from "lucide-react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getQuotes, getInvoices, deleteQuote, deleteInvoice, convertQuoteToInvoice,
 } from "@/utils/api";
@@ -283,7 +283,7 @@ export function QuotesPage() {
   const handleConvert = useCallback(async (id: string) => {
     try {
       const res = await convertQuoteToInvoice(id);
-      queryClient.invalidateQueries("quotes-gt");
+      queryClient.invalidateQueries({ queryKey: ["quotes-gt"] });
       toast({ title: "Converted to invoice." });
       navigate(`/finance/invoices/${res.data._id}`);
     } catch {
@@ -327,7 +327,11 @@ export function InvoicesPage() {
   const { user } = useAuth();
   const canDelete = ["admin", "super admin"].includes(user!.role);
 
-  const { data: allData } = useQuery("invoices-all", () => getInvoices(), { staleTime: 30_000 });
+  const { data: allData } = useQuery({
+    queryKey: ["invoices-all"],
+    queryFn: () => getInvoices(),
+    staleTime: 30_000
+  });
   const allInvoices: Invoice[] = allData?.data ?? [];
 
   return (

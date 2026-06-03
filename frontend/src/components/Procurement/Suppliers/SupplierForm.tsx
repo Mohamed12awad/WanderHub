@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery } from "react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createSupplier, updateSupplier, getSupplierById } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -27,39 +27,40 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
     notes: "",
   });
 
-  const { isLoading: isFetching } = useQuery(
-    ["supplier", id],
-    () => getSupplierById(id!),
-    {
-      enabled: mode === "edit" && !!id,
-      onSuccess: (res) => {
-        const d = res.data;
-        setFormData({
-          name: d.name || "",
-          contactName: d.contactName || "",
-          email: d.email || "",
-          phone: d.phone || "",
-          status: d.status || "active",
-          taxId: d.taxId || "",
-          address: d.address || { street: "", city: "", state: "", zip: "", country: "" },
-          notes: d.notes || "",
-        });
-      },
-    }
-  );
+  const { data: supplierData, isPending: isFetching } = useQuery({
+    queryKey: ["supplier", id],
+    queryFn: () => getSupplierById(id!),
+    enabled: mode === "edit" && !!id,
+  });
 
-  const mutation = useMutation(
-    (data: any) => (mode === "add" ? createSupplier(data) : updateSupplier(id!, data)),
-    {
-      onSuccess: () => {
-        toast({ title: "Success", description: "Supplier saved successfully." });
-        navigate("/procurement/suppliers");
-      },
-      onError: () => {
-        toast({ title: "Error", description: "Failed to save supplier.", variant: "destructive" });
-      },
+  // v5 removed useQuery onSuccess — prefill the form from the fetched record.
+  useEffect(() => {
+    if (!supplierData) return;
+    const d = supplierData.data;
+    setFormData({
+      name: d.name || "",
+      contactName: d.contactName || "",
+      email: d.email || "",
+      phone: d.phone || "",
+      status: d.status || "active",
+      taxId: d.taxId || "",
+      address: d.address || { street: "", city: "", state: "", zip: "", country: "" },
+      notes: d.notes || "",
+    });
+  }, [supplierData]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => (mode === "add" ? createSupplier(data) : updateSupplier(id!, data)),
+
+    onSuccess: () => {
+      toast({ title: "Success", description: "Supplier saved successfully." });
+      navigate("/procurement/suppliers");
+    },
+
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save supplier.", variant: "destructive" });
     }
-  );
+  });
 
   const handleChange = (field: string, value: any) => {
     if (field.startsWith("address.")) {
@@ -87,7 +88,6 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
           {tr.common.cancel}
         </Button>
       </div>
-
       <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-xl border">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -159,8 +159,8 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
         </div>
 
         <div className="flex justify-end pt-4 border-t">
-          <Button type="submit" disabled={mutation.isLoading}>
-            {mutation.isLoading ? "Saving..." : tr.common.save}
+          <Button type="submit" disabled={mutation.isPending}>
+            {mutation.isPending ? "Saving..." : tr.common.save}
           </Button>
         </div>
       </form>

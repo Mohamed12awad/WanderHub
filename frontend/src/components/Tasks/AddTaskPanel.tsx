@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTask, updateTask, getUsers } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Task, TaskFormData, TaskPriority, TaskStatus } from "@/types/types";
@@ -61,24 +61,30 @@ export function AddTaskPanel({ open, onClose, task }: Props) {
     setTagInput("");
   }, [task, open]);
 
-  const { data: usersData } = useQuery("users", () => getUsers());
+  const { data: usersData } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => getUsers()
+  });
   const users: { _id: string; name: string }[] = Array.isArray(usersData?.data)
     ? usersData.data
     : [];
 
   const onSuccess = () => {
-    queryClient.invalidateQueries("tasks");
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
     toast({ title: isEdit ? "Task updated." : "Task created." });
     onClose();
   };
 
-  const createMut = useMutation((data: TaskFormData) => createTask(data), { onSuccess });
-  const updateMut = useMutation(
-    (data: Partial<TaskFormData>) => updateTask(task!._id, data),
-    { onSuccess }
-  );
+  const createMut = useMutation({
+    mutationFn: (data: TaskFormData) => createTask(data),
+    onSuccess
+  });
+  const updateMut = useMutation({
+    mutationFn: (data: Partial<TaskFormData>) => updateTask(task!._id, data),
+    onSuccess
+  });
 
-  const saving = createMut.isLoading || updateMut.isLoading;
+  const saving = createMut.isPending || updateMut.isPending;
 
   const set = <K extends keyof TaskFormData>(k: K, v: TaskFormData[K]) =>
     setForm((p) => ({ ...p, [k]: v }));

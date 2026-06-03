@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createUser, updateUser, getUserById, getRoles, getUsers } from "@/utils/api";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/authContext";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -52,12 +52,15 @@ const UserDialog: React.FC<Props> = ({ open, onClose, editId }) => {
   const [reportsToLabel, setReportsToLabel] = useState("");
   const [changePassword, setChangePassword] = useState(false);
 
-  const { data: rolesData, isLoading: rolesLoading } = useQuery("roles", getRoles);
-  const { data: userData, isLoading: userLoading } = useQuery(
-    ["user", editId],
-    () => getUserById(editId!),
-    { enabled: !!editId }
-  );
+  const { data: rolesData, isPending: rolesLoading } = useQuery({
+    queryKey: ["roles"],
+    queryFn: getRoles
+  });
+  const { data: userData, isPending: userLoading } = useQuery({
+    queryKey: ["user", editId],
+    queryFn: () => getUserById(editId!),
+    enabled: !!editId
+  });
 
   const userDetail: UserDetail | null = userData ? (userData as AxiosResponse<UserDetail>).data : null;
 
@@ -90,28 +93,26 @@ const UserDialog: React.FC<Props> = ({ open, onClose, editId }) => {
   );
 
   const invalidate = () => {
-    queryClient.invalidateQueries("users");
-    if (editId) queryClient.invalidateQueries(["user", editId]);
+    queryClient.invalidateQueries({ queryKey: ["users"] });
+    if (editId) queryClient.invalidateQueries({
+      queryKey: ["user", editId]
+    });
   };
 
-  const createMutation = useMutation(
-    () => createUser({ name, email, phone, password, role, ...(reportsTo ? { reportsTo } : {}) }),
-    {
-      onSuccess: () => { invalidate(); toast({ title: "User created." }); onClose(); },
-      onError: () => { toast({ title: "Failed to create user.", variant: "destructive" }); },
-    }
-  );
+  const createMutation = useMutation({
+    mutationFn: () => createUser({ name, email, phone, password, role, ...(reportsTo ? { reportsTo } : {}) }),
+    onSuccess: () => { invalidate(); toast({ title: "User created." }); onClose(); },
+    onError: () => { toast({ title: "Failed to create user.", variant: "destructive" }); }
+  });
 
-  const updateMutation = useMutation(
-    () => updateUser(editId!, { name, email, phone, role, ...(changePassword && password ? { password } : {}), reportsTo: reportsTo || null }),
-    {
-      onSuccess: () => { invalidate(); toast({ title: "User updated." }); onClose(); },
-      onError: () => { toast({ title: "Failed to update user.", variant: "destructive" }); },
-    }
-  );
+  const updateMutation = useMutation({
+    mutationFn: () => updateUser(editId!, { name, email, phone, role, ...(changePassword && password ? { password } : {}), reportsTo: reportsTo || null }),
+    onSuccess: () => { invalidate(); toast({ title: "User updated." }); onClose(); },
+    onError: () => { toast({ title: "Failed to update user.", variant: "destructive" }); }
+  });
 
-  const isLoading = rolesLoading || (isEdit && userLoading);
-  const isSaving = createMutation.isLoading || updateMutation.isLoading;
+  const isPending = rolesLoading || (isEdit && userLoading);
+  const isSaving = createMutation.isPending || updateMutation.isPending;
   const directReports = userDetail?.directReports ?? [];
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -143,7 +144,7 @@ const UserDialog: React.FC<Props> = ({ open, onClose, editId }) => {
           </DialogTitle>
         </DialogHeader>
 
-        {isLoading ? (
+        {isPending ? (
           <div className="space-y-4 py-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="space-y-1.5">

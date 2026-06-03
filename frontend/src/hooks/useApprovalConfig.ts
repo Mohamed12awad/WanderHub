@@ -1,4 +1,4 @@
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getApprovalSettings } from "@/utils/api";
 
 export interface ApprovalConfig {
@@ -8,21 +8,21 @@ export interface ApprovalConfig {
 }
 
 export function useApprovalConfig() {
-  const { data } = useQuery<ApprovalConfig[]>(
-    ["approvalSettings"],
-    async () => (await getApprovalSettings()).data ?? [],
-    { staleTime: 5 * 60 * 1000 }
-  );
+  const { data } = useQuery({
+    queryKey: ["approvalSettings"],
+    queryFn: async () => (await getApprovalSettings()).data ?? [],
+    staleTime: 5 * 60 * 1000
+  });
 
   const configs = data ?? [];
 
   const isApprovalEnabled = (module: string): boolean => {
-    const cfg = configs.find((c) => c.module === module);
+    const cfg = configs.find((c: any) => c.module === module);
     return cfg?.enabled ?? false;
   };
 
   const canUserApprove = (module: string, userRole: string): boolean => {
-    const cfg = configs.find((c) => c.module === module);
+    const cfg = configs.find((c: any) => c.module === module);
     if (!cfg?.enabled) return false;
     if (["admin", "super admin"].includes(userRole)) return true;
     if (!cfg.approverRoles?.length) return true;

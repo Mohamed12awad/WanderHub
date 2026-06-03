@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLeadById, convertLead, deleteLead, getNotes, getActivities } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
@@ -59,11 +59,23 @@ export function ViewLead() {
   const [converting, setConverting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { data, isLoading, isError } = useQuery(["lead", id], () => getLeadById(id!), { enabled: !!id });
+  const { data, isPending, isError } = useQuery({
+    queryKey: ["lead", id],
+    queryFn: () => getLeadById(id!),
+    enabled: !!id
+  });
   const lead = data?.data;
 
-  const { data: notesData }      = useQuery(["notes", id, "Lead"],      () => getNotes({ linkedTo: id!, linkedModel: "Lead" }),      { enabled: !!id });
-  const { data: activitiesData } = useQuery(["activities", id],         () => getActivities(id!, "Lead"),                           { enabled: !!id });
+  const { data: notesData }      = useQuery({
+    queryKey: ["notes", id, "Lead"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Lead" }),
+    enabled: !!id
+  });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Lead"),
+    enabled: !!id
+  });
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
@@ -73,7 +85,9 @@ export function ViewLead() {
     try {
       const res = await convertLead(id);
       toast({ title: "Lead converted to contact successfully" });
-      queryClient.invalidateQueries(["lead", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["lead", id]
+      });
       navigate(`/customers/${res.data._id}`);
     } catch (err: any) {
       toast({ title: err?.response?.data?.message ?? "Failed to convert lead", variant: "destructive" });
@@ -93,7 +107,7 @@ export function ViewLead() {
     }
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <main className="p-4 space-y-4">
         <Card>

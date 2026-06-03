@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  getSummery, getDeals, getAccounts,
+  getSummery, getDeals, getAccounts, getLowStock,
   getPendingApprovals, getOutstandingReport, getLeadsReport, getPipelineReport,
 } from "@/utils/api";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -105,13 +105,42 @@ export function Dashboard() {
   const { tr } = useLanguage();
   const d = tr.dashboard;
 
-  const { data: summeryData, isLoading: summeryLoading } = useQuery("summery", () => getSummery("month"));
-  const { data: dealsData, isLoading: dealsLoading } = useQuery("deals", () => getDeals());
-  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
-  const { data: pendingData } = useQuery("pending-approvals", getPendingApprovals, { staleTime: 30000 });
-  const { data: outstandingData } = useQuery("outstanding", getOutstandingReport, { staleTime: 60000 });
-  const { data: leadsData } = useQuery("leads-report", getLeadsReport, { staleTime: 60000 });
-  const { data: pipelineData } = useQuery("pipeline-report", getPipelineReport, { staleTime: 60000 });
+  const { data: lowStockData } = useQuery({ queryKey: ["low-stock"], queryFn: getLowStock, staleTime: 30000 });
+  const lowStock: any[] = lowStockData?.data ?? [];
+
+  const { data: summeryData, isPending: summeryLoading } = useQuery({
+    queryKey: ["summery"],
+    queryFn: () => getSummery("month")
+  });
+  const { data: dealsData, isPending: dealsLoading } = useQuery({
+    queryKey: ["deals"],
+    queryFn: () => getDeals()
+  });
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 60000
+  });
+  const { data: pendingData } = useQuery({
+    queryKey: ["pending-approvals"],
+    queryFn: getPendingApprovals,
+    staleTime: 30000
+  });
+  const { data: outstandingData } = useQuery({
+    queryKey: ["outstanding"],
+    queryFn: getOutstandingReport,
+    staleTime: 60000
+  });
+  const { data: leadsData } = useQuery({
+    queryKey: ["leads-report"],
+    queryFn: getLeadsReport,
+    staleTime: 60000
+  });
+  const { data: pipelineData } = useQuery({
+    queryKey: ["pipeline-report"],
+    queryFn: getPipelineReport,
+    staleTime: 60000
+  });
   const accounts: Account[] = accountsData?.data ?? [];
   const pending = pendingData?.data ?? { total: 0, quotes: [], invoices: [], expenses: [] };
   const outstanding: { _id: string; invoiceNumber: string; dealTitle: string; total: number; totalPaid: number; currency: string; dueDate: string; status: string }[] = outstandingData?.data ?? [];
@@ -131,11 +160,14 @@ export function Dashboard() {
     [d.lastPeriod]: prev.revenue?.[currency] ?? 0,
   }));
 
-  const primaryCurrency = allCurrencies[0] ?? "USD";
-  const revenue = cur.revenue?.[primaryCurrency] ?? 0;
-  const prevRevenue = prev.revenue?.[primaryCurrency] ?? 0;
-  const underCollection = cur.underCollection?.[primaryCurrency] ?? 0;
-  const prevUnder = prev.underCollection?.[primaryCurrency] ?? 0;
+  // Prefer the base-currency consolidated totals (multi-currency normalized);
+  // fall back to the first currency's figure if the backend didn't supply them.
+  const baseCurrency: string = summeryData?.data?.baseCurrency ?? allCurrencies[0] ?? "USD";
+  const primaryCurrency = baseCurrency;
+  const revenue = cur.revenueBase ?? cur.revenue?.[primaryCurrency] ?? 0;
+  const prevRevenue = prev.revenueBase ?? prev.revenue?.[primaryCurrency] ?? 0;
+  const underCollection = cur.underCollectionBase ?? cur.underCollection?.[primaryCurrency] ?? 0;
+  const prevUnder = prev.underCollectionBase ?? prev.underCollection?.[primaryCurrency] ?? 0;
   const newCustomers = cur.newCustomers ?? 0;
   const prevCustomers = prev.newCustomers ?? 0;
   const expenses = cur.expenses?.total ?? 0;
@@ -604,6 +636,28 @@ export function Dashboard() {
                 <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Low stock */}
+      {lowStock.length > 0 && (
+        <Card className="shadow-sm border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Low stock</CardTitle>
+            <CardDescription className="text-xs">{lowStock.length} product(s) at or below reorder level</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {lowStock.slice(0, 6).map((s) => (
+                <div key={s._id ?? s.productId} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{s.productName ?? s.product?.name ?? s.productId}</span>
+                  <span className="font-mono text-muted-foreground">
+                    {s.quantityOnHand} / {s.reorderLevel}
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

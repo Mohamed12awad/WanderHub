@@ -13,7 +13,7 @@ import { Button } from "../ui/button";
 import { NotesPanel } from "@/components/common/NotesPanel";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
@@ -34,12 +34,16 @@ const ViewProduct: React.FC = () => {
   const canDelete = ["admin", "super admin"].includes(user!.role);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { data: response, isLoading, error } = useQuery(
-    ["product", id],
-    () => getProductById(id!),
-    { enabled: !!id }
-  );
-  const { data: notesData } = useQuery(["notes", id, "Product"], () => getNotes({ linkedTo: id!, linkedModel: "Product" }), { enabled: !!id });
+  const { data: response, isPending, error } = useQuery({
+    queryKey: ["product", id],
+    queryFn: () => getProductById(id!),
+    enabled: !!id
+  });
+  const { data: notesData } = useQuery({
+    queryKey: ["notes", id, "Product"],
+    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Product" }),
+    enabled: !!id
+  });
   const notesCount = ((notesData?.data) as any[])?.length ?? 0;
 
   const { getFieldsForModule } = useWorkspaceSettings();
@@ -66,7 +70,7 @@ const ViewProduct: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <main className="p-4">
         <Card>

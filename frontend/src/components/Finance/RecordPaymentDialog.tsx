@@ -13,7 +13,7 @@ import { DollarSign } from "lucide-react";
 import { recordInvoicePayment, editInvoicePayment, getAccounts } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { PaymentMethod, InvoicePayment, Account } from "@/types/types";
 
 interface CreateProps {
@@ -56,7 +56,11 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
   const [accountId, setAccountId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  const { data: accountsData } = useQuery("accounts", getAccounts, { staleTime: 60000 });
+  const { data: accountsData } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: getAccounts,
+    staleTime: 60000
+  });
   const accounts: Account[] = accountsData?.data ?? [];
 
   useEffect(() => {

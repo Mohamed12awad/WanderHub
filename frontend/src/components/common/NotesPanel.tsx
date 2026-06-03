@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getNotes, createNote, updateNote, deleteNote } from "@/utils/api";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -30,43 +30,56 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
 
   const qKey = ["notes", linkedTo, linkedModel];
 
-  const { data, isLoading } = useQuery(qKey, () =>
-    getNotes({ linkedTo, linkedModel }), { enabled: !!linkedTo }
-  );
+  const { data, isPending } = useQuery({
+    queryKey: qKey,
+
+    queryFn: () =>
+      getNotes({ linkedTo, linkedModel }),
+
+    enabled: !!linkedTo
+  });
   const notes: Note[] = data?.data ?? [];
 
   const isAdminOrOwner = (note: Note) =>
     note.createdBy._id === user?.id ||
     ["admin", "super admin"].includes(user?.role ?? "");
 
-  const createMut = useMutation(
-    () => createNote({ content: draft.trim(), linkedTo, linkedModel }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(qKey);
-        queryClient.invalidateQueries(["timeline", linkedTo, linkedModel]);
-        setDraft("");
-        toast({ title: "Note added." });
-      },
-    }
-  );
+  const createMut = useMutation({
+    mutationFn: () => createNote({ content: draft.trim(), linkedTo, linkedModel }),
 
-  const updateMut = useMutation(
-    ({ id, content }: { id: string; content: string }) => updateNote(id, content),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(qKey);
-        setEditId(null);
-        toast({ title: "Note updated." });
-      },
-    }
-  );
-
-  const deleteMut = useMutation((id: string) => deleteNote(id), {
     onSuccess: () => {
-      queryClient.invalidateQueries(qKey);
+      queryClient.invalidateQueries({
+        queryKey: qKey
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["timeline", linkedTo, linkedModel]
+      });
+      setDraft("");
+      toast({ title: "Note added." });
+    }
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) => updateNote(id, content),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: qKey
+      });
+      setEditId(null);
+      toast({ title: "Note updated." });
+    }
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteNote(id),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: qKey
+      });
       toast({ title: "Note deleted." });
-    },
+    }
   });
 
   const startEdit = (note: Note) => {
@@ -113,25 +126,22 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
           <p className="text-xs text-muted-foreground">Ctrl+Enter to submit</p>
           <Button
             size="sm"
-            disabled={!draft.trim() || createMut.isLoading}
+            disabled={!draft.trim() || createMut.isPending}
             onClick={() => createMut.mutate()}
           >
-            {createMut.isLoading ? t.saving : t.add}
+            {createMut.isPending ? t.saving : t.add}
           </Button>
         </div>
       </div>
-
       {/* List */}
-      {isLoading && (
+      {isPending && (
         <p className="text-sm text-muted-foreground text-center py-4">Loading…</p>
       )}
-
-      {!isLoading && notes.length === 0 && (
+      {!isPending && notes.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-6 border rounded-lg">
           {t.empty}
         </p>
       )}
-
       <ul className="space-y-2">
         {notes.map((note) => (
           <li key={note._id} className="group rounded-lg border bg-card p-3">
@@ -155,11 +165,11 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
                   </Button>
                   <Button
                     size="sm"
-                    disabled={!editContent.trim() || updateMut.isLoading}
+                    disabled={!editContent.trim() || updateMut.isPending}
                     onClick={saveEdit}
                   >
                     <Check className="h-3.5 w-3.5 me-1" />
-                    {updateMut.isLoading ? t.saving : t.save}
+                    {updateMut.isPending ? t.saving : t.save}
                   </Button>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { getLogs, getUsers } from "@/utils/api";
 import { LogEntry } from "@/types/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -86,9 +86,10 @@ export function Logs() {
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [page,           setPage]           = useState(1);
 
-  const { data, isLoading, error } = useQuery(
-    ["logs", startDate, endDate, activeType, selectedUserId, page],
-    () => getLogs({
+  const { data, isPending, error } = useQuery({
+    queryKey: ["logs", startDate, endDate, activeType, selectedUserId, page],
+
+    queryFn: () => getLogs({
       startDate:  startDate  || undefined,
       endDate:    endDate    || undefined,
       actionType: activeType !== "all" ? activeType : undefined,
@@ -96,11 +97,16 @@ export function Logs() {
       page,
       limit: PAGE_SIZE,
     }),
-    { keepPreviousData: true },
-  );
+
+    placeholderData: keepPreviousData
+  });
 
   // Users for the filter dropdown
-  const { data: usersData } = useQuery("users-all", () => getUsers(), { staleTime: 60_000 });
+  const { data: usersData } = useQuery({
+    queryKey: ["users-all"],
+    queryFn: () => getUsers(),
+    staleTime: 60_000
+  });
   const users: { _id: string; name: string }[] = usersData?.data ?? [];
 
   const raw: LogEntry[] = Array.isArray(data?.data) ? data.data : (data?.data?.data ?? []);
@@ -201,7 +207,7 @@ export function Logs() {
             <p className="px-6 pb-6 text-sm text-destructive">{tr.logs.errorLoading}</p>
           )}
 
-          {isLoading && (
+          {isPending && (
             <div className="px-6 pb-4 space-y-3">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">
@@ -216,7 +222,7 @@ export function Logs() {
             </div>
           )}
 
-          {!isLoading && logs.length === 0 && (
+          {!isPending && logs.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <Inbox className="h-6 w-6 text-muted-foreground/50" />
@@ -227,7 +233,7 @@ export function Logs() {
             </div>
           )}
 
-          {!isLoading && logs.length > 0 && (
+          {!isPending && logs.length > 0 && (
             <ul className="divide-y divide-border/60">
               {logs.map((log) => {
                 const type   = actionType(log.action);
@@ -300,7 +306,7 @@ export function Logs() {
           )}
 
           {/* Pagination */}
-          {!isLoading && totalPages > 1 && (
+          {!isPending && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-3 border-t text-sm text-muted-foreground">
               <span className="text-xs">
                 Page {page} of {totalPages}

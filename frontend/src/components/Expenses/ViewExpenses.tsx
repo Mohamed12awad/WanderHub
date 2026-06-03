@@ -14,8 +14,10 @@ import {
   getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense, getNotes,
 } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
 import { NotesPanel } from "@/components/common/NotesPanel";
@@ -61,15 +63,15 @@ const ViewExpense = () => {
   const isAdmin = ["admin", "super admin"].includes(user!.role);
   const canDelete = isAdmin;
 
-  const { data: expenseData, isLoading, error } = useQuery(
-    ["expenses", expenseId],
-    async () => (await getExpenseById(expenseId!)).data
-  );
-  const { data: notesData } = useQuery(
-    ["notes", expenseId, "Expense"],
-    () => getNotes({ linkedTo: expenseId!, linkedModel: "Expense" }),
-    { enabled: !!expenseId }
-  );
+  const { data: expenseData, isLoading, error } = useQuery({
+    queryKey: ["expenses", expenseId],
+    queryFn: async () => (await getExpenseById(expenseId!)).data
+  });
+  const { data: notesData } = useQuery({
+    queryKey: ["notes", expenseId, "Expense"],
+    queryFn: () => getNotes({ linkedTo: expenseId!, linkedModel: "Expense" }),
+    enabled: !!expenseId
+  });
   const notesCount = ((notesData?.data) as any[])?.length ?? 0;
 
   const [formData, setFormData] = useState<ExpenseData | null>(null);
@@ -77,14 +79,18 @@ const ViewExpense = () => {
 
   const handleDeleteItem = async (reportId: string, itemId: string) => {
     await deleteExpenseReportItem(reportId, itemId);
-    queryClient.invalidateQueries(["expenses", expenseId]);
+    queryClient.invalidateQueries({
+      queryKey: ["expenses", expenseId]
+    });
   };
 
   const handleApprove = async () => {
     setActionLoading(true);
     try {
       await approveExpenseReport(expenseId!);
-      queryClient.invalidateQueries(["expenses", expenseId]);
+      queryClient.invalidateQueries({
+        queryKey: ["expenses", expenseId]
+      });
       toast({ title: "Expense report approved." });
     } catch {
       toast({ title: "Approval failed", variant: "destructive" });
@@ -97,7 +103,9 @@ const ViewExpense = () => {
     setActionLoading(true);
     try {
       await rejectExpenseReport(expenseId!, reason);
-      queryClient.invalidateQueries(["expenses", expenseId]);
+      queryClient.invalidateQueries({
+        queryKey: ["expenses", expenseId]
+      });
       setRejectOpen(false);
       toast({ title: "Expense report rejected." });
     } catch {
@@ -141,6 +149,8 @@ const ViewExpense = () => {
 
   return (
     <main className="p-4 space-y-5">
+      <ApprovalStepsTimeline entityType="ExpenseReport" entityId={expenseId!} />
+      <AttachmentsPanel linkedModel="ExpenseReport" linkedToId={expenseId!} />
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">

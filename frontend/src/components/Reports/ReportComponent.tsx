@@ -57,7 +57,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
   const renderSection = <T,>(
     title: string,
     data: T[],
-    renderItem: (item: T, index: number) => JSX.Element
+    renderItem: (item: T, index: number) => React.JSX.Element
   ) =>
     data.length > 0 && (
       <div className="mb-8">

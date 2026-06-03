@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2 } from "lucide-react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote, getActivities } from "@/utils/api";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
@@ -47,9 +48,16 @@ const QuoteDetail: React.FC = () => {
   const isAdmin = ["admin", "super admin"].includes(user!.role);
   const canDelete = isAdmin;
   const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
-  const { data, isLoading } = useQuery(["quotes", id], () => getQuoteById(id!));
+  const { data, isLoading } = useQuery({
+    queryKey: ["quotes", id],
+    queryFn: () => getQuoteById(id!)
+  });
   const quote: Quote | undefined = data?.data;
-  const { data: activitiesData } = useQuery(["activities", id], () => getActivities(id!, "Quote"), { enabled: !!id });
+  const { data: activitiesData } = useQuery({
+    queryKey: ["activities", id],
+    queryFn: () => getActivities(id!, "Quote"),
+    enabled: !!id
+  });
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <LoadingSpinner loading />;
@@ -67,7 +75,9 @@ const QuoteDetail: React.FC = () => {
     setConverting(true);
     try {
       const res = await convertQuoteToInvoice(id!);
-      queryClient.invalidateQueries(["quotes", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["quotes", id]
+      });
       toast({ title: "Converted to invoice successfully." });
       navigate(`/finance/invoices/${res.data._id}`);
     } catch {
@@ -81,7 +91,9 @@ const QuoteDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await approveQuote(id!);
-      queryClient.invalidateQueries(["quotes", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["quotes", id]
+      });
       toast({ title: "Quote approved." });
     } catch {
       toast({ title: "Approval failed", variant: "destructive" });
@@ -92,7 +104,9 @@ const QuoteDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await rejectQuote(id!, reason);
-      queryClient.invalidateQueries(["quotes", id]);
+      queryClient.invalidateQueries({
+        queryKey: ["quotes", id]
+      });
       setRejectOpen(false);
       toast({ title: "Quote rejected." });
     } catch {
@@ -112,6 +126,7 @@ const QuoteDetail: React.FC = () => {
 
   return (
     <main className="p-4 max-w-7xl mx-auto space-y-5">
+      <ApprovalStepsTimeline entityType="Quote" entityId={id!} />
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}

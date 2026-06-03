@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
+<<<<<<< HEAD
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -54,6 +55,9 @@
     to { height: 0; }
   }
 }
+=======
+@config "../tailwind.config.js";
+>>>>>>> origin/claude/sweet-davinci-iTXUM
 
 body {
   font-family: "Cairo", sans-serif;

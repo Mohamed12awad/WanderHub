@@ -14,6 +14,9 @@ export interface LineItemRow {
   quantity: number;
   unitPrice: number;
   discount: number;
+  taxRate?: number;
+  taxCode?: string;
+  productId?: string;
 }
 
 interface Props {
@@ -24,6 +27,23 @@ interface Props {
 
 function rowTotal(item: LineItemRow) {
   return item.quantity * item.unitPrice * (1 - item.discount / 100);
+}
+
+/**
+ * Document totals mirroring the backend calcTotals: per-line tax summed when any
+ * line carries a taxRate, otherwise the document-level rate is applied to each
+ * line. Keeps the form preview consistent with what the server stores.
+ */
+export function computeTotals(items: LineItemRow[], docTaxRate = 0) {
+  const perLine = items.some((i) => i.taxRate !== undefined && i.taxRate !== null);
+  let tax = 0;
+  const subtotal = items.reduce((s, i) => {
+    const net = rowTotal(i);
+    tax += net * ((perLine ? i.taxRate ?? 0 : docTaxRate) / 100);
+    return s + net;
+  }, 0);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  return { subtotal: round2(subtotal), tax: round2(tax), total: round2(subtotal + tax) };
 }
 
 const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) => {
@@ -40,7 +60,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
   );
 
   const addRow = () =>
-    onChange([...items, { description: "", quantity: 1, unitPrice: 0, discount: 0 }]);
+    onChange([...items, { description: "", quantity: 1, unitPrice: 0, discount: 0, taxRate: 0 }]);
 
   const removeRow = (idx: number) =>
     onChange(items.filter((_, i) => i !== idx));
@@ -64,6 +84,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
               <TableHead className="w-20 text-right">{f.quantity}</TableHead>
               <TableHead className="w-28 text-right">{f.unitPrice}</TableHead>
               <TableHead className="w-24 text-right">{f.discount}</TableHead>
+              <TableHead className="w-20 text-right">Tax %</TableHead>
               <TableHead className="w-28 text-right">{f.itemTotal}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -71,7 +92,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
           <TableBody>
             {items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
                   {f.noItems}
                 </TableCell>
               </TableRow>
@@ -87,7 +108,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                       onChange(
                         items.map((row, i) =>
                           i === idx
-                            ? { ...row, description: p.label, unitPrice: product.price ?? row.unitPrice }
+                            ? { ...row, productId: product.value, description: p.label, unitPrice: product.price ?? row.unitPrice }
                             : row
                         )
                       );
@@ -132,6 +153,16 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     max={100}
                     value={item.discount}
                     onChange={(e) => update(idx, "discount", e.target.value)}
+                    className="h-8 text-right"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={item.taxRate ?? 0}
+                    onChange={(e) => update(idx, "taxRate", e.target.value)}
                     className="h-8 text-right"
                   />
                 </TableCell>

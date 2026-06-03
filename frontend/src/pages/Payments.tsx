@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from "react";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { getPayments, deleteInvoicePayment } from "@/utils/api";
 import { GenericTable, FilterConfig } from "@/components/common/GenericTable";
 import { useAuth } from "@/contexts/authContext";
@@ -166,7 +166,7 @@ const Payments: React.FC = () => {
           onOpenChange={(o) => { if (!o) setEditingPayment(null); }}
           onSuccess={() => {
             setEditingPayment(null);
-            queryClient.invalidateQueries("payments-gt");
+            queryClient.invalidateQueries({ queryKey: ["payments-gt"] });
           }}
         />
       )}

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import { getOrgSettings, updateOrgSettings } from "@/utils/api";
 import { toast } from "@/components/ui/use-toast";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useOrgLogo } from "@/hooks/useOrgLogo";
 import { Upload, X } from "lucide-react";
 
@@ -67,7 +67,9 @@ export default function OrganizationSettings() {
     setSaving(true);
     try {
       await updateOrgSettings({ baseCurrency, locale });
-      queryClient.invalidateQueries(["orgSettings"]);
+      queryClient.invalidateQueries({
+        queryKey: ["orgSettings"]
+      });
       toast({ title: "Organization settings saved." });
     } catch {
       toast({ title: "Failed to save settings.", variant: "destructive" });

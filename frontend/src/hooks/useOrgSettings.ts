@@ -1,4 +1,4 @@
-import { useQuery } from "react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getOrgSettings } from "@/utils/api";
 
 export interface OrgSettings {
@@ -8,11 +8,11 @@ export interface OrgSettings {
 
 const DEFAULTS: OrgSettings = { baseCurrency: "EGP", locale: "en-US" };
 
-export function useOrgSettings(): OrgSettings & { isLoading: boolean } {
-  const { data, isLoading } = useQuery<OrgSettings>(
-    ["orgSettings"],
-    async () => (await getOrgSettings()).data,
-    { staleTime: 10 * 60 * 1000 }
-  );
-  return { ...DEFAULTS, ...data, isLoading };
+export function useOrgSettings(): OrgSettings & { isPending: boolean } {
+  const { data, isPending } = useQuery({
+    queryKey: ["orgSettings"],
+    queryFn: async () => (await getOrgSettings()).data,
+    staleTime: 10 * 60 * 1000
+  });
+  return { ...DEFAULTS, ...data, isPending };
 }
