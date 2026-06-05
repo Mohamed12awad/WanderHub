@@ -43,6 +43,7 @@ interface SearchResults {
   expenses:       { _id: string; title: string; approvalStatus: string }[];
   invoices:       { _id: string; invoiceNumber: string; title: string; status: string; customer?: { name: string } }[];
   quotes:         { _id: string; quoteNumber: string; title: string; status: string; customer?: { name: string } }[];
+  salesOrders:    { _id: string; orderNumber: string; title: string; status: string; customer?: { name: string } }[];
   purchaseOrders: { _id: string; poNumber: string; title: string; status: string; supplier?: { name: string } }[];
   vendorBills:    { _id: string; billNumber: string; title: string; status: string; supplier?: { name: string } }[];
   projects:       { _id: string; name: string; status: string; priority: string }[];
@@ -95,7 +96,7 @@ export function SearchPalette() {
   const totalHits = results
     ? results.customers.length + results.deals.length + results.leads.length +
       results.products.length + results.expenses.length + results.invoices.length +
-      results.quotes.length + results.purchaseOrders.length + results.vendorBills.length +
+      results.quotes.length + (results.salesOrders?.length ?? 0) + results.purchaseOrders.length + results.vendorBills.length +
       results.projects.length + results.tasks.length
     : 0;
   const hasResults = totalHits > 0;
@@ -187,6 +188,21 @@ export function SearchPalette() {
                       <FileText className="me-2 h-4 w-4 text-muted-foreground" />
                       <span>{q.quoteNumber}</span>
                       <span className="ms-2 text-xs text-muted-foreground">{q.title}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            ) : null}
+
+            {results?.salesOrders?.length ? (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={s.salesOrders ?? "Sales Orders"}>
+                  {results.salesOrders.map((o) => (
+                    <CommandItem key={o._id} value={o._id} onSelect={() => go(`/sales-orders/${o._id}`)}>
+                      <FileText className="me-2 h-4 w-4 text-muted-foreground" />
+                      <span>{o.orderNumber}</span>
+                      <span className="ms-2 text-xs text-muted-foreground">{o.title}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>

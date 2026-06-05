@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { TasksService } from './tasks.service';
@@ -8,7 +10,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Controller('tasks')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('tasks')
 export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 

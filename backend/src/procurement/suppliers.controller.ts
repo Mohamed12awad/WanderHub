@@ -1,13 +1,16 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 @Controller('procurement/suppliers')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('suppliers')
 export class SuppliersController {
   constructor(private readonly suppliers: SuppliersService) {}
 

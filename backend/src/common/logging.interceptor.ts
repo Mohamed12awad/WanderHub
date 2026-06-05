@@ -17,6 +17,10 @@ const RULES: RouteRule[] = [
   { pattern: /^\/finance\/quotes/,    action: (m) => verb(m, 'quote') },
   { pattern: /^\/finance\/payments/,  action: (m) => verb(m, 'payment') },
 
+  // Sales orders
+  { pattern: /^\/sales-orders\/[^/]+\/create-invoice/, action: () => 'Created an invoice from a sales order' },
+  { pattern: /^\/sales-orders/,       action: (m) => verb(m, 'sales order') },
+
   // Core modules
   { pattern: /^\/customers/,          action: (m) => verb(m, 'customer') },
   { pattern: /^\/deals/,              action: (m) => verb(m, 'deal') },
@@ -45,7 +49,7 @@ function extractRecordName(body: unknown): string | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const b = body as Record<string, any>;
   // Prefer human-readable document names over IDs
-  return b.name ?? b.title ?? b.quoteNumber ?? b.invoiceNumber ?? undefined;
+  return b.name ?? b.title ?? b.quoteNumber ?? b.invoiceNumber ?? b.orderNumber ?? undefined;
 }
 
 function verb(method: string, resource: string): string {

@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface ActivityListProps {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote";
+  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder";
 }
 
 const TYPE_ICONS: Record<ActivityType, string> = {

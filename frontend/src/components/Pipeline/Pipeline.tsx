@@ -36,18 +36,18 @@ interface Deal {
   priority?: string;
 }
 
-const STATUSES = ["lead", "qualified", "proposal", "negotiation", "won", "lost", "cancelled"] as const;
-type DealStatus = (typeof STATUSES)[number];
+interface PipelineStage { key: string; label: string; color: string; isWin?: boolean; isLoss?: boolean; }
 
-const STATUS_META: Record<DealStatus, { bg: string; text: string; badge: string; dot: string }> = {
-  lead:        { bg: "bg-blue-500",    text: "text-blue-600",    badge: "bg-blue-50 text-blue-700 border-blue-200",    dot: "bg-blue-500"    },
-  qualified:   { bg: "bg-violet-500",  text: "text-violet-600",  badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500"  },
-  proposal:    { bg: "bg-amber-500",   text: "text-amber-600",   badge: "bg-amber-50 text-amber-700 border-amber-200",   dot: "bg-amber-500"   },
-  negotiation: { bg: "bg-orange-500",  text: "text-orange-600",  badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500"  },
-  won:         { bg: "bg-emerald-500", text: "text-emerald-600", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
-  lost:        { bg: "bg-red-500",     text: "text-red-600",     badge: "bg-red-50 text-red-700 border-red-200",         dot: "bg-red-500"     },
-  cancelled:   { bg: "bg-slate-400",   text: "text-slate-500",   badge: "bg-slate-50 text-slate-600 border-slate-200",   dot: "bg-slate-400"   },
-};
+// Used only when the workspace hasn't configured stages yet.
+const FALLBACK_STAGES: PipelineStage[] = [
+  { key: "lead",        label: "Lead",        color: "#3b82f6" },
+  { key: "qualified",   label: "Qualified",   color: "#8b5cf6" },
+  { key: "proposal",    label: "Proposal",    color: "#f59e0b" },
+  { key: "negotiation", label: "Negotiation", color: "#f97316" },
+  { key: "won",         label: "Won",         color: "#10b981", isWin: true },
+  { key: "lost",        label: "Lost",        color: "#ef4444", isLoss: true },
+  { key: "cancelled",   label: "Cancelled",   color: "#94a3b8", isLoss: true },
+];
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "text-red-500",
@@ -168,15 +168,14 @@ function Column({
   isLoading,
   onAddDeal,
 }: {
-  status: DealStatus;
+  status: string;
   deals: Deal[];
   label: string;
-  customColor?: string;
+  customColor: string;
   isLoading: boolean;
   onAddDeal: (status: string) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: status });
-  const meta = STATUS_META[status];
 
   const total = deals.reduce((s, d) => s + (d.value ?? d.price ?? 0), 0);
   const currency = deals[0]?.currency ?? "EGP";
@@ -185,8 +184,8 @@ function Column({
     <div className="flex-shrink-0 w-64 flex flex-col">
       {/* Column header */}
       <div
-        className={cn("rounded-t-xl px-3 py-2.5 flex items-center justify-between", !customColor && meta.bg)}
-        style={customColor ? { background: customColor } : undefined}
+        className="rounded-t-xl px-3 py-2.5 flex items-center justify-between"
+        style={{ background: customColor }}
       >
         <div className="flex items-center gap-2">
           <span className="text-white font-semibold text-sm">{label}</span>
@@ -219,10 +218,7 @@ function Column({
 
         {!isLoading && deals.length === 0 && (
           <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <div
-              className={cn("h-2 w-2 rounded-full opacity-40", !customColor && meta.dot)}
-              style={customColor ? { background: customColor } : undefined}
-            />
+            <div className="h-2 w-2 rounded-full opacity-40" style={{ background: customColor }} />
             <p className="text-[11px] text-muted-foreground/60">No deals</p>
           </div>
         )}
@@ -248,11 +244,13 @@ export function Pipeline() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const { data: wsData } = useWorkspaceSettings();
 
-  // Build a lookup of key → {label, color} from saved pipeline stages
-  const stageOverrides = useMemo(() => {
-    const saved: { key: string; label: string; color: string }[] = wsData?.pipelineStages ?? [];
-    return Object.fromEntries(saved.map((s) => [s.key, s]));
+  // Columns are driven entirely by the workspace's configured stages (order,
+  // labels, colors). Falls back to the defaults until stages are configured.
+  const stages: PipelineStage[] = useMemo(() => {
+    const saved = (wsData?.pipelineStages as PipelineStage[] | undefined) ?? [];
+    return saved.length ? saved : FALLBACK_STAGES;
   }, [wsData]);
+  const stageKeys = useMemo(() => stages.map((s) => s.key), [stages]);
 
   const { data, isPending, error } = useQuery({
     queryKey: ["deals"],
@@ -270,11 +268,11 @@ export function Pipeline() {
 
   const grouped = useMemo(
     () =>
-      STATUSES.reduce<Record<DealStatus, Deal[]>>(
+      stageKeys.reduce<Record<string, Deal[]>>(
         (acc, s) => { acc[s] = deals.filter((d) => d.status === s); return acc; },
-        {} as Record<DealStatus, Deal[]>
+        {}
       ),
-    [deals]
+    [deals, stageKeys]
   );
 
   const totalValue = deals.reduce((s, d) => s + (d.value ?? d.price ?? 0), 0);
@@ -292,8 +290,8 @@ export function Pipeline() {
     if (!over) return;
     const deal = deals.find((d) => d._id === active.id);
     if (!deal) return;
-    const newStatus = String(over.id) as DealStatus;
-    if (STATUSES.includes(newStatus) && deal.status !== newStatus) {
+    const newStatus = String(over.id);
+    if (stageKeys.includes(newStatus) && deal.status !== newStatus) {
       moveMutation.mutate({ id: deal._id, status: newStatus });
     }
   };
@@ -334,13 +332,13 @@ export function Pipeline() {
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-3 min-w-max">
-            {STATUSES.map((status) => (
+            {stages.map((stage) => (
               <Column
-                key={status}
-                status={status}
-                deals={grouped[status]}
-                label={stageOverrides[status]?.label ?? tr.pipeline.stages[status] ?? status}
-                customColor={stageOverrides[status]?.color}
+                key={stage.key}
+                status={stage.key}
+                deals={grouped[stage.key] ?? []}
+                label={stage.label ?? tr.pipeline.stages[stage.key] ?? stage.key}
+                customColor={stage.color || "#64748b"}
                 isLoading={isPending}
                 onAddDeal={handleAddDeal}
               />

@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { LeadsService } from './leads.service';
@@ -8,7 +10,8 @@ import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 
 @Controller('leads')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('leads')
 export class LeadsController {
   constructor(private readonly leads: LeadsService) {}
 
@@ -47,7 +50,7 @@ export class LeadsController {
   @Post(':id/convert')
   @HttpCode(201)
   @RequirePermission('leads:edit')
-  convert(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.leads.convertToCustomer(id, user.id);
+  convert(@Param('id') id: string, @Body() body: { createDeal?: boolean }, @CurrentUser() user: AuthUser) {
+    return this.leads.convertToCustomer(id, user.id, body?.createDeal ?? false);
   }
 }

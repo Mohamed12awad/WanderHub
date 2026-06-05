@@ -51,8 +51,29 @@ export class UsersService {
     return user ? toClient(user) : null;
   }
 
+  /**
+   * Enforces the "only one Super Admin" invariant. Throws if `roleId` is the
+   * super admin role and another user already holds it (optionally excluding the
+   * user being updated). The super admin is the unrestricted override account, so
+   * a single, well-known holder keeps that authority auditable.
+   */
+  private async assertSuperAdminSingleton(roleId?: string, excludeUserId?: string) {
+    if (!roleId) return;
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+    if (role?.name !== 'super admin') return;
+    const existing = await this.prisma.user.findFirst({
+      where: { role: { name: 'super admin' }, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        'Only one Super Admin can exist. Reassign the current Super Admin to another role first.',
+      );
+    }
+  }
+
   async create(body: CreateUserDto) {
     const { password, role, reportsTo, ...rest } = body;
+    await this.assertSuperAdminSingleton(role);
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await this.prisma.user.create({
       data: {
@@ -82,6 +103,8 @@ export class UsersService {
       if (existing.role.name === 'super admin' && requestingUserRole !== 'super admin') {
         throw new ForbiddenException('Access denied. Super admin only.');
       }
+      // Block promoting a second user to super admin.
+      await this.assertSuperAdminSingleton(role, id);
       data.roleId = role;
     }
 

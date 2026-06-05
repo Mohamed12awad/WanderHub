@@ -13,7 +13,7 @@ import {
 
 interface Props {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal" | "Quote" | "Invoice" | "Expense" | "Product" | "Task" | "Lead" | "Project" | "Supplier" | "PurchaseOrder";
+  linkedModel: "Customer" | "Deal" | "Quote" | "Invoice" | "Expense" | "Product" | "Task" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "SalesOrder";
 }
 
 const EVENT_ICON: Record<TimelineEventType, React.ReactNode> = {

@@ -46,11 +46,12 @@ export function Customers() {
         field: "status",
         options: Object.entries(c.statuses).map(([value, label]) => ({ value, label })),
       }}
-      renderRow={(item, handleDelete) => (
+      renderRow={(item, handleDelete, selectionCell) => (
         <CustomerRow
           key={item._id}
           item={item}
           handleDelete={handleDelete}
+          selectionCell={selectionCell}
         />
       )}
       title={c.title}
@@ -61,6 +62,12 @@ export function Customers() {
       noSearchMessage={c.noSearch}
       filterConfigs={CUSTOMER_FILTERS}
       module="customers"
+      importConfig={{ entity: "customers", title: "Contacts", permission: "contacts:create" }}
+      dedupConfig={{ entity: "customers", title: "Contacts", permission: "contacts:edit" }}
+      bulkConfig={{
+        entity: "customers",
+        statusOptions: Object.entries(c.statuses).map(([value, label]) => ({ value, label })),
+      }}
       exportConfig={{
         filename: "contacts",
         getRow: (c) => ({

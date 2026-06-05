@@ -1,13 +1,16 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 

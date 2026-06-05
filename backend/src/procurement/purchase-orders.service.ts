@@ -10,6 +10,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { ApprovalService } from '../common/approval.service';
+import { CustomFieldsService } from '../common/custom-fields.service';
 
 const PO_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -26,6 +27,7 @@ export class PurchaseOrdersService {
     private readonly timeline: TimelineService,
     private readonly inventory: InventoryService,
     private readonly approvals: ApprovalService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   private async getApprovalConfig() {
@@ -79,6 +81,7 @@ export class PurchaseOrdersService {
   async create(body: CreatePurchaseOrderDto, userId: string) {
     const { items = [], taxRate = 0, ...rest } = body;
     const data = this.cleanData(rest as any);
+    data.customFields = await this.customFields.validateAndClean('purchaseOrders', data.customFields);
     const totals = calcTotals(items, taxRate);
     const poNumber = await this.numberSequence.nextNumber('po', 'PO');
     const enabled = await this.approvals.isEnabled('purchase_orders');
@@ -117,6 +120,9 @@ export class PurchaseOrdersService {
 
     const { items, taxRate, ...rest } = body as any;
     const data = this.cleanData(rest);
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('purchaseOrders', data.customFields);
+    }
 
     const po = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (items !== undefined) {
@@ -199,7 +205,7 @@ export class PurchaseOrdersService {
     const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
     // Separation-of-duties is always enforced regardless of the approval-enabled toggle.
-    if (po.createdById === userId) throw new BadRequestException('Cannot approve your own PO');
+    if (po.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot approve your own PO');
 
     const updated = await this.prisma.purchaseOrder.update({
       where: { id },

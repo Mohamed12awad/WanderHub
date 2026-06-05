@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { FinanceService } from './finance.service';
+import { InvoicesService } from './invoices.service';
 
 // Builds a fake interactive-transaction client and a prisma mock whose
 // $transaction simply runs the callback against that client.
@@ -31,10 +31,11 @@ function makeService(prisma: any) {
     listSteps: jest.fn().mockResolvedValue([]),
     act: jest.fn(),
   };
-  return new FinanceService(prisma, numberSequence, timeline, inventory, approvals);
+  const customFields: any = { validateAndClean: jest.fn() };
+  return new InvoicesService(prisma, numberSequence, timeline, inventory, approvals, customFields);
 }
 
-describe('FinanceService — approval separation of duties', () => {
+describe('InvoicesService — approval separation of duties', () => {
   beforeEach(() => jest.clearAllMocks());
   it('throws ForbiddenException when the creator tries to approve their own invoice', async () => {
     const { prisma } = buildMocks();
@@ -72,7 +73,7 @@ describe('FinanceService — approval separation of duties', () => {
   });
 });
 
-describe('FinanceService — recordPayment', () => {
+describe('InvoicesService — recordPayment', () => {
   beforeEach(() => jest.clearAllMocks());
   it('recomputes totalPaid as the SUM of payments inside the transaction', async () => {
     const { prisma, tx } = buildMocks();

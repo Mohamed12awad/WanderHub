@@ -6,6 +6,9 @@ export class CreateCustomerDto {
 
   @IsOptional() @IsString() mobile?: string;
   @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() company?: string;
+  @IsOptional() @IsString() jobTitle?: string;
+  @IsOptional() @IsString() website?: string;
   @IsOptional() @IsString() gender?: string;
   @IsOptional() @IsString() preferredContactMethod?: string;
   @IsOptional() @IsString() location?: string;

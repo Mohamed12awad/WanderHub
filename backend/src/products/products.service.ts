@@ -2,13 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customFields: CustomFieldsService,
+  ) {}
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, type, createdAt_from, createdAt_to } = query;
@@ -45,14 +49,20 @@ export class ProductsService {
   async create(body: CreateProductDto) {
     // The global ValidationPipe (whitelist) already strips any field not
     // declared on the DTO, so the payload is safe to pass straight through.
-    const product = await this.prisma.product.create({ data: body as any });
+    const data = { ...body } as Record<string, any>;
+    data.customFields = await this.customFields.validateAndClean('products', data.customFields);
+    const product = await this.prisma.product.create({ data: data as any });
     return toClient(product);
   }
 
   async update(id: string, body: UpdateProductDto) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('product not found');
-    const product = await this.prisma.product.update({ where: { id }, data: body as any });
+    const data = { ...body } as Record<string, any>;
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('products', data.customFields);
+    }
+    const product = await this.prisma.product.update({ where: { id }, data: data as any });
     return toClient(product);
   }
 

@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { X, FolderKanban } from "lucide-react";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 interface Props {
   open: boolean;
@@ -18,6 +20,8 @@ interface Props {
   /** Pre-fills the project field and locks it when set. */
   projectId?: string;
   projectName?: string;
+  /** Pre-selects this milestone when creating a new task. */
+  presetMilestoneId?: string;
 }
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
@@ -30,7 +34,7 @@ const PRIORITY_COLORS: Record<TaskPriority, string> = {
   urgent: "bg-red-50 text-red-700 border-red-300",
 };
 
-export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projectName }: Props) {
+export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projectName, presetMilestoneId }: Props) {
   const { tr } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -49,6 +53,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
     tags: [],
   });
   const [tagInput, setTagInput] = useState("");
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (task) {
@@ -78,11 +83,16 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
     } else {
       setForm({
         title: "", description: "", priority: "medium", status: "todo",
-        dueDate: "", assignedTo: "", project: projectId ?? "", milestone: "", tags: [],
+        dueDate: "", assignedTo: "", project: projectId ?? "", milestone: presetMilestoneId ?? "", tags: [],
       });
     }
+    setCustomFields(
+      task ? toCustomFieldValues((task as any).customFields)
+      : cloneData?.customFields ? toCustomFieldValues(cloneData.customFields)
+      : {},
+    );
     setTagInput("");
-  }, [task, cloneData, open, projectId]);
+  }, [task, cloneData, open, projectId, presetMilestoneId]);
 
   const { data: usersData } = useQuery({ queryKey: ["users"], queryFn: () => getUsers() });
   const users: { _id: string; name: string }[] = Array.isArray(usersData?.data) ? usersData.data : [];
@@ -137,6 +147,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
       dueDate: form.dueDate || undefined,
       project: form.project || undefined,
       milestone: form.milestone || undefined,
+      customFields,
     };
     if (isEdit) updateMut.mutate(payload);
     else createMut.mutate(payload);
@@ -320,6 +331,10 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <DynamicFields module="tasks" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
           </div>
         </div>
 

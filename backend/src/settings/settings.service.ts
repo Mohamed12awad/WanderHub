@@ -1,38 +1,66 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
 import { CurrencyService } from '../common/currency.service';
+import { encryptSecret as encrypt, decryptSecret as decrypt } from '../common/crypto.util';
 
-const ALLOWED_SEQ_KEYS = ['invoice', 'quote', 'po', 'bill', 'expense'] as const;
+const ALLOWED_SEQ_KEYS = ['invoice', 'quote', 'salesOrder', 'po', 'bill', 'expense'] as const;
 
-// AES-256-GCM encryption for SMTP password using JWT_SECRET as key material.
-const ALGO = 'aes-256-gcm';
+// ── Workspace config validation ───────────────────────────────────────────────
+// The fieldGroups / moduleSettings JSON drives dynamic forms and module gating
+// across the app, so the write path is schema-validated rather than stored as
+// raw `unknown`. Definitions stay permissive (most props optional) for
+// backward-compatibility with older saved configs.
 
-function deriveKey(): Buffer {
-  const secret = process.env.JWT_SECRET ?? 'fallback-secret-change-me';
-  return crypto.createHash('sha256').update(secret).digest();
-}
+const FIELD_TYPES = [
+  'text', 'textarea', 'number', 'date', 'select', 'boolean', 'email', 'phone', 'url',
+] as const;
 
-function encrypt(plaintext: string): string {
-  const key = deriveKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGO, key, iv);
-  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  // Format: iv(12B) + tag(16B) + ciphertext, all base64-encoded as single string
-  return Buffer.concat([iv, tag, enc]).toString('base64');
-}
+const fieldDefSchema = z.object({
+  id: z.string().min(1, 'Field id is required'),
+  name: z.string().optional(),
+  label: z.string().optional(),
+  type: z.enum(FIELD_TYPES).optional(),
+  required: z.boolean().optional(),
+  filterable: z.boolean().optional(),
+  isSystem: z.boolean().optional(),
+  options: z.string().optional(),
+  order: z.number().optional(),
+  multiselect: z.boolean().optional(),
+  defaultValue: z.string().optional(),
+  helpText: z.string().optional(),
+  placeholder: z.string().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  pattern: z.string().optional(),
+  maxLength: z.number().optional(),
+});
 
-function decrypt(encoded: string): string {
-  const buf = Buffer.from(encoded, 'base64');
-  const iv = buf.subarray(0, 12);
-  const tag = buf.subarray(12, 28);
-  const enc = buf.subarray(28);
-  const key = deriveKey();
-  const decipher = crypto.createDecipheriv(ALGO, key, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(enc) + decipher.final('utf8');
+const fieldGroupsSchema = z.array(
+  z.object({
+    module: z.string().min(1),
+    fields: z.array(fieldDefSchema).superRefine((fields, ctx) => {
+      const ids = fields.map((f) => f.id);
+      const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+      if (dup) ctx.addIssue({ code: 'custom', message: `Duplicate field id "${dup}"` });
+    }),
+  }),
+);
+
+const moduleSettingsSchema = z.array(
+  z.object({ module: z.string().min(1), enabled: z.boolean() }),
+);
+
+const pipelineStagesSchema = z.array(z.any());
+
+function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, label: string): T {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    const msg = result.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ');
+    throw new BadRequestException(`Invalid ${label}: ${msg}`);
+  }
+  return result.data;
 }
 
 @Injectable()
@@ -84,9 +112,15 @@ export class SettingsService {
   }) {
     const config = await this.getOrCreate();
     const data: Record<string, unknown> = {};
-    if (body.fieldGroups !== undefined) data.fieldGroups = body.fieldGroups;
-    if (body.moduleSettings !== undefined) data.moduleSettings = body.moduleSettings;
-    if (body.pipelineStages !== undefined) data.pipelineStages = body.pipelineStages;
+    if (body.fieldGroups !== undefined) {
+      data.fieldGroups = parseOrThrow(fieldGroupsSchema, body.fieldGroups, 'fieldGroups');
+    }
+    if (body.moduleSettings !== undefined) {
+      data.moduleSettings = parseOrThrow(moduleSettingsSchema, body.moduleSettings, 'moduleSettings');
+    }
+    if (body.pipelineStages !== undefined) {
+      data.pipelineStages = parseOrThrow(pipelineStagesSchema, body.pipelineStages, 'pipelineStages');
+    }
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
       data: data as any,

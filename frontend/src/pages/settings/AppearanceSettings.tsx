@@ -1,8 +1,15 @@
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme, AccentColor, ColorMode } from "@/contexts/ThemeProvider";
+import { useTheme, AccentColor, ColorMode, FontSize } from "@/contexts/ThemeProvider";
 import { LANGUAGES, Lang } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Monitor, Check } from "lucide-react";
+
+const FONT_SIZES: { value: FontSize; label: string; px: string }[] = [
+  { value: "sm",   label: "Small",       px: "14px" },
+  { value: "base", label: "Default",     px: "16px" },
+  { value: "lg",   label: "Large",       px: "18px" },
+  { value: "xl",   label: "Extra Large", px: "20px" },
+];
 
 const THEMES: { value: ColorMode; icon: React.ElementType; label: string }[] = [
   { value: "light",  icon: Sun,     label: "Light"  },
@@ -22,7 +29,7 @@ const ACCENTS: { value: AccentColor; label: string; color: string; dark: string 
 
 export default function AppearanceSettings() {
   const { tr, lang, setLang } = useLanguage();
-  const { theme, accent, setTheme, setAccent } = useTheme();
+  const { theme, accent, fontSize, setTheme, setAccent, setFontSize } = useTheme();
   const s = tr.settings;
 
   const isDark =
@@ -119,6 +126,34 @@ export default function AppearanceSettings() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      <div className="border-t" />
+
+      {/* Font size */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Font Size</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Scales the text and spacing across the entire app.</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {FONT_SIZES.map(({ value, label, px }) => (
+            <button
+              key={value}
+              onClick={() => setFontSize(value)}
+              className={cn(
+                "relative flex flex-col items-center gap-1.5 rounded-xl border-2 p-4 transition-all hover:bg-muted/50",
+                fontSize === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+              )}
+            >
+              {fontSize === value && (
+                <span className="absolute top-2 end-2"><Check className="h-3.5 w-3.5 text-primary" /></span>
+              )}
+              <span className="font-semibold leading-none" style={{ fontSize: px }}>Aa</span>
+              <span className="text-xs font-medium">{label}</span>
+            </button>
+          ))}
         </div>
       </section>
 

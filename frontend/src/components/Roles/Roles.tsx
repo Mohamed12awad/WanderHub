@@ -20,10 +20,13 @@ const LOCKED_ROLES = ["super admin", "admin"];
 
 const RESOURCE_LABELS: Record<Resource, string> = {
   contacts: "Contacts", deals: "Deals", products: "Products",
-  expenses: "Expenses", tasks: "Tasks", finance: "Finance",
+  expenses: "Expenses", tasks: "Tasks",
+  quotes: "Quotes", invoices: "Invoices",
+  "sales-orders": "Sales Orders",
   reports: "Reports", users: "Users", roles: "Roles",
   settings: "Settings", logs: "Logs",
-  procurement: "Procurement", projects: "Projects",
+  suppliers: "Suppliers", "purchase-orders": "Purchase Orders", "vendor-bills": "Vendor Bills",
+  projects: "Projects",
 };
 
 const ACTION_LABELS: Record<string, string> = {

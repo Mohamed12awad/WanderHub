@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Eye, Edit, Trash2 } from "lucide-react";
+import { RowActions } from "@/components/common/RowActions";
 import { Supplier } from "@/types/types";
 import { format } from "date-fns";
 
@@ -14,7 +13,7 @@ export default function SupplierRow({ supplier, handleDelete }: Props) {
   const navigate = useNavigate();
 
   return (
-    <TableRow className="group">
+    <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/procurement/suppliers/${supplier._id}`)}>
       <TableCell className="font-medium">{supplier.name}</TableCell>
       <TableCell>{supplier.contactName || "-"}</TableCell>
       <TableCell>{supplier.email || "-"}</TableCell>
@@ -32,30 +31,12 @@ export default function SupplierRow({ supplier, handleDelete }: Props) {
       <TableCell className="text-muted-foreground whitespace-nowrap">
         {format(new Date(supplier.createdAt), "MMM d, yyyy")}
       </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/procurement/suppliers/${supplier._id}`)}
-          >
-            <Eye className="w-4 h-4 text-blue-500" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(`/procurement/suppliers/${supplier._id}/edit`)}
-          >
-            <Edit className="w-4 h-4 text-amber-500" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDelete(supplier._id)}
-          >
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <RowActions
+          viewHref={`/procurement/suppliers/${supplier._id}`}
+          editHref={`/procurement/suppliers/${supplier._id}/edit`}
+          onDelete={() => handleDelete(supplier._id)}
+        />
       </TableCell>
     </TableRow>
   );

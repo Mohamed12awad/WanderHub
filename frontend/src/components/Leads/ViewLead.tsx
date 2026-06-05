@@ -14,11 +14,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { CircleArrowLeft, ArrowRightCircle, Edit, MoreHorizontal, Trash2, Copy, Flame, Thermometer, Snowflake } from "lucide-react";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { CustomFieldsView } from "@/components/common/CustomFieldsView";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
+import { EmailsPanel } from "@/components/common/EmailsPanel";
+import { AiInsights } from "@/components/common/AiInsights";
 import { ActivityList } from "@/components/Activities/ActivityList";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -58,6 +65,7 @@ export function ViewLead() {
   const canDelete = ["admin", "super admin"].includes(user?.role ?? "");
   const [converting, setConverting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const { data, isPending, isError } = useQuery({
     queryKey: ["lead", id],
@@ -79,12 +87,13 @@ export function ViewLead() {
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
-  const handleConvert = async () => {
+  const handleConvert = async (createDeal: boolean) => {
     if (!id) return;
     setConverting(true);
     try {
-      const res = await convertLead(id);
-      toast({ title: "Lead converted to contact successfully" });
+      const res = await convertLead(id, { createDeal });
+      toast({ title: createDeal ? "Lead converted to contact + deal" : "Lead converted to contact" });
+      setConvertOpen(false);
       queryClient.invalidateQueries({
         queryKey: ["lead", id]
       });
@@ -190,7 +199,7 @@ export function ViewLead() {
           </div>
           <div className="flex gap-2 flex-wrap shrink-0">
             {!isConverted && (
-              <Button size="sm" variant="outline" className="h-8 px-4" onClick={handleConvert} disabled={converting}>
+              <Button size="sm" variant="outline" className="h-8 px-4" onClick={() => setConvertOpen(true)} disabled={converting}>
                 <ArrowRightCircle className="h-3.5 w-3.5 me-1" />
                 {converting ? tr.common.loading : tr.leads.convertToCustomer}
               </Button>
@@ -273,6 +282,8 @@ export function ViewLead() {
                 )}
               </div>
             )}
+
+            <CustomFieldsView module="leads" values={lead.customFields} className="md:col-span-2 border-t pt-4" />
           </div>
         </CardContent>
       </Card>
@@ -285,6 +296,9 @@ export function ViewLead() {
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
                 <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+                <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                <TabsTrigger value="emails">Emails</TabsTrigger>
+                <TabsTrigger value="ai">AI</TabsTrigger>
               </TabsList>
               <TabsContent value="timeline">
                 <RecordTimeline linkedTo={id} linkedModel="Lead" />
@@ -294,6 +308,15 @@ export function ViewLead() {
               </TabsContent>
               <TabsContent value="activities">
                 <ActivityList linkedTo={id} linkedModel="Lead" />
+              </TabsContent>
+              <TabsContent value="attachments">
+                <AttachmentsPanel linkedModel="Lead" linkedToId={id!} />
+              </TabsContent>
+              <TabsContent value="emails">
+                <EmailsPanel linkedTo={id} linkedModel="Lead" />
+              </TabsContent>
+              <TabsContent value="ai">
+                <AiInsights entity="leads" id={id} canScore />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -307,6 +330,25 @@ export function ViewLead() {
         title="Delete Lead"
         description="Delete this lead? This action cannot be undone."
       />
+
+      <Dialog open={convertOpen} onOpenChange={(o) => !converting && setConvertOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert lead</DialogTitle>
+            <DialogDescription>
+              A contact will be created from this lead. Do you also want to start a deal in the pipeline?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" disabled={converting} onClick={() => handleConvert(false)}>
+              Contact only
+            </Button>
+            <Button disabled={converting} onClick={() => handleConvert(true)}>
+              Contact + Deal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

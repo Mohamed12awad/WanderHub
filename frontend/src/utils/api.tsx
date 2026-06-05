@@ -68,6 +68,13 @@ function clearSessionAndRedirect() {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // NestJS class-validator returns `message` as a string[]; collapse it to a
+    // single readable string so call sites can render it directly in a toast.
+    const data = error.response?.data;
+    if (data && Array.isArray(data.message)) {
+      data.message = data.message.join(", ");
+    }
+
     const original = error.config as (typeof error.config & { _retry?: boolean });
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
@@ -91,6 +98,100 @@ api.interceptors.response.use(
 // Global search
 export const globalSearch = (q: string) =>
   api.get("/search", { params: { q } });
+
+// ── Bulk CSV import ─────────────────────────────────────────────────────────────
+export type ImportField = {
+  key: string;
+  label: string;
+  required?: boolean;
+  type?: "string" | "number" | "enum" | "date";
+  enumValues?: string[];
+  hint?: string;
+};
+export type ImportResult = {
+  total: number;
+  created: number;
+  skipped: number;
+  errors: { row: number; message: string }[];
+};
+export const getImportFields = (entity: string) =>
+  api.get<{ entity: string; fields: ImportField[] }>(`/import/${entity}/fields`);
+export const importRecords = (
+  entity: string,
+  payload: { mapping: Record<string, string>; rows: Record<string, string>[] },
+) => api.post<ImportResult>(`/import/${entity}`, payload);
+
+// ── Dedup + merge ───────────────────────────────────────────────────────────────
+export type DuplicateGroup = {
+  field: "phone" | "email";
+  value: string;
+  records: { id: string; name: string; email: string | null; phone: string | null; createdAt: string }[];
+};
+export const getDuplicates = (entity: string) =>
+  api.get<DuplicateGroup[]>(`/dedup/${entity}/duplicates`);
+export const mergeRecords = (entity: string, surviveId: string, mergeIds: string[]) =>
+  api.post<{ surviveId: string; merged: number }>(`/dedup/${entity}/merge`, { surviveId, mergeIds });
+
+// ── Bulk actions ────────────────────────────────────────────────────────────────
+export type BulkResult = { updated: number; failed: { id: string; message: string }[] };
+export const bulkAction = (
+  entity: string,
+  payload: { ids: string[]; action: "delete" | "assignOwner" | "setStatus"; value?: string },
+) => api.post<BulkResult>(`/bulk/${entity}`, payload);
+
+// ── Saved views ─────────────────────────────────────────────────────────────────
+export type SavedView = { id: string; module: string; name: string; query: string; createdAt: string };
+export const getSavedViews = (module: string) =>
+  api.get<SavedView[]>("/saved-views", { params: { module } });
+export const createSavedView = (data: { module: string; name: string; query: string }) =>
+  api.post<SavedView>("/saved-views", data);
+export const deleteSavedView = (id: string): Promise<void> => api.delete(`/saved-views/${id}`);
+
+// ── API keys ────────────────────────────────────────────────────────────────────
+export type ApiKeyRow = {
+  id: string; name: string; prefix: string;
+  lastUsedAt: string | null; revokedAt: string | null; createdAt: string;
+  user: { id: string; name: string };
+};
+export const getApiKeys = () => api.get<ApiKeyRow[]>("/api-keys");
+export const createApiKey = (data: { name: string; userId?: string }) =>
+  api.post<{ id: string; name: string; prefix: string; key: string; createdAt: string }>("/api-keys", data);
+export const revokeApiKey = (id: string): Promise<void> => api.delete(`/api-keys/${id}`);
+
+// ── Email tracking ──────────────────────────────────────────────────────────────
+export type TrackedEmail = {
+  id: string; to: string; subject: string;
+  status: string; deliveryStatus?: string;
+  openCount: number; openedAt: string | null;
+  clickCount: number; clickedAt: string | null;
+  createdAt: string;
+};
+export const sendEmail = (data: { to: string; subject: string; body: string; linkedToId?: string; linkedModel?: string }) =>
+  api.post<TrackedEmail>("/emails", data);
+export const getEmails = (linkedToId: string, linkedModel: string) =>
+  api.get<TrackedEmail[]>("/emails", { params: { linkedToId, linkedModel } });
+
+// ── AI assistant ────────────────────────────────────────────────────────────────
+export type AiProviderName = "anthropic" | "google" | "openai";
+export type AiConfig = {
+  provider: AiProviderName;
+  model: string;
+  enabled: boolean;
+  workspaceProviders: AiProviderName[];
+  userProviders: AiProviderName[];
+  defaultModels: Record<AiProviderName, string>;
+};
+export const getAiConfig = () => api.get<AiConfig>("/ai/config");
+export const setAiConfig = (data: { provider?: string; model?: string; enabled?: boolean }) =>
+  api.put<AiConfig>("/ai/config", data);
+export const setAiKey = (provider: string, key: string, scope: "workspace" | "user" = "workspace") =>
+  api.put(`/ai/keys/${provider}`, { key, scope });
+export const removeAiKey = (provider: string, scope: "workspace" | "user" = "workspace"): Promise<void> =>
+  api.delete(`/ai/keys/${provider}`, { params: { scope } });
+export const aiSummarize = (entity: string, id: string) =>
+  api.post<{ provider: string; model: string; summary: string }>("/ai/summarize", { entity, id });
+export const aiScore = (entity: string, id: string) =>
+  api.post<{ provider: string; model: string; score: number | null; rating: string | null; rationale: string; raw: string }>("/ai/score", { entity, id });
 
 // Deals API Requests
 export const getDeals = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
@@ -171,7 +272,7 @@ export const deleteExpenseReportItem = (
 ): Promise<void> => api.delete(`/expenses/${id}/expense/${expenseId}`);
 
 // Activities API Requests
-export const getActivities = (linkedTo: string, linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote") =>
+export const getActivities = (linkedTo: string, linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder") =>
   api.get("/activities", { params: { linkedTo, linkedModel } });
 export const getAllActivities = (params?: { month?: number; year?: number }) =>
   api.get("/activities", { params });
@@ -246,6 +347,26 @@ export const approveQuote = (id: string) => api.patch(`/finance/quotes/${id}/app
 export const rejectQuote = (id: string, reason: string) => api.patch(`/finance/quotes/${id}/reject`, { reason });
 export const convertQuoteToInvoice = (id: string) =>
   api.post(`/finance/quotes/${id}/convert`);
+export const convertQuoteToSalesOrder = (id: string) =>
+  api.post(`/finance/quotes/${id}/convert-to-sales-order`);
+
+// ── Sales Orders ────────────────────────────────────────────────────────────────
+export const getSalesOrders = (params?: { page?: number; limit?: number; status?: string; q?: string; [key: string]: unknown }) =>
+  api.get("/sales-orders", { params });
+export const getSalesOrderById = (id: string) => api.get(`/sales-orders/${id}`);
+export const createSalesOrder = (data: any) => api.post("/sales-orders", data);
+export const updateSalesOrder = (id: string, data: any) => api.put(`/sales-orders/${id}`, data);
+export const deleteSalesOrder = (id: string): Promise<void> => api.delete(`/sales-orders/${id}`);
+export const updateSalesOrderStatus = (id: string, status: string) =>
+  api.patch(`/sales-orders/${id}/status`, { status });
+export const approveSalesOrder = (id: string) => api.patch(`/sales-orders/${id}/approve`);
+export const rejectSalesOrder = (id: string, reason: string) =>
+  api.patch(`/sales-orders/${id}/reject`, { reason });
+export const createInvoiceFromSalesOrder = (id: string) =>
+  api.post(`/sales-orders/${id}/create-invoice`);
+// Read-only: PO prefill data for SO line items short on stock (creates nothing).
+export const getSalesOrderPurchaseOrderPrefill = (id: string) =>
+  api.get(`/sales-orders/${id}/purchase-order-prefill`);
 
 // Finance — Invoices
 export const getInvoices = (params?: { status?: string; customer?: string; deal?: string }) =>
@@ -320,7 +441,8 @@ export const getLeadById = (id: string) => api.get(`/leads/${id}`);
 export const createLead = (data: Record<string, unknown>) => api.post("/leads", data);
 export const updateLead = (id: string, data: Record<string, unknown>) => api.put(`/leads/${id}`, data);
 export const deleteLead = (id: string): Promise<void> => api.delete(`/leads/${id}`);
-export const convertLead = (id: string) => api.post(`/leads/${id}/convert`);
+export const convertLead = (id: string, data?: { createDeal?: boolean }) =>
+  api.post(`/leads/${id}/convert`, data ?? {});
 
 // Leads report
 export const getLeadsFunnelReport = () => api.get("/reports/leads");

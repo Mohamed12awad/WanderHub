@@ -2,12 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 @Injectable()
 export class SuppliersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customFields: CustomFieldsService,
+  ) {}
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, status } = query;
@@ -46,6 +50,7 @@ export class SuppliersService {
 
   async create(body: CreateSupplierDto) {
     const { address, ...rest } = body as any;
+    rest.customFields = await this.customFields.validateAndClean('suppliers', rest.customFields);
     const supplier = await this.prisma.supplier.create({
       data: { ...rest, ...(address !== undefined ? { address } : {}) },
     });
@@ -56,6 +61,9 @@ export class SuppliersService {
     const existing = await this.prisma.supplier.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
     const { address, ...rest } = body as any;
+    if ('customFields' in rest) {
+      rest.customFields = await this.customFields.validateAndClean('suppliers', rest.customFields);
+    }
     const supplier = await this.prisma.supplier.update({
       where: { id },
       data: { ...rest, ...(address !== undefined ? { address } : {}) },

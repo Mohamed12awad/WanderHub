@@ -42,6 +42,7 @@ interface ExpenseData {
   _id: string;
   title: string;
   userId: { _id: string; name: string } | string;
+  project?: { _id: string; name: string } | null;
   expenses: ExpenseItem[];
   approved: boolean;
   approvalStatus?: ApprovalStatus;
@@ -150,7 +151,6 @@ const ViewExpense = () => {
   return (
     <main className="p-4 space-y-5">
       <ApprovalStepsTimeline entityType="ExpenseReport" entityId={expenseId!} />
-      <AttachmentsPanel linkedModel="ExpenseReport" linkedToId={expenseId!} />
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
@@ -251,6 +251,11 @@ const ViewExpense = () => {
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Report Information</h2>
               <InfoRow label="Title" value={formData.title} />
+              {formData.project && (
+                <InfoRow label="Project">
+                  <Link to={`/projects/${formData.project._id}`} className="text-sm text-blue-500 hover:underline">{formData.project.name}</Link>
+                </InfoRow>
+              )}
               {approvalEnabled && (
                 <>
                   <InfoRow label="Approval">
@@ -335,12 +340,16 @@ const ViewExpense = () => {
                   <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{notesCount}</span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               {expenseId && <RecordTimeline linkedTo={expenseId} linkedModel="Expense" />}
             </TabsContent>
             <TabsContent value="notes">
               {expenseId && <NotesPanel linkedTo={expenseId} linkedModel="Expense" />}
+            </TabsContent>
+            <TabsContent value="attachments">
+              {expenseId && <AttachmentsPanel linkedModel="ExpenseReport" linkedToId={expenseId} />}
             </TabsContent>
           </Tabs>
         </CardContent>

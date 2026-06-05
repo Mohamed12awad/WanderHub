@@ -4,6 +4,7 @@ import {
   IsIn,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -50,6 +51,10 @@ export class CreateQuoteDto {
   @IsOptional()
   @IsNumber()
   taxRate?: number;
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
 
   @IsOptional()
   @IsArray()

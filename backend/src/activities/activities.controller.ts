@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { ActivitiesService } from './activities.service';
@@ -8,7 +10,8 @@ import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 
 @Controller('activities')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('calendar')
 @RequirePermission('activities:view')
 export class ActivitiesController {
   constructor(private readonly activities: ActivitiesService) {}

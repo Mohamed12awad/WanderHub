@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CircleArrowLeft, Edit, ArrowRightLeft, CheckCircle, XCircle, Printer, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getQuoteById, deleteQuote, convertQuoteToInvoice, approveQuote, rejectQuote, getActivities } from "@/utils/api";
+import { getQuoteById, deleteQuote, convertQuoteToInvoice, convertQuoteToSalesOrder, approveQuote, rejectQuote, getActivities } from "@/utils/api";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,6 +22,7 @@ import LoadingSpinner from "@/components/common/spinner";
 import { Quote } from "@/types/types";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import { useAuth } from "@/contexts/authContext";
@@ -42,6 +43,7 @@ const QuoteDetail: React.FC = () => {
   const { user } = useAuth();
   const f = tr.finance;
   const [converting, setConverting] = useState(false);
+  const [convertingSO, setConvertingSO] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -84,6 +86,20 @@ const QuoteDetail: React.FC = () => {
       toast({ title: "Conversion failed", variant: "destructive" });
     } finally {
       setConverting(false);
+    }
+  };
+
+  const handleConvertToSalesOrder = async () => {
+    setConvertingSO(true);
+    try {
+      const res = await convertQuoteToSalesOrder(id!);
+      queryClient.invalidateQueries({ queryKey: ["quotes", id] });
+      toast({ title: "Converted to sales order successfully." });
+      navigate(`/sales-orders/${res.data._id}`);
+    } catch (e: any) {
+      toast({ title: e?.response?.data?.message ?? "Conversion failed", variant: "destructive" });
+    } finally {
+      setConvertingSO(false);
     }
   };
 
@@ -212,6 +228,18 @@ const QuoteDetail: React.FC = () => {
               <Link to={`/finance/invoices/${quote.convertedToInvoice._id}`}>
                 <Button size="sm" variant="outline" className="h-8 px-4">
                   {f.alreadyConverted}: {quote.convertedToInvoice.invoiceNumber}
+                </Button>
+              </Link>
+            )}
+            {!quote.salesOrder ? (
+              <Button size="sm" variant="outline" className="h-8 px-4" onClick={handleConvertToSalesOrder} disabled={convertingSO || !canConvert} title={!canConvert ? "Approve the quote before converting." : undefined}>
+                <ArrowRightLeft className="h-3.5 w-3.5 me-1" />
+                {convertingSO ? "Converting…" : "To Sales Order"}
+              </Button>
+            ) : (
+              <Link to={`/sales-orders/${quote.salesOrder._id}`}>
+                <Button size="sm" variant="outline" className="h-8 px-4">
+                  Sales Order: {quote.salesOrder.orderNumber}
                 </Button>
               </Link>
             )}
@@ -362,6 +390,7 @@ const QuoteDetail: React.FC = () => {
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={id!} linkedModel="Quote" />
@@ -371,6 +400,9 @@ const QuoteDetail: React.FC = () => {
             </TabsContent>
             <TabsContent value="activities">
               <ActivityList linkedTo={id!} linkedModel="Quote" />
+            </TabsContent>
+            <TabsContent value="attachments">
+              <AttachmentsPanel linkedModel="Quote" linkedToId={id!} />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -2,6 +2,7 @@ import {
   IsArray,
   IsIn,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -62,4 +63,8 @@ export class CreateTaskDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
 }

@@ -107,7 +107,9 @@ export class ApprovalService {
     decision: ApprovalDecision,
     comment?: string,
   ): Promise<{ status: OverallStatus; finalApproverId?: string }> {
-    if (creatorId && creatorId === userId) {
+    // Separation of duties: the creator can't act on their own item — except
+    // Super Admin, the unrestricted override role.
+    if (creatorId && creatorId === userId && userRole !== 'super admin') {
       throw new ForbiddenException(`You cannot ${decision} an item you created`);
     }
     const steps = await this.listSteps(entityType, entityId);

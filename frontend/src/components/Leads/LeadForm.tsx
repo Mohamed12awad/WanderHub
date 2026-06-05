@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LoadingSpinner from "@/components/common/spinner";
+import DynamicFields from "@/components/common/DynamicFields";
 import { createLead, updateLead, getUsers } from "@/utils/api";
 
 const LEAD_SOURCES = [
@@ -50,10 +51,11 @@ interface LeadFormProps {
   mode: "create" | "edit";
   id?: string;
   defaultValues?: Partial<FormValues>;
+  customFieldValues?: Record<string, string>;
   ownerLabel?: string;
 }
 
-export function LeadForm({ mode, id, defaultValues, ownerLabel }: LeadFormProps) {
+export function LeadForm({ mode, id, defaultValues, customFieldValues, ownerLabel }: LeadFormProps) {
   const { tr } = useLanguage();
   const l = tr.leads;
   const navigate = useNavigate();
@@ -72,6 +74,7 @@ export function LeadForm({ mode, id, defaultValues, ownerLabel }: LeadFormProps)
 
   const { formState: { isSubmitting } } = form;
   const status = form.watch("status");
+  const [customFields, setCustomFields] = useState<Record<string, string>>(customFieldValues ?? {});
 
   const fetchUsers = useCallback(
     (q: string) =>
@@ -89,6 +92,7 @@ export function LeadForm({ mode, id, defaultValues, ownerLabel }: LeadFormProps)
     payload.budget            = values.budget ? Number(values.budget) : null;
     payload.expectedCloseDate = values.expectedCloseDate || null;
     payload.owner             = values.owner || null;
+    payload.customFields      = customFields;
     if (!values.lostReason) delete payload.lostReason;
 
     try {
@@ -328,6 +332,8 @@ export function LeadForm({ mode, id, defaultValues, ownerLabel }: LeadFormProps)
                   </FormItem>
                 )} />
               </div>
+
+              <DynamicFields module="leads" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
 
               <div className="col-span-1 md:col-span-2 flex justify-end border-t pt-4 mt-2">
                 <Button type="submit" disabled={isSubmitting} className="px-8">

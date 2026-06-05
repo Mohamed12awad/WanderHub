@@ -1,66 +1,76 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
-import { FinanceService } from './finance.service';
+import { QuotesService } from './quotes.service';
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 
 @Controller('finance/quotes')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('quotes')
 export class QuotesController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(private readonly quotes: QuotesService) {}
 
   @Get()
-  @RequirePermission('finance:view')
+  @RequirePermission('quotes:view')
   findAll(@Query() query: Record<string, string>) {
-    return this.finance.getQuotes(query);
+    return this.quotes.getQuotes(query);
   }
 
   @Get(':id')
-  @RequirePermission('finance:view')
+  @RequirePermission('quotes:view')
   findOne(@Param('id') id: string) {
-    return this.finance.getQuoteById(id);
+    return this.quotes.getQuoteById(id);
   }
 
   @Post()
   @HttpCode(201)
-  @RequirePermission('finance:create')
+  @RequirePermission('quotes:create')
   create(@Body() body: CreateQuoteDto, @CurrentUser() user: AuthUser) {
-    return this.finance.createQuote(body, user.id);
+    return this.quotes.createQuote(body, user.id);
   }
 
   @Put(':id')
-  @RequirePermission('finance:edit')
+  @RequirePermission('quotes:edit')
   update(@Param('id') id: string, @Body() body: UpdateQuoteDto) {
-    return this.finance.updateQuote(id, body);
+    return this.quotes.updateQuote(id, body);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  @RequirePermission('finance:delete')
+  @RequirePermission('quotes:delete')
   remove(@Param('id') id: string) {
-    return this.finance.deleteQuote(id);
+    return this.quotes.deleteQuote(id);
   }
 
   @Patch(':id/approve')
-  @RequirePermission('finance:approve')
+  @RequirePermission('quotes:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.finance.approveQuote(id, user.id, user.role);
+    return this.quotes.approveQuote(id, user.id, user.role);
   }
 
   @Patch(':id/reject')
-  @RequirePermission('finance:approve')
+  @RequirePermission('quotes:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.finance.rejectQuote(id, user.id, body.reason.trim(), user.role);
+    return this.quotes.rejectQuote(id, user.id, body.reason.trim(), user.role);
   }
 
   @Post(':id/convert')
   @HttpCode(201)
-  @RequirePermission('finance:create')
+  @RequirePermission('quotes:create')
   convert(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.finance.convertQuoteToInvoice(id, user.id);
+    return this.quotes.convertQuoteToInvoice(id, user.id);
+  }
+
+  @Post(':id/convert-to-sales-order')
+  @HttpCode(201)
+  @RequirePermission('quotes:create')
+  convertToSalesOrder(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quotes.convertQuoteToSalesOrder(id, user.id);
   }
 }

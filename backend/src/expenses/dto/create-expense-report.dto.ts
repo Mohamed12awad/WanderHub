@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -17,8 +18,16 @@ export class CreateExpenseReportDto {
   title: string;
 
   @IsOptional()
+  @IsString()
+  project?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ExpenseItemDto)
   expenses?: ExpenseItemDto[];
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
 }

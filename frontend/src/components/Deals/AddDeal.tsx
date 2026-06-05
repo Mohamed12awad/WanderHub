@@ -16,6 +16,7 @@ import { ErrorResponse } from "@/types/types";
 import LoadingSpinner from "../common/spinner";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 
 const DEAL_STATUSES = ["lead", "qualified", "proposal", "negotiation", "won", "lost", "cancelled"];
 const DEAL_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Exhibition", "Partner", "Other"];
@@ -64,6 +65,11 @@ const AddDeal = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { data: wsData } = useWorkspaceSettings();
+  const dealStages: { key: string; label: string }[] =
+    (wsData?.pipelineStages as { key: string; label: string }[] | undefined)?.length
+      ? wsData!.pipelineStages
+      : DEAL_STATUSES.map((s) => ({ key: s, label: s }));
 
   const fetchCustomers = useCallback(
     (q: string) => getCustomers({ page: 1, limit: 20, q }).then((r) =>
@@ -190,7 +196,7 @@ const AddDeal = () => {
                   <Select value={formData.status} onValueChange={(v) => handleSelect("status", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {DEAL_STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                      {dealStages.map((s) => <SelectItem key={s.key} value={s.key} className="capitalize">{s.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

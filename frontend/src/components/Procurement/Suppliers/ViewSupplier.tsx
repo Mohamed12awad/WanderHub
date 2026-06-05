@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { ActivityList } from "@/components/Activities/ActivityList";
 
 export default function ViewSupplier() {
@@ -185,6 +186,7 @@ export default function ViewSupplier() {
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
                 <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+                <TabsTrigger value="attachments">Attachments</TabsTrigger>
               </TabsList>
               <TabsContent value="timeline">
                 <RecordTimeline linkedTo={id} linkedModel="Supplier" />
@@ -194,6 +196,9 @@ export default function ViewSupplier() {
               </TabsContent>
               <TabsContent value="activities">
                 <ActivityList linkedTo={id} linkedModel="Supplier" />
+              </TabsContent>
+              <TabsContent value="attachments">
+                <AttachmentsPanel linkedModel="Supplier" linkedToId={id!} />
               </TabsContent>
             </Tabs>
           </CardContent>

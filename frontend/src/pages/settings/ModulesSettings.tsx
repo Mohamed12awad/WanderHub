@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   Users2, Handshake, KanbanSquare, CalendarDays,
   CheckSquare, Package, Banknote, WalletCards, Receipt, UserSearch,
-  ShoppingCart, Briefcase,
+  ShoppingCart, Briefcase, ClipboardCheck, FileText, Truck, ClipboardList,
 } from "lucide-react";
 
 interface ModuleInfo {
@@ -54,20 +54,40 @@ const MODULE_INFO: Record<ModuleKey, ModuleInfo> = {
     label: (tr) => tr.nav.expenses,
     description: "Track expense reports, approvals and reimbursements.",
   },
-  finance: {
+  quotes: {
+    icon: FileText,
+    label: (tr) => tr.nav.quotes,
+    description: "Create and manage customer quotes with line items.",
+  },
+  invoices: {
     icon: Receipt,
-    label: (tr) => tr.nav.finance,
-    description: "Create and manage quotes and invoices with line items.",
+    label: (tr) => tr.nav.invoices,
+    description: "Issue invoices, record payments, and track receivables.",
+  },
+  salesOrders: {
+    icon: ClipboardCheck,
+    label: (tr) => tr.nav.salesOrders || "Sales Orders",
+    description: "Confirmed customer orders between a quote and an invoice.",
   },
   reports: {
     icon: WalletCards,
     label: (tr) => tr.nav.reports,
     description: "Financial and sales reports with date range filters.",
   },
-  procurement: {
+  suppliers: {
+    icon: Truck,
+    label: (tr) => tr.nav.suppliers || "Suppliers",
+    description: "Manage your vendors and suppliers.",
+  },
+  purchaseOrders: {
     icon: ShoppingCart,
-    label: (tr) => tr.nav.procurement || "Procurement",
-    description: "Manage suppliers, purchase orders and vendor bills.",
+    label: (tr) => tr.nav.purchaseOrders || "Purchase Orders",
+    description: "Raise and track purchase orders to suppliers.",
+  },
+  vendorBills: {
+    icon: ClipboardList,
+    label: (tr) => tr.nav.bills || "Vendor Bills",
+    description: "Track vendor bills and payables.",
   },
   projects: {
     icon: Briefcase,

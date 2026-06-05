@@ -40,13 +40,20 @@ export function Leads() {
         field: "status",
         options: Object.entries(l.statuses).map(([value, label]) => ({ value, label })),
       }}
-      renderRow={(item, handleDelete) => (
-        <LeadRow key={item._id} item={item} handleDelete={handleDelete} />
+      renderRow={(item, handleDelete, selectionCell) => (
+        <LeadRow key={item._id} item={item} handleDelete={handleDelete} selectionCell={selectionCell} />
       )}
       title={l.title}
       description={l.description}
       addLink="/leads/add"
       addLabel={l.add}
+      importConfig={{ entity: "leads", title: "Leads" }}
+      dedupConfig={{ entity: "leads", title: "Leads" }}
+      bulkConfig={{
+        entity: "leads",
+        statusOptions: Object.entries(l.statuses).map(([value, label]) => ({ value, label: label as string })),
+      }}
+      module="leads"
       filterConfigs={LEAD_FILTERS}
     />
   );

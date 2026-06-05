@@ -10,6 +10,7 @@ import { CreateVendorBillDto } from './dto/create-vendor-bill.dto';
 import { UpdateVendorBillDto } from './dto/update-vendor-bill.dto';
 import { RecordBillPaymentDto } from './dto/record-bill-payment.dto';
 import { ApprovalService } from '../common/approval.service';
+import { CustomFieldsService } from '../common/custom-fields.service';
 
 const BILL_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -34,6 +35,7 @@ export class VendorBillsService {
     private readonly numberSequence: NumberSequenceService,
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   private async getApprovalConfig() {
@@ -100,6 +102,7 @@ export class VendorBillsService {
   async create(body: CreateVendorBillDto, userId: string) {
     const { items = [], taxRate = 0, ...rest } = body;
     const data = this.cleanData(rest as any);
+    data.customFields = await this.customFields.validateAndClean('vendorBills', data.customFields);
     const totals = calcTotals(items, taxRate);
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const enabled = await this.approvals.isEnabled('vendor_bills');
@@ -138,6 +141,9 @@ export class VendorBillsService {
 
     const { items, taxRate, ...rest } = body as any;
     const data = this.cleanData(rest);
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('vendorBills', data.customFields);
+    }
 
     const bill = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (items !== undefined) {
@@ -186,7 +192,7 @@ export class VendorBillsService {
 
     const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
-    if (enabled && bill.createdById === userId) throw new BadRequestException('Cannot approve your own bill');
+    if (enabled && bill.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot approve your own bill');
 
     const updated = await this.prisma.vendorBill.update({
       where: { id },

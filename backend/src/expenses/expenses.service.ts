@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { ApprovalService } from '../common/approval.service';
 import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
@@ -14,6 +15,7 @@ export class ExpensesService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -64,14 +66,17 @@ export class ExpensesService {
   }
 
   async create(body: CreateExpenseReportDto, userId: string) {
-    const { title, expenses } = body;
+    const { title, expenses, project, ...rest } = body as any;
     const total = (expenses ?? []).reduce((s: number, e: any) => s + Number(e.amount), 0);
     const enabled = await this.approvals.isEnabled('expenses');
+    const customFields = await this.customFields.validateAndClean('expenses', (rest as any).customFields ?? body.customFields);
     const report = await this.prisma.expenseReport.create({
       data: {
         title,
         userId,
+        ...(project ? { projectId: project } : {}),
         approvalStatus: enabled ? 'pending' : 'approved',
+        ...(customFields !== undefined ? { customFields: customFields as any } : {}),
         expenses: {
           create: (expenses ?? []).map((e: any) => ({
             description: e.description,
@@ -98,9 +103,16 @@ export class ExpensesService {
   async update(id: string, body: UpdateExpenseReportDto) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('expense report not found');
-    const { expenses, ...rest } = body;
-    // Replace expense items entirely if provided
+    const { expenses, project, ...rest } = body as any;
+    // Map project ID string → Prisma relation connect
     const data: any = { ...rest };
+    if (project !== undefined) {
+      data.projectId = project || null;
+      delete data.project;
+    }
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('expenses', data.customFields);
+    }
     if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (expenses && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
     if (expenses) {
@@ -144,7 +156,7 @@ export class ExpensesService {
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve expense reports');
     // Separation of duties: the report owner cannot approve their own report.
-    if (report.userId === userId) throw new ForbiddenException('You cannot approve an expense report you created');
+    if (report.userId === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot approve an expense report you created');
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -173,7 +185,7 @@ export class ExpensesService {
 
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject expense reports');
-    if (report.userId === userId) throw new ForbiddenException('You cannot reject an expense report you created');
+    if (report.userId === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot reject an expense report you created');
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },

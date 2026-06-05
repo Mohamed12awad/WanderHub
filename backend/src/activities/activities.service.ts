@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 
@@ -10,6 +11,7 @@ export class ActivitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -49,6 +51,7 @@ export class ActivitiesService {
     if (resolvedLinkedToId && rest.linkedModel === 'Customer') data.customerId = resolvedLinkedToId;
     if (resolvedLinkedToId && rest.linkedModel === 'Deal') data.dealId = resolvedLinkedToId;
     if (resolvedLinkedToId && rest.linkedModel === 'Project') data.projectId = resolvedLinkedToId;
+    data.customFields = await this.customFields.validateAndClean('activities', data.customFields);
 
     const activity = await this.prisma.activity.create({
       data,
@@ -82,6 +85,9 @@ export class ActivitiesService {
     if (data.date && typeof data.date === 'string') data.date = new Date(data.date);
     if (data.description === '') delete data.description;
     if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('activities', data.customFields);
+    }
     const activity = await this.prisma.activity.update({ where: { id }, data });
     return toClient(activity);
   }

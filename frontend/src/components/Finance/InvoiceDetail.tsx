@@ -164,7 +164,6 @@ const InvoiceDetail: React.FC = () => {
   return (
     <main className="p-4 max-w-7xl mx-auto space-y-5">
       <ApprovalStepsTimeline entityType="Invoice" entityId={id!} />
-      <AttachmentsPanel linkedModel="Invoice" linkedToId={id!} />
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}
@@ -296,9 +295,14 @@ const InvoiceDetail: React.FC = () => {
               } />
               <InfoRow label="Deal" value={
                 invoice.deal ? (
-                  <Link to={`/deals/${invoice.deal._id}`} className="text-blue-500">{invoice.deal.title}</Link>
+                  <Link to={`/deals/${invoice.deal._id}`} className="text-blue-500 hover:underline">{invoice.deal.title}</Link>
                 ) : "—"
               } />
+              {invoice.project && (
+                <InfoRow label="Project" value={
+                  <Link to={`/projects/${invoice.project._id}`} className="text-blue-500 hover:underline">{invoice.project.name}</Link>
+                } />
+              )}
               {invoice.quote && (
                 <InfoRow label="From Quote" value={
                   <Link to={`/finance/quotes/${invoice.quote._id}`} className="text-blue-500">
@@ -450,6 +454,7 @@ const InvoiceDetail: React.FC = () => {
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={id!} linkedModel="Invoice" />
@@ -459,6 +464,9 @@ const InvoiceDetail: React.FC = () => {
             </TabsContent>
             <TabsContent value="activities">
               <ActivityList linkedTo={id!} linkedModel="Invoice" />
+            </TabsContent>
+            <TabsContent value="attachments">
+              <AttachmentsPanel linkedModel="Invoice" linkedToId={id!} />
             </TabsContent>
           </Tabs>
         </CardContent>

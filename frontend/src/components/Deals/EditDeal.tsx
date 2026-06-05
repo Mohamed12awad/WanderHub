@@ -13,6 +13,7 @@ import DynamicFields from "@/components/common/DynamicFields";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
 import LoadingSpinner from "../common/spinner";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 
 const DEAL_STATUSES = ["lead", "qualified", "proposal", "negotiation", "won", "lost", "cancelled"];
 const DEAL_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Exhibition", "Partner", "Other"];
@@ -53,6 +54,11 @@ const EditDeal = () => {
   const [isLoading, setIsLoading] = useState(false);
   const originalRef = useRef<string | null>(null);
   const navigate = useNavigate();
+  const { data: wsData } = useWorkspaceSettings();
+  const dealStages: { key: string; label: string }[] =
+    (wsData?.pipelineStages as { key: string; label: string }[] | undefined)?.length
+      ? wsData!.pipelineStages
+      : DEAL_STATUSES.map((s) => ({ key: s, label: s }));
 
   const fetchCustomers = useCallback(
     (q: string) => getCustomers({ page: 1, limit: 20, q }).then((r) =>
@@ -222,7 +228,7 @@ const EditDeal = () => {
                   <Select value={formData.status} onValueChange={(v) => handleSelect("status", v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {DEAL_STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                      {dealStages.map((s) => <SelectItem key={s.key} value={s.key} className="capitalize">{s.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

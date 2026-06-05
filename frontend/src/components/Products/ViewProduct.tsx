@@ -11,6 +11,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { CircleArrowLeft, Edit, MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { Button } from "../ui/button";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { useQuery } from "@tanstack/react-query";
@@ -182,12 +183,16 @@ const ViewProduct: React.FC = () => {
                     <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{notesCount}</span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="attachments">Attachments</TabsTrigger>
               </TabsList>
               <TabsContent value="timeline">
                 <RecordTimeline linkedTo={id} linkedModel="Product" />
               </TabsContent>
               <TabsContent value="notes">
                 <NotesPanel linkedTo={id} linkedModel="Product" />
+              </TabsContent>
+              <TabsContent value="attachments">
+                <AttachmentsPanel linkedModel="Product" linkedToId={id!} />
               </TabsContent>
             </Tabs>
           </CardContent>

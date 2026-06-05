@@ -16,6 +16,8 @@ import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { QuoteStatus } from "@/types/types";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
 
@@ -46,6 +48,9 @@ const QuoteForm: React.FC = () => {
     cloneData?.items?.length
       ? cloneData.items
       : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]
+  );
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
   );
   const [saving, setSaving] = useState(false);
 
@@ -109,6 +114,7 @@ const QuoteForm: React.FC = () => {
       unitPrice: i.unitPrice,
       discount: i.discount,
     })));
+    setCustomFields(toCustomFieldValues(q.customFields));
   }, [quoteData]);
 
   const { subtotal, tax, total } = computeTotals(items, taxRate);
@@ -131,6 +137,7 @@ const QuoteForm: React.FC = () => {
         notes: notes || undefined,
         terms: terms || undefined,
         items,
+        customFields,
       };
       if (isEdit) {
         await updateQuote(id!, payload);
@@ -268,6 +275,10 @@ const QuoteForm: React.FC = () => {
                   placeholder="Terms & conditions…"
                 />
               </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <DynamicFields module="quotes" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
           </CardContent>
         </Card>

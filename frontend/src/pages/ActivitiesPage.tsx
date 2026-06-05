@@ -27,6 +27,7 @@ const TYPE_EMOJIS: Record<ActivityType, string> = {
   call: "📞",
   meeting: "🤝",
   task: "✅",
+  note: "📝",
   email: "📧",
 };
 

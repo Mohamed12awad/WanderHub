@@ -2,21 +2,35 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 export type ColorMode = "light" | "dark" | "system";
 export type AccentColor = "blue" | "green" | "red" | "purple" | "orange" | "teal" | "rose";
+export type FontSize = "sm" | "base" | "lg" | "xl";
 
 const ACCENT_CLASSES: AccentColor[] = ["blue", "green", "red", "purple", "orange", "teal", "rose"];
+
+// Root font-size drives every rem-based size in the app, so changing it scales
+// the whole UI proportionally. "base" matches the stylesheet default (16px).
+export const FONT_SIZE_PX: Record<FontSize, string> = {
+  sm: "14px",
+  base: "16px",
+  lg: "18px",
+  xl: "20px",
+};
 
 type ThemeProviderState = {
   theme: ColorMode;
   accent: AccentColor;
+  fontSize: FontSize;
   setTheme: (t: ColorMode) => void;
   setAccent: (a: AccentColor) => void;
+  setFontSize: (f: FontSize) => void;
 };
 
 const initialState: ThemeProviderState = {
   theme: "system",
   accent: "blue",
+  fontSize: "base",
   setTheme: () => null,
   setAccent: () => null,
+  setFontSize: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
@@ -27,6 +41,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
   const [accent, setAccentState] = useState<AccentColor>(
     () => (localStorage.getItem("ui-accent") as AccentColor) || "blue"
+  );
+  const [fontSize, setFontSizeState] = useState<FontSize>(
+    () => (localStorage.getItem("ui-font-size") as FontSize) || "base"
   );
 
   useEffect(() => {
@@ -47,6 +64,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (accent !== "blue") root.classList.add(`accent-${accent}`);
   }, [accent]);
 
+  useEffect(() => {
+    window.document.documentElement.style.fontSize = FONT_SIZE_PX[fontSize] ?? FONT_SIZE_PX.base;
+  }, [fontSize]);
+
   const setTheme = (t: ColorMode) => {
     localStorage.setItem("ui-theme", t);
     setThemeState(t);
@@ -57,8 +78,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setAccentState(a);
   };
 
+  const setFontSize = (f: FontSize) => {
+    localStorage.setItem("ui-font-size", f);
+    setFontSizeState(f);
+  };
+
   return (
-    <ThemeProviderContext.Provider value={{ theme, accent, setTheme, setAccent }}>
+    <ThemeProviderContext.Provider value={{ theme, accent, fontSize, setTheme, setAccent, setFontSize }}>
       {children}
     </ThemeProviderContext.Provider>
   );

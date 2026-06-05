@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { getWorkspaceSettings, updateWorkspaceSettings } from "@/utils/api";
 
 export const MODULE_KEYS = [
-  "customers", "leads", "deals", "pipeline", "calendar", "tasks", "products", "expenses", "finance", "reports", "procurement", "projects",
+  "customers", "leads", "deals", "pipeline", "calendar", "tasks", "products", "expenses",
+  "quotes", "invoices", "salesOrders", "suppliers", "purchaseOrders", "vendorBills",
+  "reports", "projects",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -10,8 +12,10 @@ type ModulesState = Record<ModuleKey, boolean>;
 
 const DEFAULT: ModulesState = {
   customers: true, leads: true, deals: true, pipeline: true, calendar: true,
-  tasks: true, products: true, expenses: true, finance: true, reports: true,
-  procurement: true, projects: true,
+  tasks: true, products: true, expenses: true,
+  quotes: true, invoices: true, salesOrders: true,
+  suppliers: true, purchaseOrders: true, vendorBills: true,
+  reports: true, projects: true,
 };
 
 function loadFromStorage(): ModulesState {

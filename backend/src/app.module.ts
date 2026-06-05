@@ -18,11 +18,14 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { ProductsModule } from './products/products.module';
 import { ExpensesModule } from './expenses/expenses.module';
-import { FinanceModule } from './finance/finance.module';
+import { QuotesModule } from './finance/quotes.module';
+import { InvoicesModule } from './finance/invoices.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { NotesModule } from './notes/notes.module';
 import { TasksModule } from './tasks/tasks.module';
-import { ProcurementModule } from './procurement/procurement.module';
+import { SuppliersModule } from './procurement/suppliers.module';
+import { PurchaseOrdersModule } from './procurement/purchase-orders.module';
+import { VendorBillsModule } from './procurement/vendor-bills.module';
 import { ProjectsModule } from './projects/projects.module';
 import { LogsModule } from './logs/logs.module';
 import { SearchModule } from './search/search.module';
@@ -36,6 +39,15 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { ApprovalsModule } from './approvals/approvals.module';
+import { ImportModule } from './import/import.module';
+import { DedupModule } from './dedup/dedup.module';
+import { BulkModule } from './bulk/bulk.module';
+import { SavedViewsModule } from './saved-views/saved-views.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { PublicApiModule } from './public-api/public-api.module';
+import { EmailsModule } from './emails/emails.module';
+import { AiModule } from './ai/ai.module';
+import { SalesOrdersModule } from './sales-orders/sales-orders.module';
 
 @Module({
   providers: [
@@ -71,11 +83,14 @@ import { ApprovalsModule } from './approvals/approvals.module';
     RolesModule,
     ProductsModule,
     ExpensesModule,
-    FinanceModule,
+    QuotesModule,
+    InvoicesModule,
     ActivitiesModule,
     NotesModule,
     TasksModule,
-    ProcurementModule,
+    SuppliersModule,
+    PurchaseOrdersModule,
+    VendorBillsModule,
     ProjectsModule,
     LogsModule,
     SearchModule,
@@ -87,6 +102,15 @@ import { ApprovalsModule } from './approvals/approvals.module';
     InventoryModule,
     AttachmentsModule,
     ApprovalsModule,
+    ImportModule,
+    DedupModule,
+    BulkModule,
+    SavedViewsModule,
+    ApiKeysModule,
+    PublicApiModule,
+    EmailsModule,
+    AiModule,
+    SalesOrdersModule,
   ],
 })
 export class AppModule {}

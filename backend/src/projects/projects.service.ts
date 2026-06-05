@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { VisibilityService } from '../common/visibility.service';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -25,6 +26,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly visibility: VisibilityService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   private cleanData(body: Record<string, any>) {
@@ -102,6 +104,7 @@ export class ProjectsService {
   async create(body: CreateProjectDto, userId: string) {
     const data = this.cleanData(body as any);
     data.createdById = userId;
+    data.customFields = await this.customFields.validateAndClean('projects', data.customFields);
     const project = await this.prisma.project.create({ data: data as any, include: PROJECT_INCLUDE });
     await this.timeline.log('project.created', `Project "${project.name}" created`, project.id, 'Project', {}, userId);
     return toClient(project);
@@ -111,6 +114,9 @@ export class ProjectsService {
     const existing = await this.prisma.project.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('project not found');
     const data = this.cleanData(body as any);
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('projects', data.customFields);
+    }
     // Stamp completedAt when transitioning to completed
     if (data.status === 'completed' && existing.status !== 'completed') data.completedAt = new Date();
     if (data.status && data.status !== 'completed') data.completedAt = null;

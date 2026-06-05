@@ -13,8 +13,12 @@ export class SettingsController {
 
   // ── Approvals ───────────────────────────────────────────────────────────────
 
+  // Operational config reads (approvals, organization, exchange rates, tax
+  // rates, invoice defaults, password policy) are non-sensitive and needed by
+  // ordinary users to render approval banners, format currency, validate
+  // passwords and fill document forms — so they require only authentication.
+  // Every write below still requires `settings:manage`.
   @Get('approvals')
-  @RequirePermission('settings:view')
   getApprovals() {
     return this.settings.getApprovals();
   }
@@ -27,8 +31,10 @@ export class SettingsController {
 
   // ── Workspace (fields, modules, pipeline stages) ────────────────────────────
 
+  // Workspace config (custom fields, enabled modules, pipeline stages) is UI
+  // metadata every page and role needs to render correctly, so it's readable by
+  // any authenticated user. Mutations below still require `settings:manage`.
   @Get('workspace')
-  @RequirePermission('settings:view')
   getWorkspace() {
     return this.settings.getWorkspace();
   }
@@ -44,7 +50,6 @@ export class SettingsController {
   // ── Organization ────────────────────────────────────────────────────────────
 
   @Get('organization')
-  @RequirePermission('settings:view')
   getOrganization() {
     return this.settings.getOrganization();
   }
@@ -58,7 +63,6 @@ export class SettingsController {
   // ── Exchange Rates ──────────────────────────────────────────────────────────
 
   @Get('exchange-rates')
-  @RequirePermission('settings:view')
   getExchangeRates() {
     return this.settings.getExchangeRates();
   }
@@ -89,7 +93,6 @@ export class SettingsController {
   // ── Invoice Defaults ────────────────────────────────────────────────────────
 
   @Get('invoice-defaults')
-  @RequirePermission('settings:view')
   getInvoiceDefaults() {
     return this.settings.getInvoiceDefaults();
   }
@@ -105,7 +108,6 @@ export class SettingsController {
   // ── Tax Rates ───────────────────────────────────────────────────────────────
 
   @Get('tax-rates')
-  @RequirePermission('settings:view')
   getTaxRates() {
     return this.settings.getTaxRates();
   }
@@ -134,7 +136,6 @@ export class SettingsController {
   // ── Password Policy ─────────────────────────────────────────────────────────
 
   @Get('password-policy')
-  @RequirePermission('settings:view')
   getPasswordPolicy() {
     return this.settings.getPasswordPolicy();
   }

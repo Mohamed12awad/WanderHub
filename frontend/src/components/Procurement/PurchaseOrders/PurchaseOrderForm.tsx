@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LineItemsTable, { LineItemRow, computeTotals } from "@/components/Finance/LineItemsTable";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
@@ -34,6 +36,9 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
     tax: 0,
     total: 0,
   });
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
+  );
 
   const { data: suppliersData } = useQuery({
     queryKey: ["suppliers-all"],
@@ -64,6 +69,7 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
       tax: d.tax || 0,
       total: d.total || 0,
     });
+    setCustomFields(toCustomFieldValues(d.customFields));
   }, [poData]);
 
   const mutation = useMutation({
@@ -99,11 +105,11 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
     }
     
     const { subtotal, tax, total } = computeTotals(formData.items, formData.taxRate);
-    const payload = { ...formData, supplier: formData.supplierId, subtotal, tax, total };
+    const payload = { ...formData, supplier: formData.supplierId, subtotal, tax, total, customFields };
     mutation.mutate(payload);
   };
 
-  if (isFetching) return <div className="p-6">Loading...</div>;
+  if (mode === "edit" && isFetching) return <div className="p-6">Loading...</div>;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -163,6 +169,10 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
                 <div className="space-y-2 pt-2">
                   <Label>Notes</Label>
                   <Textarea value={formData.notes} onChange={(e) => handleChange("notes", e.target.value)} placeholder="Terms, conditions, or shipping notes..." />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <DynamicFields module="purchaseOrders" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
                 </div>
               </CardContent>
             </Card>

@@ -5,6 +5,7 @@ import { NumberSequenceService } from '../number-sequence/number-sequence.servic
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { buildCfConditions } from '../common/customFields';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
 import { VisibilityService } from '../common/visibility.service';
@@ -17,6 +18,7 @@ export class DealsService {
     private readonly timeline: TimelineService,
     private readonly numberSequence: NumberSequenceService,
     private readonly visibility: VisibilityService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   /** Maps frontend deal payload (customer/owner as strings) to Prisma data. */
@@ -39,7 +41,9 @@ export class DealsService {
   }
 
   async create(body: CreateDealDto, userId: string) {
-    const deal = await this.prisma.deal.create({ data: this.cleanData(body) as any });
+    const data = this.cleanData(body);
+    data.customFields = await this.customFields.validateAndClean('deals', data.customFields);
+    const deal = await this.prisma.deal.create({ data: data as any });
 
     await this.timeline.log(
       'deal.created',
@@ -148,6 +152,9 @@ export class DealsService {
     if (!oldDeal) throw new NotFoundException('deal not found');
 
     const cleaned = this.cleanData(body);
+    if ('customFields' in cleaned) {
+      cleaned.customFields = await this.customFields.validateAndClean('deals', cleaned.customFields);
+    }
     const newStatus = body.status as string | undefined;
     const deal = await this.prisma.deal.update({ where: { id }, data: cleaned });
 

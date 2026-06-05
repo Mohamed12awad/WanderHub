@@ -11,15 +11,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getCustomerById, deleteCustomer, createDeal, getDeals, getNotes, getActivities, getQuotes, getInvoices } from "@/utils/api";
+import { getCustomerById, deleteCustomer, createDeal, getDeals, getNotes, getActivities, getQuotes, getInvoices, getProjects } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, MoreHorizontal, Trash2, Handshake, TrendingUp, Copy } from "lucide-react";
+import { CircleArrowLeft, Edit, MoreHorizontal, Trash2, Handshake, TrendingUp, Copy, FolderKanban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Customer } from "@/types/types";
 import { Button } from "../ui/button";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
+import { EmailsPanel } from "@/components/common/EmailsPanel";
+import { AiInsights } from "@/components/common/AiInsights";
 import FinanceTab from "@/components/Finance/FinanceTab";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { useQuery } from "@tanstack/react-query";
@@ -79,12 +82,18 @@ const ViewCustomer: React.FC = () => {
     queryFn: () => getDeals({ customerId: id, page: 1, limit: 50 }),
     enabled: !!id
   });
+  const { data: projectsData }   = useQuery({
+    queryKey: ["customer-projects", id],
+    queryFn: () => getProjects({ customer: id, limit: 50 }),
+    enabled: !!id
+  });
 
   const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
   const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
   const quotesCount     = ((quotesData?.data)     as any[])?.length ?? 0;
   const invoicesCount   = ((invoicesData?.data)   as any[])?.length ?? 0;
   const dealsCount      = ((dealsData?.data as any)?.data as any[])?.length ?? 0;
+  const projectsCount   = ((projectsData?.data as any)?.data as any[])?.length ?? 0;
 
   const handleClone = () => {
     if (!customerData) return;
@@ -232,6 +241,9 @@ const ViewCustomer: React.FC = () => {
               <InfoItem label="Phone" value={customerData.phone} />
               <InfoItem label="Mobile" value={customerData.mobile} />
               <InfoItem label="Email" value={customerData.email} />
+              <InfoItem label="Company" value={customerData.company} />
+              <InfoItem label="Job Title" value={customerData.jobTitle} />
+              <InfoItem label="Website" value={customerData.website} />
             </section>
 
             <section>
@@ -301,16 +313,23 @@ const ViewCustomer: React.FC = () => {
               <TabsList className="mb-4 flex-wrap h-auto">
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="deals">Deals<Cnt n={dealsCount} /></TabsTrigger>
+                <TabsTrigger value="projects">Projects<Cnt n={projectsCount} /></TabsTrigger>
                 <TabsTrigger value="quotes">Quotes<Cnt n={quotesCount} /></TabsTrigger>
                 <TabsTrigger value="invoices">Invoices<Cnt n={invoicesCount} /></TabsTrigger>
                 <TabsTrigger value="notes">Notes<Cnt n={notesCount} /></TabsTrigger>
                 <TabsTrigger value="activities">Activities<Cnt n={activitiesCount} /></TabsTrigger>
+                <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                <TabsTrigger value="emails">Emails</TabsTrigger>
+                <TabsTrigger value="ai">AI</TabsTrigger>
               </TabsList>
               <TabsContent value="timeline">
                 <RecordTimeline linkedTo={id} linkedModel="Customer" />
               </TabsContent>
               <TabsContent value="deals">
                 <CustomerDealsTab customerId={id!} />
+              </TabsContent>
+              <TabsContent value="projects">
+                <CustomerProjectsTab customerId={id!} />
               </TabsContent>
               <TabsContent value="quotes">
                 <FinanceTab linkedModel="Customer" linkedId={id!} view="quotes" />
@@ -323,6 +342,15 @@ const ViewCustomer: React.FC = () => {
               </TabsContent>
               <TabsContent value="activities">
                 <ActivityList linkedTo={id} linkedModel="Customer" />
+              </TabsContent>
+              <TabsContent value="attachments">
+                <AttachmentsPanel linkedModel="Customer" linkedToId={id!} />
+              </TabsContent>
+              <TabsContent value="emails">
+                <EmailsPanel linkedTo={id!} linkedModel="Customer" />
+              </TabsContent>
+              <TabsContent value="ai">
+                <AiInsights entity="customers" id={id!} />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -498,5 +526,42 @@ const InfoItem: React.FC<{ label: string; value?: string | number | null }> = ({
     <p className="text-sm text-foreground">{value ?? "—"}</p>
   </div>
 );
+
+const CustomerProjectsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const { data, isPending } = useQuery({
+    queryKey: ["customer-projects", customerId],
+    queryFn: () => getProjects({ customer: customerId, limit: 50 })
+  });
+  const projects: any[] = (data?.data as any)?.data ?? [];
+
+  if (isPending) return (
+    <div className="space-y-2">
+      {[1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+    </div>
+  );
+
+  if (!projects.length) return (
+    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+      <FolderKanban className="h-8 w-8 opacity-30" />
+      <p className="text-sm">No projects yet</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      {projects.map((project) => (
+        <Link key={project._id} to={`/projects/${project._id}`} className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/50 transition-colors">
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{project.name}</p>
+            {project.endDate && <p className="text-xs text-muted-foreground">Ends {new Date(project.endDate).toLocaleDateString()}</p>}
+          </div>
+          <Badge className="capitalize shrink-0 ml-3" variant="outline">
+            {project.status?.replace("_", " ")}
+          </Badge>
+        </Link>
+      ))}
+    </div>
+  );
+};
 
 export default ViewCustomer;

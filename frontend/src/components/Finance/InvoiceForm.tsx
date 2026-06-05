@@ -11,13 +11,15 @@ import {
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { CircleArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice } from "@/utils/api";
+import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice, getProjects } from "@/utils/api";
 import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { InvoiceStatus } from "@/types/types";
 import { useOrgSettings } from "@/hooks/useOrgSettings";
 import { CURRENCIES } from "@/utils/constants";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 async function fetchExchangeRate(baseCurrency: string, toCurrency: string): Promise<number | null> {
   try {
@@ -48,6 +50,8 @@ const InvoiceForm: React.FC = () => {
   const [customerLabel, setCustomerLabel] = useState("");
   const [deal, setDeal] = useState(cloneData?.deal ?? dealParam ?? "none");
   const [dealLabel, setDealLabel] = useState("");
+  const [project, setProject] = useState(cloneData?.project ?? "none");
+  const [projectLabel, setProjectLabel] = useState("");
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [currency, setCurrency] = useState(cloneData?.currency ?? "EGP");
   const [taxRate, setTaxRate] = useState<number>(cloneData?.taxRate ?? 0);
@@ -59,6 +63,9 @@ const InvoiceForm: React.FC = () => {
     cloneData?.items?.length
       ? cloneData.items
       : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]
+  );
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
   );
   const [saving, setSaving] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number | "">("");
@@ -78,6 +85,17 @@ const InvoiceForm: React.FC = () => {
         [
           { value: "none", label: "None" },
           ...(r.data as any).data.map((d: { _id: string; title: string }) => ({ value: d._id, label: d.title })),
+        ]
+      ),
+    [],
+  );
+
+  const fetchProjects = useCallback(
+    (q: string) =>
+      getProjects({ page: 1, limit: 20, q }).then((r) =>
+        [
+          { value: "none", label: "None" },
+          ...(Array.isArray(r.data) ? r.data : r.data?.data ?? []).map((p: { _id: string; name: string }) => ({ value: p._id, label: p.name })),
         ]
       ),
     [],
@@ -122,6 +140,8 @@ const InvoiceForm: React.FC = () => {
     setCustomerLabel(inv.customer.name ?? "");
     setDeal(inv.deal?._id ?? "none");
     setDealLabel(inv.deal?.title ?? "None");
+    setProject(inv.project?._id ?? "none");
+    setProjectLabel(inv.project?.name ?? "None");
     setStatus(inv.status);
     setCurrency(inv.currency);
     setTaxRate(inv.taxRate);
@@ -136,6 +156,7 @@ const InvoiceForm: React.FC = () => {
       discount: i.discount,
     })));
     setExchangeRate(inv.exchangeRate ?? "");
+    setCustomFields(toCustomFieldValues(inv.customFields));
   }, [invoiceData]);
 
   const { subtotal, tax, total } = computeTotals(items, taxRate);
@@ -151,6 +172,7 @@ const InvoiceForm: React.FC = () => {
         title,
         customer,
         deal: deal && deal !== "none" ? deal : undefined,
+        project: project && project !== "none" ? project : undefined,
         status,
         currency,
         exchangeRate: currency !== baseCurrency && exchangeRate !== "" ? Number(exchangeRate) : undefined,
@@ -160,6 +182,7 @@ const InvoiceForm: React.FC = () => {
         notes: notes || undefined,
         terms: terms || undefined,
         items,
+        customFields,
       };
       if (isEdit) {
         await updateInvoice(id!, payload);
@@ -213,6 +236,17 @@ const InvoiceForm: React.FC = () => {
                   selectedLabel={dealLabel}
                   placeholder="None"
                   searchPlaceholder="Search deals..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Project (optional)</Label>
+                <AsyncSearchableSelect
+                  value={project}
+                  onChange={setProject}
+                  fetchFn={fetchProjects}
+                  selectedLabel={projectLabel}
+                  placeholder="None"
+                  searchPlaceholder="Search projects..."
                 />
               </div>
               <div className="space-y-2">
@@ -322,6 +356,10 @@ const InvoiceForm: React.FC = () => {
                   placeholder="Terms & conditions…"
                 />
               </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <DynamicFields module="invoices" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
           </CardContent>
         </Card>

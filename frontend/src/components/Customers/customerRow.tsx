@@ -33,9 +33,10 @@ interface CustomerItem {
 interface CustomerRowProps {
   item: CustomerItem;
   handleDelete: (id: string) => void;
+  selectionCell?: React.ReactNode;
 }
 
-const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete }) => {
+const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete, selectionCell }) => {
   const { user } = useAuth();
   const { tr } = useLanguage();
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete }) => {
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/customers/${item._id}`)}>
+      {selectionCell}
       <TableCell className="font-medium">{item.name}</TableCell>
       <TableCell>
         <Badge variant="outline" className={`${STATUS_COLORS[item.status] ?? ""} capitalize w-fit`}>

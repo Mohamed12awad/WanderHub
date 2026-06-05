@@ -9,6 +9,7 @@ import {
 } from "@/utils/api";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -233,6 +234,7 @@ export default function ViewPurchaseOrder() {
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
               <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={id!} linkedModel="PurchaseOrder" />
@@ -242,6 +244,9 @@ export default function ViewPurchaseOrder() {
             </TabsContent>
             <TabsContent value="activities">
               <ActivityList linkedTo={id!} linkedModel="PurchaseOrder" />
+            </TabsContent>
+            <TabsContent value="attachments">
+              <AttachmentsPanel linkedModel="PurchaseOrder" linkedToId={id!} />
             </TabsContent>
           </Tabs>
         </CardContent>

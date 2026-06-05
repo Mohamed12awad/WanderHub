@@ -15,7 +15,7 @@ export class SearchService {
 
   async search(q: string, user: AuthUser) {
     if (!q || q.length < 2) {
-      return { customers: [], deals: [], leads: [], products: [], expenses: [], invoices: [], quotes: [], purchaseOrders: [], vendorBills: [], projects: [], tasks: [] };
+      return { customers: [], deals: [], leads: [], products: [], expenses: [], invoices: [], quotes: [], salesOrders: [], purchaseOrders: [], vendorBills: [], projects: [], tasks: [] };
     }
 
     const contains = { contains: q, mode: 'insensitive' as const };
@@ -35,7 +35,7 @@ export class SearchService {
     });
     const customerIds = customers.map((c) => c.id);
 
-    const [deals, leads, products, expenses, invoices, quotes, purchaseOrders, vendorBills, projects, tasks] = await Promise.all([
+    const [deals, leads, products, expenses, invoices, quotes, salesOrders, purchaseOrders, vendorBills, projects, tasks] = await Promise.all([
       this.prisma.deal.findMany({
         where: {
           deletedAt: null,
@@ -70,6 +70,11 @@ export class SearchService {
         select: { id: true, quoteNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
         take: LIMIT,
       }),
+      this.prisma.salesOrder.findMany({
+        where: { deletedAt: null, OR: [{ orderNumber: contains }, { title: contains }] },
+        select: { id: true, orderNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
+        take: LIMIT,
+      }),
       this.prisma.purchaseOrder.findMany({
         where: { deletedAt: null, OR: [{ poNumber: contains }, { title: contains }] },
         select: { id: true, poNumber: true, title: true, status: true, total: true, currency: true, supplier: { select: { id: true, name: true } } },
@@ -100,6 +105,7 @@ export class SearchService {
       expenses: toClient(expenses),
       invoices: toClient(invoices),
       quotes: toClient(quotes),
+      salesOrders: toClient(salesOrders),
       purchaseOrders: toClient(purchaseOrders),
       vendorBills: toClient(vendorBills),
       projects: toClient(projects),

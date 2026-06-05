@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateProjectDto {
   @IsString() @IsNotEmpty() name: string;
@@ -14,6 +14,7 @@ export class CreateProjectDto {
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() startDate?: string;
   @IsOptional() @IsString() endDate?: string;
+  @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 
   // Mapped to customerId / dealId / managerId by the service.
   @IsOptional() customer?: any;

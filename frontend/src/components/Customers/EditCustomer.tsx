@@ -11,13 +11,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/use-toast";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { updateCustomer, getCustomerById, getUsers } from "@/utils/api";
 
 const LEAD_SOURCES = ["Website", "Referral", "Cold Call", "Email", "Social Media", "Walk-in", "Other"];
 import { Link, useNavigate, useParams } from "react-router-dom";
 import DynamicFields from "@/components/common/DynamicFields";
 import { CircleArrowLeft } from "lucide-react";
-import { Customer } from "@/types/types";
 import { useAuth } from "@/contexts/authContext";
 
 interface User {
@@ -31,6 +32,9 @@ const initialFormData = {
   phone: "",
   mobile: "",
   email: "",
+  company: "",
+  jobTitle: "",
+  website: "",
   address: {
     street: "",
     city: "",
@@ -83,6 +87,8 @@ const EditCustomer = () => {
   const { user } = useAuth();
   const originalRef = useRef<string | null>(null);
   const navigate = useNavigate();
+  const { getSystemFieldLabel } = useWorkspaceSettings();
+  const lbl = (name: string, fallback: string) => getSystemFieldLabel("customers", name) ?? fallback;
 
   useEffect(() => {
     if (!id) return;
@@ -161,18 +167,40 @@ const EditCustomer = () => {
     e.preventDefault();
     if (!id) return;
 
+    // Explicit, field-specific validation (clearer than the browser's native bubble).
+    const missing =
+      !formData.name.trim() ? "Name"
+      : !formData.phone.trim() ? "Phone"
+      : !formData.owner ? "Owner"
+      : null;
+    if (missing) {
+      toast({ title: `${missing} is required`, description: `Please fill in the ${missing} field before saving.`, variant: "destructive" });
+      return;
+    }
+
     try {
-      const customerData: Customer = {
+      // The form loads the full customer record into state; strip server-managed
+      // / relation fields the update DTO rejects (the API derives them itself).
+      const customerData: Record<string, any> = {
         ...formData,
         dateOfBirth: formData.dateOfBirth || null,
-      } as any;
+      };
+      for (const k of ["_id", "id", "ownerId", "createdAt", "updatedAt", "deletedAt",
+        "deals", "quotes", "invoices", "activities", "timelines", "customerNotes", "fromLead", "projects"]) {
+        delete customerData[k];
+      }
       setIsLoading(true);
-      await updateCustomer(id, customerData);
+      await updateCustomer(id, customerData as any);
       setIsLoading(false);
+      toast({ title: "Customer updated" });
       navigate("/customers/" + id);
-    } catch (error) {
+    } catch (error: any) {
       setIsLoading(false);
-      console.error("Error updating customer:", error);
+      toast({
+        title: "Could not save changes",
+        description: error?.response?.data?.message ?? "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -201,7 +229,7 @@ const EditCustomer = () => {
               </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="name">
-                  Name <span className="text-red-700 font-bold">*</span>
+                  {lbl("name", "Name")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -213,7 +241,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="phone">
-                  Phone <span className="text-red-700 font-bold">*</span>
+                  {lbl("phone", "Phone")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="phone"
@@ -225,7 +253,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="mobile">
-                  Mobile
+                  {lbl("mobile", "Mobile")}
                 </Label>
                 <Input
                   id="mobile"
@@ -236,7 +264,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="email">
-                  Email
+                  {lbl("email", "Email")}
                 </Label>
                 <Input
                   id="email"
@@ -245,6 +273,24 @@ const EditCustomer = () => {
                   onChange={handleChange}
                 />
               </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="company">
+                  {lbl("company", "Company")}
+                </Label>
+                <Input id="company" name="company" value={formData.company} onChange={handleChange} />
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="jobTitle">
+                  {lbl("jobTitle", "Job Title")}
+                </Label>
+                <Input id="jobTitle" name="jobTitle" value={formData.jobTitle} onChange={handleChange} />
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="website">
+                  {lbl("website", "Website")}
+                </Label>
+                <Input id="website" name="website" value={formData.website} onChange={handleChange} />
+              </div>
             </div>
 
             {/* Work Related */}
@@ -252,7 +298,7 @@ const EditCustomer = () => {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Work Related</h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="location">
-                  Location
+                  {lbl("location", "Location")}
                 </Label>
                 <Select
                   value={formData.location}
@@ -271,11 +317,10 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="owner">
-                  Owner <span className="text-red-700 font-bold">*</span>
+                  {lbl("owner", "Owner")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Select
                   value={formData.owner}
-                  required
                   disabled={
                     ["admin", "super admin"].includes(user!.role) ? false : true
                   }
@@ -297,11 +342,10 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="Status">
-                  Status
+                  {lbl("status", "Status")}
                 </Label>
                 <Select
                   value={formData.status}
-                  required
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, status: value }))
                   }
@@ -320,7 +364,7 @@ const EditCustomer = () => {
                 </Select>
               </div>
               <div className="flex flex-col">
-                <Label className="my-3">Lead Source</Label>
+                <Label className="my-3">{lbl("source", "Lead Source")}</Label>
                 <Select
                   value={formData.source}
                   onValueChange={(value) =>
@@ -339,7 +383,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="notes">
-                  Notes
+                  {lbl("notes", "Notes")}
                 </Label>
                 <Input
                   id="notes"
@@ -441,7 +485,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="dateOfBirth">
-                  Date of Birth
+                  {lbl("dateOfBirth", "Date of Birth")}
                 </Label>
                 <Input
                   id="dateOfBirth"
@@ -453,7 +497,7 @@ const EditCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="gender">
-                  Gender
+                  {lbl("gender", "Gender")}
                 </Label>
                 <Select
                   value={formData.gender}

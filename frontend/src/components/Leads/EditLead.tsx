@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getLeadById } from "@/utils/api";
+import { toCustomFieldValues } from "@/utils/customFields";
 import { LeadForm } from "./LeadForm";
 import LoadingSpinner from "@/components/common/spinner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -23,6 +24,7 @@ export function EditLead() {
       mode="edit"
       id={id}
       ownerLabel={lead.owner?.name}
+      customFieldValues={toCustomFieldValues(lead.customFields)}
       defaultValues={{
         name:               lead.name ?? "",
         company:            lead.company ?? "",

@@ -21,10 +21,11 @@ import {
 import { PlusCircle } from "lucide-react";
 import { createActivity } from "@/utils/api";
 import { ActivityFormData, ActivityType } from "@/types/types";
+import DynamicFields from "@/components/common/DynamicFields";
 
 interface ActivityDialogProps {
   linkedTo: string;
-  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote";
+  linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder";
 }
 
 const ACTIVITY_ICONS: Record<ActivityType, string> = {
@@ -45,6 +46,7 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
 
   const { mutate, isPending } = useMutation({
     mutationFn: createActivity,
@@ -57,6 +59,7 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
       setTitle("");
       setDescription("");
       setType("call");
+      setCustomFields({});
     }
   });
 
@@ -70,6 +73,7 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
       status: "pending",
       linkedTo,
       linkedModel,
+      customFields,
     };
     mutate(data);
   };
@@ -134,6 +138,9 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
                 onChange={(e) => setDate(e.target.value)}
                 className="col-span-3"
               />
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <DynamicFields module="activities" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
           </div>
           <DialogFooter>

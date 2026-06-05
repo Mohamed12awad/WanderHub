@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/authContext";
 import { Account } from "@/types/types";
 
 const LEAD_COLORS: Record<string, string> = {
@@ -116,10 +117,17 @@ export function Dashboard() {
     queryKey: ["deals"],
     queryFn: () => getDeals()
   });
+  // Cash/bank balances are gated by `settings:view`; only fetch them when the
+  // user can, so the dashboard never 403s for finance-less roles (the widgets
+  // below already hide when there are no accounts).
+  const { user } = useAuth();
+  const canViewAccounts =
+    (user?.permissions ?? []).some((p) => p === "*" || p === "settings:view");
   const { data: accountsData } = useQuery({
     queryKey: ["accounts"],
     queryFn: getAccounts,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: canViewAccounts,
   });
   const { data: pendingData } = useQuery({
     queryKey: ["pending-approvals"],

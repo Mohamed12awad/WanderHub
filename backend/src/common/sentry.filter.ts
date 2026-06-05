@@ -15,11 +15,22 @@ export class SentryExceptionFilter implements ExceptionFilter {
     let status = 500;
     let body: Record<string, unknown> = { message: 'Internal server error' };
 
-    if (exception instanceof Prisma.PrismaClientKnownRequestError && exception.code === 'P2002') {
-      status = 409;
-      const fields = (exception.meta?.target as string[]) ?? [];
-      const field = fields[0] ?? 'field';
-      body = { message: `A record with this ${field} already exists.` };
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      if (exception.code === 'P2002') {
+        // Unique constraint violation.
+        status = 409;
+        const fields = (exception.meta?.target as string[]) ?? [];
+        const field = fields[0] ?? 'field';
+        body = { message: `A record with this ${field} already exists.` };
+      } else if (exception.code === 'P2025') {
+        // Operation failed because a required record was not found.
+        status = 404;
+        body = { message: 'The requested record was not found.' };
+      } else if (exception.code === 'P2003') {
+        // Foreign key constraint failed (e.g. deleting a record still in use).
+        status = 409;
+        body = { message: 'This record is referenced by other records and cannot be modified.' };
+      }
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const r = exception.getResponse();

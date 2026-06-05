@@ -6,7 +6,7 @@ import {
   User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck,
   LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2, Building2, Coins,
   KeyRound, Bell, GitBranch, ListOrdered, FileText, Percent, Mail,
-  Lock, Download, AlertTriangle, Tag,
+  Lock, Download, AlertTriangle, Tag, Plug, Sparkles,
 } from "lucide-react";
 import ProfileSettings from "./settings/ProfileSettings";
 import AppearanceSettings from "./settings/AppearanceSettings";
@@ -27,6 +27,8 @@ import EmailConfigSettings from "./settings/EmailConfigSettings";
 import PasswordPolicySettings from "./settings/PasswordPolicySettings";
 import DataExportSettings from "./settings/DataExportSettings";
 import DangerZoneSettings from "./settings/DangerZoneSettings";
+import ApiKeysSettings from "./settings/ApiKeysSettings";
+import AiSettings from "./settings/AiSettings";
 import { Logs } from "@/components/Logs/Logs";
 import { Roles } from "@/components/Roles/Roles";
 import { Users as UsersPage } from "@/components/Users/Users";
@@ -78,6 +80,8 @@ export default function Settings() {
 
   const advancedItems: NavItem[] = [
     { to: "/settings/email-config",    icon: Mail,          label: "Email Config" },
+    { to: "/settings/api-keys",        icon: Plug,          label: "API Keys" },
+    { to: "/settings/ai",              icon: Sparkles,      label: "AI Assistant" },
     { to: "/settings/password-policy", icon: Lock,          label: "Password Policy" },
     { to: "/settings/data-export",     icon: Download,      label: "Data Export" },
     { to: "/settings/danger-zone",     icon: AlertTriangle, label: "Danger Zone" },
@@ -216,6 +220,8 @@ export default function Settings() {
             <Route path="logs"   element={<Logs />} />
             {/* Advanced */}
             <Route path="email-config"    element={<EmailConfigSettings />} />
+            <Route path="api-keys"        element={<ApiKeysSettings />} />
+            <Route path="ai"              element={<AiSettings />} />
             <Route path="password-policy" element={<PasswordPolicySettings />} />
             <Route path="data-export"     element={<DataExportSettings />} />
             <Route path="danger-zone"     element={<DangerZoneSettings />} />

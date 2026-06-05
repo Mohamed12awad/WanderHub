@@ -21,6 +21,7 @@ import { AxiosError } from "axios";
 import { Customer, ErrorResponse } from "@/types/types";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 
 interface User {
   _id: string;
@@ -32,6 +33,9 @@ const initialFormData = {
   phone: "",
   mobile: "",
   email: "",
+  company: "",
+  jobTitle: "",
+  website: "",
   address: {
     street: "",
     city: "",
@@ -74,6 +78,8 @@ const AddCustomer = () => {
   const [formData, setFormData] = useState<typeof initialFormData>(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { getSystemFieldLabel } = useWorkspaceSettings();
+  const lbl = (name: string, fallback: string) => getSystemFieldLabel("customers", name) ?? fallback;
 
   const { data: users } = useQuery({
     queryKey: ["users"],
@@ -117,6 +123,15 @@ const AddCustomer = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const missing =
+      !formData.name?.trim() ? "Name"
+      : !formData.phone?.trim() ? "Phone"
+      : !formData.owner ? "Owner"
+      : null;
+    if (missing) {
+      toast({ title: `${missing} is required`, description: `Please fill in the ${missing} field before saving.`, variant: "destructive" });
+      return;
+    }
     try {
       const customerData: Customer = {
         ...formData,
@@ -158,7 +173,7 @@ const AddCustomer = () => {
               </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="name">
-                  Name <span className="text-red-700 font-bold">*</span>
+                  {lbl("name", "Name")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -170,7 +185,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="phone">
-                  Phone <span className="text-red-700 font-bold">*</span>
+                  {lbl("phone", "Phone")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Input
                   id="phone"
@@ -182,7 +197,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="mobile">
-                  Mobile
+                  {lbl("mobile", "Mobile")}
                 </Label>
                 <Input
                   id="mobile"
@@ -193,7 +208,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="email">
-                  Email
+                  {lbl("email", "Email")}
                 </Label>
                 <Input
                   id="email"
@@ -203,8 +218,41 @@ const AddCustomer = () => {
                 />
               </div>
               <div className="flex flex-col">
+                <Label className="my-3" htmlFor="company">
+                  {lbl("company", "Company")}
+                </Label>
+                <Input
+                  id="company"
+                  name="company"
+                  value={formData.company}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="jobTitle">
+                  {lbl("jobTitle", "Job Title")}
+                </Label>
+                <Input
+                  id="jobTitle"
+                  name="jobTitle"
+                  value={formData.jobTitle}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex flex-col">
+                <Label className="my-3" htmlFor="website">
+                  {lbl("website", "Website")}
+                </Label>
+                <Input
+                  id="website"
+                  name="website"
+                  value={formData.website}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex flex-col">
                 <Label className="my-3" htmlFor="dateOfBirth">
-                  Date of Birth
+                  {lbl("dateOfBirth", "Date of Birth")}
                 </Label>
                 <Input
                   id="dateOfBirth"
@@ -216,7 +264,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="gender">
-                  Gender
+                  {lbl("gender", "Gender")}
                 </Label>
                 <Select
                   onValueChange={(value) =>
@@ -241,7 +289,7 @@ const AddCustomer = () => {
               </h2>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="location">
-                  Location
+                  {lbl("location", "Location")}
                 </Label>
                 <Select
                   onValueChange={(value) =>
@@ -259,10 +307,9 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="owner">
-                  Owner <span className="text-red-700 font-bold">*</span>
+                  {lbl("owner", "Owner")} <span className="text-red-700 font-bold">*</span>
                 </Label>
                 <Select
-                  required
                   onValueChange={(value) =>
                     setFormData((prev: any) => ({ ...prev, owner: value }))
                   }
@@ -281,7 +328,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="Status">
-                  Status
+                  {lbl("status", "Status")}
                 </Label>
                 <Select
                   defaultValue="Draft"
@@ -303,7 +350,7 @@ const AddCustomer = () => {
                 </Select>
               </div>
               <div className="flex flex-col">
-                <Label className="my-3">Lead Source</Label>
+                <Label className="my-3">{lbl("source", "Lead Source")}</Label>
                 <Select
                   onValueChange={(value) =>
                     setFormData((prev: any) => ({ ...prev, source: value }))
@@ -321,7 +368,7 @@ const AddCustomer = () => {
               </div>
               <div className="flex flex-col">
                 <Label className="my-3" htmlFor="notes">
-                  Notes
+                  {lbl("notes", "Notes")}
                 </Label>
                 <Input
                   id="notes"

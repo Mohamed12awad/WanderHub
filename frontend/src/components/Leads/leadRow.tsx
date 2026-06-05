@@ -43,9 +43,10 @@ interface LeadItem {
 interface LeadRowProps {
   item: LeadItem;
   handleDelete: (id: string) => void;
+  selectionCell?: React.ReactNode;
 }
 
-const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete }) => {
+const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete, selectionCell }) => {
   const { user } = useAuth();
   const { tr } = useLanguage();
   const navigate = useNavigate();
@@ -56,6 +57,7 @@ const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete }) => {
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/leads/${item._id}`)}>
+      {selectionCell}
       <TableCell>
         <div className="font-medium">{item.name}</div>
         {item.company && <div className="text-xs text-muted-foreground">{item.company}</div>}

@@ -33,6 +33,9 @@ export interface Customer {
   phone: string;
   mobile: string;
   email: string;
+  company?: string;
+  jobTitle?: string;
+  website?: string;
   location: string;
   source?: string;
   owner: Owner | string;
@@ -86,7 +89,7 @@ export interface DealData {
   customFields?: Record<string, string>;
 }
 
-export type ActivityType = "call" | "meeting" | "task" | "email";
+export type ActivityType = "call" | "meeting" | "task" | "note" | "email";
 export type ActivityStatus = "pending" | "completed";
 
 export interface Activity {
@@ -114,6 +117,7 @@ export interface ActivityFormData {
   status: ActivityStatus;
   linkedTo: string;
   linkedModel: string;
+  customFields?: Record<string, string>;
 }
 
 export interface LogEntry {
@@ -166,6 +170,7 @@ export interface ExpenseReportData {
   expenses: ExpenseItem[];
   approvalStatus?: ApprovalStatus;
   createdAt?: string;
+  customFields?: Record<string, string>;
 }
 
 export interface Product {
@@ -189,7 +194,8 @@ export type NoteLinkedModel =
   | "Lead"
   | "Project"
   | "Supplier"
-  | "PurchaseOrder";
+  | "PurchaseOrder"
+  | "SalesOrder";
 
 export interface Note {
   _id: string;
@@ -289,6 +295,7 @@ export interface TaskFormData {
   linkedTo?: string;
   linkedModel?: "Customer" | "Deal";
   tags?: string[];
+  customFields?: Record<string, string>;
 }
 
 // ── Finance ───────────────────────────────────────────────────────────────────
@@ -340,6 +347,7 @@ export interface Quote {
   notes?: string;
   terms?: string;
   convertedToInvoice?: { _id: string; invoiceNumber: string };
+  salesOrder?: { _id: string; orderNumber: string };
   createdAt: string;
   approvalStatus?: ApprovalStatus;
   approvedBy?: { _id: string; name: string };
@@ -353,6 +361,7 @@ export interface Invoice {
   title: string;
   customer: { _id: string; name: string; phone?: string };
   deal?: { _id: string; title: string };
+  project?: { _id: string; name: string };
   quote?: { _id: string; quoteNumber: string };
   status: InvoiceStatus;
   items: LineItem[];
@@ -465,6 +474,39 @@ export interface PurchaseOrder {
   issueDate: string;
   expectedDeliveryDate?: string;
   notes?: string;
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: { _id: string; name: string };
+  approvedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+}
+
+export type SalesOrderStatus =
+  | "draft"
+  | "confirmed"
+  | "fulfilled"
+  | "invoiced"
+  | "cancelled";
+
+export interface SalesOrder {
+  _id: string;
+  orderNumber: string;
+  title: string;
+  customer: { _id: string; name: string; phone?: string };
+  deal?: { _id: string; title: string };
+  project?: { _id: string; name: string };
+  fromQuote?: { _id: string; quoteNumber: string };
+  invoices?: { _id: string; invoiceNumber: string; status: string; total: number }[];
+  status: SalesOrderStatus;
+  items: LineItem[];
+  subtotal: number;
+  taxRate: number;
+  tax: number;
+  total: number;
+  currency: string;
+  expectedDate?: string;
+  notes?: string;
+  terms?: string;
   approvalStatus?: ApprovalStatus;
   approvedBy?: { _id: string; name: string };
   approvedAt?: string;

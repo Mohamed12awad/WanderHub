@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
@@ -26,6 +28,7 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
     address: { street: "", city: "", state: "", zip: "", country: "" },
     notes: "",
   });
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
 
   const { data: supplierData, isPending: isFetching } = useQuery({
     queryKey: ["supplier", id],
@@ -47,6 +50,7 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
       address: d.address || { street: "", city: "", state: "", zip: "", country: "" },
       notes: d.notes || "",
     });
+    setCustomFields(toCustomFieldValues(d.customFields));
   }, [supplierData]);
 
   const mutation = useMutation({
@@ -73,7 +77,7 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate(formData);
+    mutation.mutate({ ...formData, customFields });
   };
 
   if (isFetching) return <div className="p-6">Loading...</div>;
@@ -156,6 +160,10 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
             value={formData.notes}
             onChange={(e) => handleChange("notes", e.target.value)}
           />
+        </div>
+
+        <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DynamicFields module="suppliers" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
         </div>
 
         <div className="flex justify-end pt-4 border-t">

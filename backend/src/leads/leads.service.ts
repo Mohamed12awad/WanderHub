@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { VisibilityService } from '../common/visibility.service';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { toClient } from '../common/serialize';
 import { cleanData } from '../common/clean-data';
 import { paginate, dateRange } from '../common/paginate';
@@ -17,6 +18,7 @@ export class LeadsService {
     private readonly timeline: TimelineService,
     private readonly dispatcher: NotificationDispatcher,
     private readonly visibility: VisibilityService,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   async create(body: CreateLeadDto, userId: string) {
@@ -51,6 +53,7 @@ export class LeadsService {
     }
 
     data.createdById = userId;
+    data.customFields = await this.customFields.validateAndClean('leads', data.customFields);
     const lead = await this.prisma.lead.create({ data: data as any });
 
     if (lead.ownerId && lead.ownerId !== userId) {
@@ -79,7 +82,10 @@ export class LeadsService {
         { phone:   { contains: q, mode: 'insensitive' } },
       ];
     }
+    // Converted leads are kept but hidden from the active list: the default
+    // ("All") view excludes them; selecting the "Converted" tab shows them.
     if (status) where.status = status;
+    else where.status = { not: 'converted' };
     if (rating) where.rating = rating;
     if (ownerId) where.ownerId = ownerId;
     if (source) where.source = source;
@@ -117,6 +123,9 @@ export class LeadsService {
       emptyToNull: ['expectedCloseDate', 'rating'],
       numeric: ['budget'],
     });
+    if ('customFields' in cleaned) {
+      cleaned.customFields = await this.customFields.validateAndClean('leads', cleaned.customFields);
+    }
     const oldOwnerId = existing.ownerId;
     const lead = await this.prisma.lead.update({ where: { id }, data: cleaned });
 
@@ -139,7 +148,7 @@ export class LeadsService {
     return true;
   }
 
-  async convertToCustomer(id: string, userId: string) {
+  async convertToCustomer(id: string, userId: string, createDeal = false) {
     const lead = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
     if (!lead) throw new NotFoundException('Lead not found');
 
@@ -158,19 +167,8 @@ export class LeadsService {
       throw new BadRequestException('Add a phone or mobile number to this lead before converting it to a contact');
     }
 
-    // Preserve the richer lead fields that have no dedicated Customer column.
-    const extra: Record<string, unknown> = {};
-    if (lead.company) extra.company = lead.company;
-    if (lead.jobTitle) extra.jobTitle = lead.jobTitle;
-    if (lead.website) extra.website = lead.website;
-    if (lead.rating) extra.rating = lead.rating;
-    if (lead.budget != null) extra.budget = lead.budget;
-    if (lead.currency) extra.currency = lead.currency;
-    if (lead.campaign) extra.campaign = lead.campaign;
-    if (lead.expectedCloseDate) extra.expectedCloseDate = lead.expectedCloseDate;
-
     // Create the contact and flip the lead atomically so the link can never be lost.
-    // Also auto-create a deal to start the pipeline so the rep doesn't re-key the opportunity.
+    // The deal is optional — created only when the user asks to start the pipeline.
     const customer = await this.prisma.$transaction(async (tx) => {
       const created = await tx.customer.create({
         data: {
@@ -178,12 +176,14 @@ export class LeadsService {
           phone,
           email: lead.email ?? undefined,
           mobile: lead.mobile ?? undefined,
+          company: lead.company ?? undefined,
+          jobTitle: lead.jobTitle ?? undefined,
+          website: lead.website ?? undefined,
           source: lead.source ?? undefined,
           status: 'In Progress',
           notes: lead.notes ?? undefined,
           ownerId: lead.ownerId ?? undefined,
           ...((lead.city || lead.country) ? { location: [lead.city, lead.country].filter(Boolean).join(', ') } : {}),
-          ...(Object.keys(extra).length ? { customFields: extra } : {}),
         } as any,
       });
       await tx.lead.update({
@@ -191,26 +191,28 @@ export class LeadsService {
         data: { status: 'converted', convertedAt: new Date(), convertedToId: created.id },
       });
 
-      // Seed the deal from the lead's known opportunity details.
-      await tx.deal.create({
-        data: {
-          title: lead.name,
-          customerId: created.id,
-          price: lead.budget ?? 0,
-          currency: lead.currency ?? 'EGP',
-          status: 'qualified',
-          source: lead.source ?? undefined,
-          ownerId: lead.ownerId ?? undefined,
-          expectedCloseDate: lead.expectedCloseDate ?? undefined,
-        } as any,
-      });
+      // Seed the deal from the lead's opportunity details — only when requested.
+      if (createDeal) {
+        await tx.deal.create({
+          data: {
+            title: lead.name,
+            customerId: created.id,
+            price: lead.budget ?? 0,
+            currency: lead.currency ?? 'EGP',
+            status: 'qualified',
+            source: lead.source ?? undefined,
+            ownerId: lead.ownerId ?? undefined,
+            expectedCloseDate: lead.expectedCloseDate ?? undefined,
+          } as any,
+        });
+      }
 
       return created;
     });
 
     await this.timeline.log(
       'contact.created',
-      `Lead "${lead.name}" converted to customer`,
+      `Lead "${lead.name}" converted to ${createDeal ? 'contact + deal' : 'contact'}`,
       customer.id,
       'Customer',
       { fromLead: lead.id },

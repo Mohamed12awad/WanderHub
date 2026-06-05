@@ -3,11 +3,16 @@
  * Run via: npm run seed   or   npx prisma db seed
  */
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 import * as bcrypt from "bcryptjs";
 import * as dotenv from "dotenv";
 dotenv.config();
 
-const prisma = new PrismaClient();
+// Prisma 7 connects through a driver adapter rather than a schema `url`,
+// mirroring src/prisma/prisma.service.ts.
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 // ─── Roles ───────────────────────────────────────────────────────────────────
 
@@ -16,10 +21,12 @@ const ALL_PERMISSIONS = [
   "contacts:create",
   "contacts:edit",
   "contacts:delete",
+  "contacts:export",
   "deals:view",
   "deals:create",
   "deals:edit",
   "deals:delete",
+  "deals:export",
   "leads:view",
   "leads:create",
   "leads:edit",
@@ -28,21 +35,50 @@ const ALL_PERMISSIONS = [
   "products:create",
   "products:edit",
   "products:delete",
-  "finance:view",
-  "finance:create",
-  "finance:edit",
-  "finance:delete",
-  "finance:approve",
+  "quotes:view",
+  "quotes:create",
+  "quotes:edit",
+  "quotes:delete",
+  "quotes:approve",
+  "invoices:view",
+  "invoices:create",
+  "invoices:edit",
+  "invoices:delete",
+  "invoices:approve",
+  "sales-orders:view",
+  "sales-orders:create",
+  "sales-orders:edit",
+  "sales-orders:delete",
+  "sales-orders:approve",
   "expenses:view",
   "expenses:create",
   "expenses:edit",
   "expenses:delete",
   "expenses:approve",
+  "suppliers:view",
+  "suppliers:create",
+  "suppliers:edit",
+  "suppliers:delete",
+  "purchase-orders:view",
+  "purchase-orders:create",
+  "purchase-orders:edit",
+  "purchase-orders:delete",
+  "purchase-orders:approve",
+  "vendor-bills:view",
+  "vendor-bills:create",
+  "vendor-bills:edit",
+  "vendor-bills:delete",
+  "vendor-bills:approve",
+  "projects:view",
+  "projects:create",
+  "projects:edit",
+  "projects:delete",
   "tasks:view",
   "tasks:create",
   "tasks:edit",
   "tasks:delete",
   "reports:view",
+  "reports:export",
   "logs:view",
   "users:view",
   "users:create",
@@ -70,14 +106,36 @@ const ROLES = [
       "leads:create",
       "leads:edit",
       "products:view",
-      "finance:view",
-      "finance:create",
-      "finance:edit",
-      "finance:approve",
+      "quotes:view",
+      "quotes:create",
+      "quotes:edit",
+      "quotes:approve",
+      "invoices:view",
+      "invoices:create",
+      "invoices:edit",
+      "invoices:approve",
+      "sales-orders:view",
+      "sales-orders:create",
+      "sales-orders:edit",
+      "sales-orders:approve",
       "expenses:view",
       "expenses:create",
       "expenses:edit",
       "expenses:approve",
+      "suppliers:view",
+      "suppliers:create",
+      "suppliers:edit",
+      "purchase-orders:view",
+      "purchase-orders:create",
+      "purchase-orders:edit",
+      "purchase-orders:approve",
+      "vendor-bills:view",
+      "vendor-bills:create",
+      "vendor-bills:edit",
+      "vendor-bills:approve",
+      "projects:view",
+      "projects:create",
+      "projects:edit",
       "tasks:view",
       "tasks:create",
       "tasks:edit",
@@ -98,9 +156,19 @@ const ROLES = [
       "leads:create",
       "leads:edit",
       "products:view",
-      "finance:view",
+      "quotes:view",
+      "quotes:create",
+      "quotes:edit",
+      "invoices:view",
+      "sales-orders:view",
+      "sales-orders:create",
+      "sales-orders:edit",
       "expenses:view",
       "expenses:create",
+      "suppliers:view",
+      "purchase-orders:view",
+      "vendor-bills:view",
+      "projects:view",
       "tasks:view",
       "tasks:create",
       "tasks:edit",
@@ -113,8 +181,14 @@ const ROLES = [
       "deals:view",
       "leads:view",
       "products:view",
-      "finance:view",
+      "quotes:view",
+      "invoices:view",
+      "sales-orders:view",
       "expenses:view",
+      "suppliers:view",
+      "purchase-orders:view",
+      "vendor-bills:view",
+      "projects:view",
       "tasks:view",
       "reports:view",
     ],
@@ -207,6 +281,10 @@ import {
   ActivityType,
   ActivityStatus,
   AccountType,
+  PurchaseOrderStatus,
+  BillStatus,
+  ProjectStatus,
+  MilestoneStatus,
 } from "@prisma/client";
 
 function daysAgo(n: number) {
@@ -303,26 +381,88 @@ async function seedData() {
   ]);
   console.log("    ✓ products");
 
-  // Workspace config (single row — upsert the first found or create)
-  const existingWs = await prisma.workspaceConfig.findFirst();
-  if (!existingWs) {
-    await prisma.workspaceConfig.create({
-      data: {
-        baseCurrency: "EGP",
-        locale: "en-US",
-        approvals: [
-          {
-            module: "expenses",
-            enabled: true,
-            approverRoles: ["admin", "manager"],
-          },
-          { module: "quotes", enabled: true, approverRoles: ["admin"] },
-          { module: "invoices", enabled: true, approverRoles: ["admin"] },
+  // Workspace config (single row). Keep it current with approvals + custom
+  // fields + pipeline stages + module toggles so every settings surface has data.
+  const wsData = {
+    baseCurrency: "EGP",
+    locale: "en-US",
+    approvals: [
+      { module: "expenses", enabled: true, approverRoles: ["admin", "manager"] },
+      { module: "quotes", enabled: true, approverRoles: ["admin"] },
+      { module: "salesOrders", enabled: true, approverRoles: ["admin", "manager"] },
+      { module: "invoices", enabled: true, approverRoles: ["admin"] },
+      { module: "purchaseOrders", enabled: true, approverRoles: ["admin", "manager"] },
+      { module: "vendorBills", enabled: true, approverRoles: ["admin"] },
+    ],
+    fieldGroups: [
+      {
+        module: "customers",
+        fields: [
+          { id: "industry", name: "industry", label: "Industry", type: "text", required: false, filterable: true, isSystem: false, order: 0 },
+          { id: "company_size", name: "company_size", label: "Company Size", type: "select", options: "1-10,11-50,51-200,200+", required: false, filterable: true, isSystem: false, order: 1 },
         ],
       },
+      {
+        module: "deals",
+        fields: [
+          { id: "lead_source_detail", name: "lead_source_detail", label: "Lead Source Detail", type: "text", required: false, filterable: true, isSystem: false, order: 0 },
+        ],
+      },
+    ],
+    pipelineStages: [
+      { id: "lead", label: "Lead", order: 0 },
+      { id: "qualified", label: "Qualified", order: 1 },
+      { id: "proposal", label: "Proposal", order: 2 },
+      { id: "negotiation", label: "Negotiation", order: 3 },
+      { id: "won", label: "Won", order: 4 },
+      { id: "lost", label: "Lost", order: 5 },
+    ],
+    moduleSettings: [
+      { module: "crm", enabled: true },
+      { module: "quotes", enabled: true },
+      { module: "invoices", enabled: true },
+      { module: "salesOrders", enabled: true },
+      { module: "suppliers", enabled: true },
+      { module: "purchaseOrders", enabled: true },
+      { module: "vendorBills", enabled: true },
+      { module: "projects", enabled: true },
+      { module: "inventory", enabled: true },
+    ],
+  };
+  const existingWs = await prisma.workspaceConfig.findFirst();
+  if (existingWs) {
+    await prisma.workspaceConfig.update({ where: { id: existingWs.id }, data: wsData });
+  } else {
+    await prisma.workspaceConfig.create({ data: wsData });
+  }
+  console.log("    ✓ workspace (approvals, custom fields, stages, modules)");
+
+  // Tax rates, exchange rates, number sequences
+  await prisma.taxRate.upsert({
+    where: { id: "tax-vat-14" },
+    update: {},
+    create: { id: "tax-vat-14", name: "VAT 14%", rate: 14, isDefault: true },
+  });
+  await prisma.taxRate.upsert({
+    where: { id: "tax-zero" },
+    update: {},
+    create: { id: "tax-zero", name: "Zero-rated", rate: 0, isDefault: false },
+  });
+  for (const [currency, rate] of [["USD", 49], ["EUR", 53], ["SAR", 13], ["AED", 13.3]] as [string, number][]) {
+    await prisma.exchangeRate.upsert({
+      where: { id: `fx-${currency}` },
+      update: { rate },
+      create: { id: `fx-${currency}`, currency, baseCurrency: "EGP", rate },
     });
   }
-  console.log("    ✓ workspace");
+  for (const [key, prefix] of [["quote", "QUO"], ["invoice", "INV"], ["purchaseOrder", "PO"], ["vendorBill", "BILL"]] as [string, string][]) {
+    await prisma.numberSequence.upsert({
+      where: { key },
+      update: {},
+      create: { key, prefix, lastNumber: 1, padLength: 4, separator: "-" },
+    });
+  }
+  console.log("    ✓ tax rates, exchange rates, number sequences");
 
   // Customers
   const [c1, c2, c3] = await Promise.all([
@@ -642,9 +782,117 @@ async function seedData() {
   });
   console.log("    ✓ notes");
 
+  // Inventory — stock items + movement ledger for each product
+  for (const p of products) {
+    await prisma.stockItem.upsert({
+      where: { productId: p.id },
+      update: {},
+      create: { productId: p.id, quantityOnHand: 25, reorderLevel: 5, location: "Warehouse A" },
+    });
+  }
+  await prisma.stockMovement.upsert({
+    where: { id: "mv-001" },
+    update: {},
+    create: { id: "mv-001", productId: products[2].id, qty: 30, type: "in", note: "Opening stock", createdById: admin.id },
+  });
+  await prisma.stockMovement.upsert({
+    where: { id: "mv-002" },
+    update: {},
+    create: { id: "mv-002", productId: products[2].id, qty: -5, type: "out", refType: "sale", note: "Catering used", createdById: sales?.id ?? admin.id },
+  });
+  console.log("    ✓ inventory (stock items + movements)");
+
+  // Suppliers
+  const [sup1, sup2] = await Promise.all([
+    prisma.supplier.upsert({
+      where: { id: "sup-001" }, update: {},
+      create: { id: "sup-001", name: "Cairo Catering Supplies", email: "sales@cairocatering.com", phone: "+201600000001", taxId: "EG-100200300", currency: "EGP", status: "active" },
+    }),
+    prisma.supplier.upsert({
+      where: { id: "sup-002" }, update: {},
+      create: { id: "sup-002", name: "AV Rentals Egypt", email: "hello@avrentals.eg", phone: "+201600000002", currency: "EGP", status: "active" },
+    }),
+  ]);
+  console.log("    ✓ suppliers");
+
+  // Purchase order (+ items)
+  const po1 = await prisma.purchaseOrder.upsert({
+    where: { id: "po-001" }, update: {},
+    create: {
+      id: "po-001", poNumber: "PO-0001", title: "Catering supplies — June events",
+      supplierId: sup1.id, status: PurchaseOrderStatus.confirmed, currency: "EGP",
+      subtotal: 18000, total: 18000, expectedDate: daysFromNow(10),
+      approvalStatus: ApprovalStatus.approved, createdById: admin.id,
+      items: { create: [
+        { description: "Disposable serveware (bulk)", quantity: 200, unitPrice: 50, total: 10000 },
+        { description: "Beverages", quantity: 1, unitPrice: 8000, total: 8000 },
+      ] },
+    },
+  });
+  console.log("    ✓ purchase orders");
+
+  // Vendor bill (+ items + payment) linked to the PO
+  const bill1 = await prisma.vendorBill.upsert({
+    where: { id: "bill-001" }, update: {},
+    create: {
+      id: "bill-001", billNumber: "BILL-0001", title: "Catering supplies bill",
+      supplierId: sup1.id, purchaseOrderId: po1.id, status: BillStatus.partially_paid,
+      currency: "EGP", subtotal: 18000, total: 18000, totalPaid: 10000,
+      issueDate: daysAgo(6), dueDate: daysFromNow(9),
+      approvalStatus: ApprovalStatus.approved, createdById: admin.id,
+      items: { create: [
+        { description: "Disposable serveware (bulk)", quantity: 200, unitPrice: 50, total: 10000 },
+        { description: "Beverages", quantity: 1, unitPrice: 8000, total: 8000 },
+      ] },
+    },
+  });
+  await prisma.vendorBillPayment.upsert({
+    where: { id: "vbp-001" }, update: {},
+    create: { id: "vbp-001", billId: bill1.id, amount: 10000, method: "bank_transfer", accountId: bankAcc.id, date: daysAgo(2), createdById: admin.id },
+  });
+  console.log("    ✓ vendor bills & payments");
+
+  // Project (+ milestones + members) seeded from the won deal
+  const proj1 = await prisma.project.upsert({
+    where: { id: "proj-001" }, update: {},
+    create: {
+      id: "proj-001", name: "Nile Corp Q3 Retreat Delivery", description: "Plan & deliver the retreat.",
+      status: ProjectStatus.active, priority: "high", budget: 42000, currency: "EGP",
+      startDate: daysAgo(5), endDate: daysFromNow(40), customerId: c2.id, dealId: d2.id,
+      managerId: manager.id, createdById: admin.id,
+      milestones: { create: [
+        { title: "Venue & logistics booked", status: MilestoneStatus.completed, dueDate: daysAgo(2), order: 0, completedAt: daysAgo(2) },
+        { title: "Agenda finalized", status: MilestoneStatus.in_progress, dueDate: daysFromNow(7), order: 1 },
+        { title: "Event delivered", status: MilestoneStatus.pending, dueDate: daysFromNow(35), order: 2 },
+      ] },
+    },
+  });
+  await prisma.projectMember.upsert({
+    where: { projectId_userId: { projectId: proj1.id, userId: sales?.id ?? manager.id } },
+    update: {},
+    create: { projectId: proj1.id, userId: sales?.id ?? manager.id, role: "coordinator" },
+  });
+  console.log("    ✓ projects (milestones + members)");
+
+  // Intentional duplicates so the dedup tool has something to find.
+  // Lead with the same phone as lead-001 (lead phone is not unique).
+  await prisma.lead.upsert({
+    where: { id: "lead-dup-001" }, update: {},
+    create: {
+      id: "lead-dup-001", name: "Hana M.", email: "hana.dup@example.com", phone: "+201444444444",
+      source: "facebook", status: LeadStatus.new, ownerId: sales?.id ?? manager.id, createdById: admin.id,
+    },
+  });
+  // Contact whose phone NORMALIZES to c1's "+201111111111" (digits 201111111111)
+  // but is a distinct string, so the unique constraint holds yet dedup matches.
+  await prisma.customer.upsert({
+    where: { id: "cust-dup-001" }, update: {},
+    create: { id: "cust-dup-001", name: "Layla H.", phone: "201111111111", status: "active", location: "Cairo, Egypt" },
+  });
+  console.log("    ✓ duplicate samples (for dedup testing)");
+
   void cashAcc;
   void c3;
-  void products; // suppress unused-var warnings
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getExpenseById, updateExpense } from "@/utils/api";
+import { getExpenseById, updateExpense, getProjects } from "@/utils/api";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosError } from "axios";
@@ -12,6 +13,8 @@ import { ErrorResponse } from "@/types/types";
 import LoadingSpinner from "../common/spinner";
 import { toast } from "@/components/ui/use-toast";
 import ExpenseLineTable, { ExpenseLine } from "./ExpenseLineTable";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 function toDateString(v: unknown): string {
   if (!v) return "";
@@ -22,12 +25,17 @@ function toDateString(v: unknown): string {
 const EditExpenseReport: React.FC = () => {
   const { id: expenseId } = useParams<{ id: string }>();
   const [title, setTitle] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [lines, setLines] = useState<ExpenseLine[]>([]);
+  const [customFields, setCustomFields] = useState<Record<string, string>>({});
   const [titleError, setTitleError] = useState("");
   const [linesError, setLinesError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const originalRef = useRef<string | null>(null);
   const navigate = useNavigate();
+
+  const { data: projectsData } = useQuery({ queryKey: ["projects-all"], queryFn: () => getProjects({ limit: 1000 }) });
+  const projects: { _id: string; name: string }[] = Array.isArray(projectsData?.data) ? projectsData.data : projectsData?.data?.data ?? [];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +49,8 @@ const EditExpenseReport: React.FC = () => {
         }));
         setTitle(loadedTitle);
         setLines(loadedLines);
+        setProjectId(data.project?._id ?? data.project ?? "");
+        setCustomFields(toCustomFieldValues(data.customFields));
         originalRef.current = JSON.stringify({ title: loadedTitle, lines: loadedLines });
       } catch {
         toast({ title: "Failed to load expense report", variant: "destructive" });
@@ -73,7 +83,8 @@ const EditExpenseReport: React.FC = () => {
     if (!validate()) return;
     try {
       setIsLoading(true);
-      await updateExpense(expenseId!, { title: title.trim(), userId: "", expenses: lines });
+      const cleanLines = lines.map(({ _id, expenseReportId, ...line }: any) => line);
+      await updateExpense(expenseId!, { title: title.trim(), expenses: cleanLines, customFields, ...(projectId ? { project: projectId } : {}) } as any);
       navigate("/expenses");
     } catch (error) {
       setIsLoading(false);
@@ -109,6 +120,21 @@ const EditExpenseReport: React.FC = () => {
               {titleError && <p className="text-sm text-destructive">{titleError}</p>}
             </div>
 
+            <div className="max-w-sm space-y-1">
+              <Label htmlFor="project">Project (optional)</Label>
+              <select
+                id="project"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+              >
+                <option value="">None</option>
+                {projects.map((p) => (
+                  <option key={p._id} value={p._id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-3">
               <h2 className="text-base font-semibold">Expense Lines</h2>
               <ExpenseLineTable
@@ -116,6 +142,10 @@ const EditExpenseReport: React.FC = () => {
                 onChange={(next) => { setLines(next); setLinesError(""); }}
                 error={linesError}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DynamicFields module="expenses" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
 
             <Button type="submit" disabled={isLoading}>

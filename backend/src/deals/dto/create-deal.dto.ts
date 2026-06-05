@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateDealDto {
   @IsString() @IsNotEmpty() title: string;
@@ -21,9 +21,8 @@ export class CreateDealDto {
 
   @IsOptional() @IsString() expectedCloseDate?: string;
 
-  @IsOptional()
-  @IsIn(['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'cancelled'])
-  status?: string;
+  // Accepts any configured pipeline stage key (stages are admin-defined).
+  @IsOptional() @IsString() status?: string;
 
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }

@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast";
 const MODULES = [
   { key: "expenses", label: "Expense Reports" },
   { key: "quotes", label: "Quotes" },
+  { key: "salesOrders", label: "Sales Orders" },
   { key: "invoices", label: "Invoices" },
   { key: "purchase_orders", label: "Purchase Orders" },
   { key: "vendor_bills", label: "Vendor Bills" },

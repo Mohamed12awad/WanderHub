@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
 
 // The frontend submits the relation alias `linkedTo` (+ `linkedModel`); the
 // service resolves it to linkedToId and derives customerId/dealId. createdById
@@ -40,4 +40,8 @@ export class CreateActivityDto {
   @IsOptional()
   @IsString()
   assignedTo?: string;
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
 }

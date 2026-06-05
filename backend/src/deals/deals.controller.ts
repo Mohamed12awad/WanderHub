@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
+import { ModuleGuard } from '../common/module.guard';
+import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { DealsService } from './deals.service';
@@ -8,7 +10,8 @@ import { CreateDealDto } from './dto/create-deal.dto';
 import { UpdateDealDto } from './dto/update-deal.dto';
 
 @Controller('deals')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, ModuleGuard)
+@RequireModule('deals')
 export class DealsController {
   constructor(private readonly deals: DealsService) {}
 
@@ -46,7 +49,7 @@ export class DealsController {
 
   @Post(':id/create-quote')
   @HttpCode(201)
-  @RequirePermission('finance:create')
+  @RequirePermission('quotes:create')
   createQuote(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.deals.createQuoteFromDeal(id, user.id);
   }

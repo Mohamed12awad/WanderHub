@@ -1,12 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Trash2, GripVertical, Plus } from "lucide-react";
 import { getWorkspaceSettings, updateWorkspaceSettings } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface PipelineStage {
   key: string;
@@ -26,37 +35,52 @@ const DEFAULT_STAGES: PipelineStage[] = [
   { key: "cancelled",   label: "Cancelled",   color: "#94a3b8", isWin: false, isLoss: true  },
 ];
 
+const slugify = (s: string) =>
+  s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
 function StageRow({
-  stage,
-  onChange,
+  stage, onChange, onDelete,
 }: {
   stage: PipelineStage;
   onChange: (patch: Partial<PipelineStage>) => void;
+  onDelete: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: stage.key });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
   const [editing, setEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b last:border-0">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 px-4 py-3 border-b last:border-0 bg-card">
+      {/* Drag handle */}
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab active:cursor-grabbing touch-none text-muted-foreground/40 hover:text-muted-foreground"
+        title="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
       {/* Color swatch */}
-      <div className="relative shrink-0">
-        <div
-          className="h-6 w-6 rounded-full border-2 border-white shadow cursor-pointer ring-1 ring-border"
-          style={{ background: stage.color }}
-          onClick={() => inputRef.current?.click()}
-          title="Click to change color"
-        />
+      <label className="relative shrink-0 cursor-pointer" title="Click to change color">
+        <div className="h-6 w-6 rounded-full border-2 border-white shadow ring-1 ring-border" style={{ background: stage.color || "#94a3b8" }} />
         <input
-          ref={inputRef}
           type="color"
           value={stage.color}
           onChange={(e) => onChange({ color: e.target.value })}
-          className="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+          className="absolute inset-0 opacity-0 cursor-pointer"
         />
-      </div>
+      </label>
 
       {/* Key badge */}
-      <Badge variant="outline" className="text-[10px] font-mono shrink-0 capitalize">{stage.key}</Badge>
+      <Badge variant="outline" className="text-[10px] font-mono shrink-0">{stage.key}</Badge>
 
       {/* Editable label */}
       {editing ? (
@@ -96,6 +120,9 @@ function StageRow({
           />
           <Label className="text-xs text-muted-foreground cursor-pointer">Loss</Label>
         </div>
+        <button onClick={onDelete} className="p-1 rounded text-destructive opacity-60 hover:opacity-100 hover:bg-muted" title="Delete stage">
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -107,19 +134,14 @@ export default function PipelineStagesSettings() {
   const [stages, setStages] = useState<PipelineStage[]>(DEFAULT_STAGES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
     getWorkspaceSettings()
       .then((res) => {
         const saved: PipelineStage[] = res.data?.pipelineStages ?? [];
-        if (saved.length) {
-          // Merge saved labels/colors with defaults to ensure all 7 stages are present
-          const merged = DEFAULT_STAGES.map((d) => {
-            const s = saved.find((x) => x.key === d.key);
-            return s ? { ...d, ...s } : d;
-          });
-          setStages(merged);
-        }
+        if (saved.length) setStages(saved);
       })
       .catch(() => toast({ title: "Failed to load stages.", variant: "destructive" }))
       .finally(() => setLoading(false));
@@ -138,8 +160,33 @@ export default function PipelineStagesSettings() {
     }
   };
 
-  const updateStage = (key: string, patch: Partial<PipelineStage>) => {
+  const updateStage = (key: string, patch: Partial<PipelineStage>) =>
     setStages((prev) => prev.map((s) => s.key === key ? { ...s, ...patch } : s));
+
+  const deleteStage = (key: string) =>
+    setStages((prev) => prev.filter((s) => s.key !== key));
+
+  const addStage = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    let base = slugify(label) || "stage";
+    let key = base;
+    let i = 2;
+    while (stages.some((s) => s.key === key)) key = `${base}_${i++}`;
+    setStages((prev) => [...prev, { key, label, color: "#64748b", isWin: false, isLoss: false }]);
+    setNewLabel("");
+  };
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = stages.findIndex((s) => s.key === active.id);
+    const newIdx = stages.findIndex((s) => s.key === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const next = [...stages];
+    const [moved] = next.splice(oldIdx, 1);
+    next.splice(newIdx, 0, moved);
+    setStages(next);
   };
 
   if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -149,7 +196,8 @@ export default function PipelineStagesSettings() {
       <div>
         <h2 className="text-lg font-semibold">Pipeline Stages</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Rename stages and assign colors. Mark which stages represent a Win or Loss outcome.
+          Drag to reorder, rename, recolor, add or remove stages. The order here is the column
+          order on your deal pipeline board. Mark which stages count as a Win or Loss.
         </p>
       </div>
 
@@ -157,18 +205,39 @@ export default function PipelineStagesSettings() {
         <CardHeader className="pb-0">
           <CardTitle className="text-sm font-semibold">Deal Stages</CardTitle>
           <CardDescription className="text-xs">
-            Click on a label to rename it. Click the color dot to pick a new color.
-            Stage keys are fixed and map to your existing deal records.
+            Click a label to rename, the dot to recolor, and the grip to reorder. Deleting a stage
+            does not delete deals — move them to another stage first so they stay visible on the board.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0 mt-3">
-          {stages.map((stage) => (
-            <StageRow
-              key={stage.key}
-              stage={stage}
-              onChange={(patch) => updateStage(stage.key, patch)}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={stages.map((s) => s.key)} strategy={verticalListSortingStrategy}>
+              {stages.map((stage) => (
+                <StageRow
+                  key={stage.key}
+                  stage={stage}
+                  onChange={(patch) => updateStage(stage.key, patch)}
+                  onDelete={() => deleteStage(stage.key)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+
+          {/* Add stage */}
+          <form
+            className="flex gap-2 px-4 py-3 border-t"
+            onSubmit={(e) => { e.preventDefault(); addStage(); }}
+          >
+            <Input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="New stage name…"
+              className="h-8"
             />
-          ))}
+            <Button type="submit" size="sm" className="h-8 gap-1" disabled={!newLabel.trim()}>
+              <Plus className="h-3.5 w-3.5" />Add stage
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

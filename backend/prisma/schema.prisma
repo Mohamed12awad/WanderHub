@@ -19,16 +19,6 @@ datasource db {
 //
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-enum DealStatus {
-  lead
-  qualified
-  proposal
-  negotiation
-  won
-  lost
-  cancelled
-}
-
 enum QuoteStatus {
   draft
   sent
@@ -114,6 +104,14 @@ enum PurchaseOrderStatus {
   cancelled
 }
 
+enum SalesOrderStatus {
+  draft
+  confirmed
+  fulfilled
+  invoiced
+  cancelled
+}
+
 enum BillStatus {
   draft
   received
@@ -150,49 +148,54 @@ model Role {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  phone       String
-  password    String
+  id                      String   @id @default(cuid())
+  name                    String
+  email                   String   @unique
+  phone                   String
+  password                String
   active                  Boolean  @default(true)
   notificationPreferences Json?
   roleId                  String
   role                    Role     @relation(fields: [roleId], references: [id])
   reportsToId             String?
-  reportsTo   User?    @relation("ReportsTo", fields: [reportsToId], references: [id])
-  directReports User[] @relation("ReportsTo")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  reportsTo               User?    @relation("ReportsTo", fields: [reportsToId], references: [id])
+  directReports           User[]   @relation("ReportsTo")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
-  ownedCustomers         Customer[]         @relation("CustomerOwner")
-  ownedDeals             Deal[]             @relation("DealOwner")
-  createdQuotes          Quote[]            @relation("QuoteCreatedBy")
-  approvedQuotes         Quote[]            @relation("QuoteApprovedBy")
-  createdInvoices        Invoice[]          @relation("InvoiceCreatedBy")
-  approvedInvoices       Invoice[]          @relation("InvoiceApprovedBy")
+  ownedCustomers         Customer[]          @relation("CustomerOwner")
+  ownedDeals             Deal[]              @relation("DealOwner")
+  createdQuotes          Quote[]             @relation("QuoteCreatedBy")
+  approvedQuotes         Quote[]             @relation("QuoteApprovedBy")
+  createdInvoices        Invoice[]           @relation("InvoiceCreatedBy")
+  approvedInvoices       Invoice[]           @relation("InvoiceApprovedBy")
   invoicePayments        InvoicePayment[]
-  expenseReports         ExpenseReport[]    @relation("ExpenseUser")
-  approvedExpenses       ExpenseReport[]    @relation("ExpenseApprovedBy")
-  assignedActivities     Activity[]         @relation("ActivityAssignedTo")
-  createdActivities      Activity[]         @relation("ActivityCreatedBy")
+  expenseReports         ExpenseReport[]     @relation("ExpenseUser")
+  approvedExpenses       ExpenseReport[]     @relation("ExpenseApprovedBy")
+  assignedActivities     Activity[]          @relation("ActivityAssignedTo")
+  createdActivities      Activity[]          @relation("ActivityCreatedBy")
   notes                  Note[]
-  assignedTasks          Task[]             @relation("TaskAssignedTo")
-  createdTasks           Task[]             @relation("TaskCreatedBy")
+  assignedTasks          Task[]              @relation("TaskAssignedTo")
+  createdTasks           Task[]              @relation("TaskCreatedBy")
   triggeredTimelines     TimelineEvent[]
   logs                   Log[]
   refreshTokens          RefreshToken[]
-  ownedLeads             Lead[]             @relation("LeadOwner")
-  createdLeads           Lead[]             @relation("LeadCreator")
+  ownedLeads             Lead[]              @relation("LeadOwner")
+  createdLeads           Lead[]              @relation("LeadCreator")
   notifications          Notification[]
-  createdPurchaseOrders  PurchaseOrder[]    @relation("POCreatedBy")
-  approvedPurchaseOrders PurchaseOrder[]    @relation("POApprovedBy")
-  createdVendorBills     VendorBill[]       @relation("BillCreatedBy")
-  approvedVendorBills    VendorBill[]       @relation("BillApprovedBy")
+  createdPurchaseOrders  PurchaseOrder[]     @relation("POCreatedBy")
+  approvedPurchaseOrders PurchaseOrder[]     @relation("POApprovedBy")
+  createdSalesOrders     SalesOrder[]        @relation("SalesOrderCreatedBy")
+  approvedSalesOrders    SalesOrder[]        @relation("SalesOrderApprovedBy")
+  createdVendorBills     VendorBill[]        @relation("BillCreatedBy")
+  approvedVendorBills    VendorBill[]        @relation("BillApprovedBy")
   vendorBillPayments     VendorBillPayment[]
-  managedProjects        Project[]          @relation("ProjectManager")
-  createdProjects        Project[]          @relation("ProjectCreatedBy")
+  managedProjects        Project[]           @relation("ProjectManager")
+  createdProjects        Project[]           @relation("ProjectCreatedBy")
   projectMemberships     ProjectMember[]
+  savedViews             SavedView[]
+  apiKeys                ApiKey[]            @relation("ApiKeyUser")
+  createdApiKeys         ApiKey[]            @relation("ApiKeyCreatedBy")
 }
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
@@ -203,6 +206,9 @@ model Customer {
   phone                  String    @unique
   mobile                 String?
   email                  String?   @unique
+  company                String?
+  jobTitle               String?
+  website                String?
   // Embedded objects stored as JSON
   address                Json?
   identification         Json?
@@ -226,6 +232,7 @@ model Customer {
   deals         Deal[]
   quotes        Quote[]
   invoices      Invoice[]
+  salesOrders   SalesOrder[]
   activities    Activity[]
   customerNotes Note[]
   timelines     TimelineEvent[]
@@ -238,35 +245,36 @@ model Customer {
 }
 
 model Deal {
-  id                String     @id @default(cuid())
+  id                String    @id @default(cuid())
   customerId        String
-  customer          Customer   @relation(fields: [customerId], references: [id])
+  customer          Customer  @relation(fields: [customerId], references: [id])
   ownerId           String?
-  owner             User?      @relation("DealOwner", fields: [ownerId], references: [id])
+  owner             User?     @relation("DealOwner", fields: [ownerId], references: [id])
   title             String
   category          String?
   dealType          String?
   price             Float
-  currency          String     @default("EGP")
-  status            DealStatus @default(lead)
-  priority          String?    @default("medium")
-  probability       Float?     @default(10)
+  currency          String    @default("EGP")
+  status            String    @default("lead")
+  priority          String?   @default("medium")
+  probability       Float?    @default(10)
   source            String?
   expectedCloseDate DateTime?
   lostReason        String?
   notes             String?
   customFields      Json?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  quotes          Quote[]
-  invoices        Invoice[]
-  activities      Activity[]
-  dealNotes       Note[]
-  timelines       TimelineEvent[]
-  tasks           Task[]
-  project         Project?
+  quotes      Quote[]
+  invoices    Invoice[]
+  salesOrders SalesOrder[]
+  activities  Activity[]
+  dealNotes   Note[]
+  timelines   TimelineEvent[]
+  tasks       Task[]
+  project     Project?
 
   @@index([customerId])
   @@index([ownerId])
@@ -275,35 +283,36 @@ model Deal {
 }
 
 model Lead {
-  id                 String      @id @default(cuid())
-  name               String
-  company            String?
-  jobTitle           String?
-  phone              String?
-  email              String?
-  mobile             String?
-  website            String?
-  city               String?
-  country            String?
-  source             String?
-  campaign           String?
-  status             LeadStatus  @default(new)
-  rating             LeadRating?
-  budget             Float?
-  currency           String?     @default("EGP")
-  expectedCloseDate  DateTime?
-  lostReason         String?
-  notes              String?
-  ownerId            String?
-  owner              User?       @relation("LeadOwner", fields: [ownerId], references: [id])
-  createdById        String?
-  createdBy          User?       @relation("LeadCreator", fields: [createdById], references: [id])
-  convertedAt        DateTime?
-  convertedToId      String?     @unique
-  convertedTo        Customer?   @relation("LeadConversion", fields: [convertedToId], references: [id])
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  deletedAt          DateTime?
+  id                String      @id @default(cuid())
+  name              String
+  company           String?
+  jobTitle          String?
+  phone             String?
+  email             String?
+  mobile            String?
+  website           String?
+  city              String?
+  country           String?
+  source            String?
+  campaign          String?
+  status            LeadStatus  @default(new)
+  rating            LeadRating?
+  budget            Float?
+  currency          String?     @default("EGP")
+  expectedCloseDate DateTime?
+  lostReason        String?
+  notes             String?
+  customFields      Json?
+  ownerId           String?
+  owner             User?       @relation("LeadOwner", fields: [ownerId], references: [id])
+  createdById       String?
+  createdBy         User?       @relation("LeadCreator", fields: [createdById], references: [id])
+  convertedAt       DateTime?
+  convertedToId     String?     @unique
+  convertedTo       Customer?   @relation("LeadConversion", fields: [convertedToId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
 
   @@index([ownerId])
   @@index([status])
@@ -329,7 +338,7 @@ model Notification {
 // ─── Catalog ─────────────────────────────────────────────────────────────────
 
 model Product {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
   type         String?
   capacity     Float?
@@ -368,7 +377,7 @@ model StockMovement {
   refType          String?
   refId            String?
   note             String?
-  adjustmentReason String?  // recount | damage | theft | expiry | write_off | return | correction
+  adjustmentReason String? // recount | damage | theft | expiry | write_off | return | correction
   createdById      String?
   createdAt        DateTime @default(now())
 
@@ -394,8 +403,10 @@ model Quote {
   validUntil           DateTime?
   notes                String?
   terms                String?
+  customFields         Json?
   convertedToInvoiceId String?        @unique
   convertedToInvoice   Invoice?       @relation("QuoteToInvoice", fields: [convertedToInvoiceId], references: [id])
+  salesOrder           SalesOrder?    @relation("QuoteToSalesOrder")
   createdById          String
   createdBy            User           @relation("QuoteCreatedBy", fields: [createdById], references: [id])
   approvalStatus       ApprovalStatus @default(pending)
@@ -442,6 +453,8 @@ model Invoice {
   deal            Deal?          @relation(fields: [dealId], references: [id])
   projectId       String?
   project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  salesOrderId    String?
+  salesOrder      SalesOrder?    @relation("SalesOrderToInvoice", fields: [salesOrderId], references: [id], onDelete: SetNull)
   fromQuote       Quote?         @relation("QuoteToInvoice")
   status          InvoiceStatus  @default(draft)
   subtotal        Float          @default(0)
@@ -455,6 +468,7 @@ model Invoice {
   dueDate         DateTime?
   notes           String?
   terms           String?
+  customFields    Json?
   createdById     String
   createdBy       User           @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   approvalStatus  ApprovalStatus @default(pending)
@@ -472,6 +486,7 @@ model Invoice {
   @@index([customerId])
   @@index([dealId])
   @@index([projectId])
+  @@index([salesOrderId])
   @@index([status])
   @@index([deletedAt])
 }
@@ -513,6 +528,69 @@ model InvoicePayment {
   @@index([date])
 }
 
+// ─── Sales Orders ─────────────────────────────────────────────────────────────
+// A confirmed customer order between an accepted Quote and an Invoice. Mirrors
+// the Quote/Invoice shape; the generated Invoice (not the SO) moves stock.
+
+model SalesOrder {
+  id              String           @id @default(cuid())
+  orderNumber     String           @unique
+  title           String
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  dealId          String?
+  deal            Deal?            @relation(fields: [dealId], references: [id])
+  projectId       String?
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  fromQuoteId     String?          @unique
+  fromQuote       Quote?           @relation("QuoteToSalesOrder", fields: [fromQuoteId], references: [id])
+  status          SalesOrderStatus @default(draft)
+  subtotal        Float            @default(0)
+  taxRate         Float            @default(0)
+  tax             Float            @default(0)
+  total           Float            @default(0)
+  currency        String           @default("EGP")
+  expectedDate    DateTime?
+  notes           String?
+  terms           String?
+  customFields    Json?
+  createdById     String
+  createdBy       User             @relation("SalesOrderCreatedBy", fields: [createdById], references: [id])
+  approvalStatus  ApprovalStatus   @default(pending)
+  approvedById    String?
+  approvedBy      User?            @relation("SalesOrderApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  items    SalesOrderLineItem[]
+  invoices Invoice[]            @relation("SalesOrderToInvoice")
+
+  @@index([customerId])
+  @@index([dealId])
+  @@index([projectId])
+  @@index([status])
+  @@index([approvalStatus])
+  @@index([deletedAt])
+}
+
+model SalesOrderLineItem {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId    String?
+  description  String
+  quantity     Float
+  unitPrice    Float
+  discount     Float      @default(0)
+  taxRate      Float      @default(0)
+  taxCode      String?
+  total        Float
+  order        Int        @default(0)
+}
+
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
 enum AccountType {
@@ -549,6 +627,7 @@ model ExpenseReport {
   approvedBy      User?          @relation("ExpenseApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
   rejectionReason String?
+  customFields    Json?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   deletedAt       DateTime?
@@ -593,6 +672,7 @@ model Activity {
   project      Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
   assignedToId String?
   assignedTo   User?          @relation("ActivityAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  customFields Json?
   createdById  String
   createdBy    User           @relation("ActivityCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime       @default(now())
@@ -652,6 +732,7 @@ model Task {
   milestone    ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
   completedAt  DateTime?
   tags         String[]
+  customFields Json?
   createdById  String
   createdBy    User              @relation("TaskCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime          @default(now())
@@ -778,10 +859,82 @@ model WorkspaceConfig {
   pipelineStages  Json     @default("[]")
   invoiceDefaults Json     @default("{}")
   passwordPolicy  Json     @default("{}")
+  // Non-secret AI settings: { provider, model, enabled }. Keys live in AiKey.
+  aiConfig        Json     @default("{}")
   baseCurrency    String   @default("EGP")
   locale          String   @default("en-US")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// An outbound email with open/click tracking. The body is rendered with a 1x1
+// tracking pixel and rewritten links; delivery itself reuses EmailOutbox.
+model TrackedEmail {
+  id          String    @id @default(cuid())
+  to          String
+  subject     String
+  // Polymorphic link to the record the email is about (Customer/Deal/Lead).
+  linkedToId  String?
+  linkedModel String?
+  status      String    @default("queued") // queued | sent | failed
+  openCount   Int       @default(0)
+  openedAt    DateTime?
+  clickCount  Int       @default(0)
+  clickedAt   DateTime?
+  outboxId    String?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([linkedToId, linkedModel])
+  @@index([createdById])
+}
+
+// Encrypted AI provider API keys. scope=workspace (userId null) is the default;
+// scope=user is a per-user override. Only the encrypted key is stored.
+model AiKey {
+  id        String   @id @default(cuid())
+  provider  String // anthropic | google | openai
+  scope     String // workspace | user
+  userId    String?
+  encKey    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope, provider])
+  @@index([userId])
+}
+
+// Per-user saved list views: a named snapshot of a list page's query string
+// (search + filters + sort), surfaced as quick presets on that module's list.
+model SavedView {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    String // e.g. customers | leads | deals
+  name      String
+  query     String // serialized URLSearchParams (q, filters, sort, dir)
+  createdAt DateTime @default(now())
+
+  @@index([userId, module])
+}
+
+// Public API keys. Only the SHA-256 hash is stored; the raw key is shown once on
+// creation. A key acts as `user` and inherits that user's role permissions, so
+// the existing PermissionGuard/visibility rules apply unchanged.
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  prefix      String // leading chars, shown in the UI to identify the key
+  keyHash     String    @unique
+  userId      String
+  user        User      @relation("ApiKeyUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation("ApiKeyCreatedBy", fields: [createdById], references: [id])
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model TaxRate {
@@ -840,18 +993,19 @@ model ExchangeRate {
 // ─── Procurement — Suppliers ──────────────────────────────────────────────────
 
 model Supplier {
-  id        String    @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  address   Json?
-  taxId     String?
-  currency  String    @default("EGP")
-  notes     String?
-  status    String    @default("active")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id           String    @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  address      Json?
+  taxId        String?
+  currency     String    @default("EGP")
+  notes        String?
+  status       String    @default("active")
+  customFields Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   purchaseOrders PurchaseOrder[]
   bills          VendorBill[]
@@ -877,6 +1031,7 @@ model PurchaseOrder {
   expectedDate    DateTime?
   notes           String?
   terms           String?
+  customFields    Json?
   approvalStatus  ApprovalStatus      @default(pending)
   approvedById    String?
   approvedBy      User?               @relation("POApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -933,6 +1088,7 @@ model VendorBill {
   dueDate         DateTime?
   notes           String?
   terms           String?
+  customFields    Json?
   approvalStatus  ApprovalStatus @default(pending)
   approvedById    String?
   approvedBy      User?          @relation("BillApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -994,32 +1150,34 @@ model VendorBillPayment {
 // ─── Projects ────────────────────────────────────────────────────────────────
 
 model Project {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  status      ProjectStatus @default(planning)
-  priority    String        @default("medium")
-  budget      Float?
-  currency    String        @default("EGP")
-  startDate   DateTime?
-  endDate     DateTime?
-  completedAt DateTime?
-  customerId  String?
-  customer    Customer?     @relation(fields: [customerId], references: [id])
-  dealId      String?       @unique
-  deal        Deal?         @relation(fields: [dealId], references: [id])
-  managerId   String?
-  manager     User?         @relation("ProjectManager", fields: [managerId], references: [id])
-  createdById String
-  createdBy   User          @relation("ProjectCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  deletedAt   DateTime?
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  status       ProjectStatus @default(planning)
+  priority     String        @default("medium")
+  budget       Float?
+  currency     String        @default("EGP")
+  startDate    DateTime?
+  endDate      DateTime?
+  completedAt  DateTime?
+  customFields Json?
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  dealId       String?       @unique
+  deal         Deal?         @relation(fields: [dealId], references: [id])
+  managerId    String?
+  manager      User?         @relation("ProjectManager", fields: [managerId], references: [id])
+  createdById  String
+  createdBy    User          @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
 
   milestones  ProjectMilestone[]
   members     ProjectMember[]
   tasks       Task[]
   invoices    Invoice[]
+  salesOrders SalesOrder[]
   expenses    ExpenseReport[]
   activities  Activity[]
   notes       Note[]
@@ -1044,7 +1202,7 @@ model ProjectMilestone {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  tasks       Task[]
+  tasks Task[]
 
   @@index([projectId])
   @@index([status])

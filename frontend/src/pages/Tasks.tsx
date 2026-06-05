@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getTasks, deleteTask, completeTask, getProjects } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -72,9 +73,16 @@ function TaskCard({
             </Badge>
 
             {task.project && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary hover:underline transition-colors">
                 <FolderKanban className="h-3 w-3" />
                 {task.project.name}
+              </Link>
+            )}
+
+            {task.milestone && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="text-[10px]">·</span>
+                {task.milestone.title}
               </span>
             )}
 

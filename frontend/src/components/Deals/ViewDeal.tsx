@@ -17,6 +17,9 @@ import { Button } from "../ui/button";
 import { ActivityList } from "@/components/Activities/ActivityList";
 import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { NotesPanel } from "@/components/common/NotesPanel";
+import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
+import { EmailsPanel } from "@/components/common/EmailsPanel";
+import { AiInsights } from "@/components/common/AiInsights";
 import FinanceTab from "@/components/Finance/FinanceTab";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { useToast } from "@/components/ui/use-toast";
@@ -391,6 +394,9 @@ const ViewDeal = () => {
               <TabsTrigger value="invoices">Invoices<Cnt n={invoicesCount} /></TabsTrigger>
               <TabsTrigger value="notes">Notes<Cnt n={notesCount} /></TabsTrigger>
               <TabsTrigger value="activities">Activities<Cnt n={activitiesCount} /></TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
+              <TabsTrigger value="emails">Emails</TabsTrigger>
+              <TabsTrigger value="ai">AI</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <RecordTimeline linkedTo={dealId!} linkedModel="Deal" />
@@ -406,6 +412,15 @@ const ViewDeal = () => {
             </TabsContent>
             <TabsContent value="activities">
               <ActivityList linkedTo={dealId!} linkedModel="Deal" />
+            </TabsContent>
+            <TabsContent value="attachments">
+              <AttachmentsPanel linkedModel="Deal" linkedToId={dealId!} />
+            </TabsContent>
+            <TabsContent value="emails">
+              <EmailsPanel linkedTo={dealId!} linkedModel="Deal" />
+            </TabsContent>
+            <TabsContent value="ai">
+              <AiInsights entity="deals" id={dealId!} canScore />
             </TabsContent>
           </Tabs>
         </CardContent>

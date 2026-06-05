@@ -84,10 +84,11 @@ export function Deals() {
       deleteData={deleteDeal}
       headers={d.headers}
       sortableHeaders={["Title", "Value", "Created", "Priority"]}
-      renderRow={(item, handleDelete) => (
+      renderRow={(item, handleDelete, selectionCell) => (
         <DealRow
           key={item._id}
           id={item._id}
+          selectionCell={selectionCell}
           title={item.title}
           customer={item.customer?.name ?? "—"}
           status={item.status}
@@ -106,6 +107,19 @@ export function Deals() {
       noSearchMessage={d.noSearch}
       filterConfigs={DEAL_FILTERS}
       module="deals"
+      importConfig={{ entity: "deals", title: "Deals", permission: "deals:create" }}
+      bulkConfig={{
+        entity: "deals",
+        statusOptions: [
+          { value: "lead", label: "Lead" },
+          { value: "qualified", label: "Qualified" },
+          { value: "proposal", label: "Proposal" },
+          { value: "negotiation", label: "Negotiation" },
+          { value: "won", label: "Won" },
+          { value: "lost", label: "Lost" },
+          { value: "cancelled", label: "Cancelled" },
+        ],
+      }}
       quickStatusFilter={{
         field: "status",
         options: [

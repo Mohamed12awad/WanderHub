@@ -39,14 +39,16 @@ interface DealRowProps {
   value: string;
   date: string;
   handleDelete: (id: string) => void;
+  selectionCell?: React.ReactNode;
 }
 
-const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority, owner, value, date, handleDelete }) => {
+const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority, owner, value, date, handleDelete, selectionCell }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
     <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/deals/${id}`)}>
+      {selectionCell}
       <TableCell className="font-medium">{title}</TableCell>
       <TableCell className="text-foreground/70">{customer}</TableCell>
       <TableCell>

@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
+import { IsIn, IsNotEmpty, IsObject, IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
 import { LeadStatus, LeadRating } from '@prisma/client';
 
 export class CreateLeadDto {
@@ -20,6 +20,7 @@ export class CreateLeadDto {
   @IsOptional() @IsNumber() budget?: number;
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsDateString() expectedCloseDate?: string;
+  @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 
   @IsOptional()
   @IsIn(Object.values(LeadStatus))

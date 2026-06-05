@@ -3,7 +3,7 @@ import type { JSX } from "react";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useSearchParams } from "react-router-dom";
-import { PlusCircle, Search, Download, SlidersHorizontal, X, Inbox, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { PlusCircle, Search, Download, Upload, SlidersHorizontal, X, Inbox, ArrowUpDown, ArrowUp, ArrowDown, Users, Bookmark, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,16 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { downloadCSV } from "@/utils/csv";
+import { ImportDialog } from "@/components/common/ImportDialog";
+import { DedupDialog } from "@/components/common/DedupDialog";
+import { BulkActionBar } from "@/components/common/BulkActionBar";
+import { PermissionGate } from "@/components/common/PermissionGate";
+import type { Permission } from "@/config/permissions";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { getSavedViews, createSavedView, deleteSavedView, type SavedView } from "@/utils/api";
 import { Pagination } from "@/components/ui/pagination";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
@@ -38,7 +48,7 @@ type GenericTableProps<T extends DataItem> = {
   deleteData: (id: string) => Promise<void>;
   headers: string[];
   sortableHeaders?: string[];
-  renderRow: (item: T, handleDelete: (id: string) => void) => JSX.Element;
+  renderRow: (item: T, handleDelete: (id: string) => void, selectionCell?: React.ReactNode) => JSX.Element;
   title: string;
   description: string;
   addLink: string;
@@ -49,6 +59,25 @@ type GenericTableProps<T extends DataItem> = {
   exportConfig?: {
     filename: string;
     getRow: (item: T) => Record<string, unknown>;
+  };
+  importConfig?: {
+    /** Import target key understood by the backend, e.g. "customers". */
+    entity: string;
+    /** Label shown in the dialog title, e.g. "Contacts". */
+    title: string;
+    /** When set, the Import button is gated behind this permission. */
+    permission?: Permission;
+  };
+  dedupConfig?: {
+    entity: string;
+    title: string;
+    permission?: Permission;
+  };
+  bulkConfig?: {
+    /** Bulk target key understood by the backend, e.g. "customers". */
+    entity: string;
+    /** Status choices for the "Set status" bulk action; omit to hide it. */
+    statusOptions?: { value: string; label: string }[];
   };
   filterConfigs?: FilterConfig[];
   module?: string;
@@ -76,6 +105,9 @@ export function GenericTable<T extends DataItem>({
   emptyMessage,
   noSearchMessage,
   exportConfig,
+  importConfig,
+  dedupConfig,
+  bulkConfig,
   filterConfigs,
   module,
   quickStatusFilter,
@@ -150,6 +182,36 @@ export function GenericTable<T extends DataItem>({
   const [localSearch, setLocalSearch] = useState(committedQ);
   const [filterDraft, setFilterDraft] = useState<Record<string, string>>(activeFilters);
   const [sheetOpen, setSheetOpen]     = useState(false);
+  const [importOpen, setImportOpen]   = useState(false);
+  const [dedupOpen, setDedupOpen]     = useState(false);
+  const [selected, setSelected]       = useState<Set<string>>(new Set());
+
+  // Saved views for this module (per-user list-query presets).
+  const savedViewsQuery = useQuery({
+    queryKey: ["saved-views", module],
+    queryFn: () => getSavedViews(module as string),
+    enabled: !!module,
+  });
+  const savedViews: SavedView[] = savedViewsQuery.data?.data ?? [];
+
+  const applySavedView = (view: SavedView) =>
+    setSearchParams(new URLSearchParams(view.query), { replace: true });
+
+  const saveCurrentView = async () => {
+    const name = window.prompt(tr.tools.views.namePrompt);
+    if (!name?.trim() || !module) return;
+    await createSavedView({ module, name: name.trim(), query: searchParams.toString() });
+    saveViewMutationDone();
+  };
+  const saveViewMutationDone = () => queryClient.invalidateQueries({ queryKey: ["saved-views", module] });
+  const removeSavedView = async (id: string) => { await deleteSavedView(id); saveViewMutationDone(); };
+
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const clearSelection = () => setSelected(new Set());
+
+  // Selection is per-view; drop it whenever the underlying query changes.
+  useEffect(() => { setSelected(new Set()); }, [committedQ, page, sortBy, sortDir, JSON.stringify(activeFilters)]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -264,6 +326,24 @@ export function GenericTable<T extends DataItem>({
   return (
     <div className="flex flex-col pb-6 min-h-full bg-muted/30 dark:bg-muted/10">
       <ConfirmDialog open={!!pendingDeleteId} onConfirm={confirmDelete} onCancel={() => setPendingDeleteId(null)} />
+      {importConfig && (
+        <ImportDialog
+          entity={importConfig.entity}
+          title={importConfig.title}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onDone={() => queryClient.invalidateQueries({ queryKey: [queryKey] })}
+        />
+      )}
+      {dedupConfig && (
+        <DedupDialog
+          entity={dedupConfig.entity}
+          title={dedupConfig.title}
+          open={dedupOpen}
+          onOpenChange={setDedupOpen}
+          onDone={() => queryClient.invalidateQueries({ queryKey: [queryKey] })}
+        />
+      )}
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-4 px-6 py-4 border-b bg-card shrink-0">
         <div className="min-w-0">
@@ -278,6 +358,31 @@ export function GenericTable<T extends DataItem>({
           <p className="text-sm text-muted-foreground mt-0.5 truncate">{description}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {importConfig && (() => {
+            const importBtn = (
+              <Button
+                variant="outline" size="sm" className="h-8 gap-1.5"
+                onClick={() => setImportOpen(true)}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{tr.common.importCsv}</span>
+              </Button>
+            );
+            return importConfig.permission
+              ? <PermissionGate require={importConfig.permission}>{importBtn}</PermissionGate>
+              : importBtn;
+          })()}
+          {dedupConfig && (() => {
+            const dedupBtn = (
+              <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setDedupOpen(true)}>
+                <Users className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{tr.tools.dedup.button}</span>
+              </Button>
+            );
+            return dedupConfig.permission
+              ? <PermissionGate require={dedupConfig.permission}>{dedupBtn}</PermissionGate>
+              : dedupBtn;
+          })()}
           {exportConfig && (
             <Button
               variant="outline" size="sm" className="h-8 gap-1.5"
@@ -417,6 +522,41 @@ export function GenericTable<T extends DataItem>({
               </SheetContent>
             </Sheet>
           )}
+
+          {module && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm">
+                  <Bookmark className="h-3.5 w-3.5" />
+                  {tr.tools.views.button}
+                  {savedViews.length > 0 && (
+                    <Badge className="ms-0.5 h-4 min-w-4 px-1 text-[10px] rounded-full">{savedViews.length}</Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>{tr.tools.views.title}</DropdownMenuLabel>
+                {savedViews.length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">{tr.tools.views.none}</div>
+                )}
+                {savedViews.map((v) => (
+                  <DropdownMenuItem key={v.id} onClick={() => applySavedView(v)} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{v.name}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeSavedView(v.id); }}
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={saveCurrentView}>
+                  <Save className="h-3.5 w-3.5 me-2" /> {tr.tools.views.saveCurrent}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Active filter chips */}
@@ -469,12 +609,40 @@ export function GenericTable<T extends DataItem>({
           })}
         </div>
       )}
+      {/* ── Bulk action bar ── */}
+      {bulkConfig && selected.size > 0 && (
+        <div className="px-6 pt-3 shrink-0">
+          <BulkActionBar
+            entity={bulkConfig.entity}
+            ids={[...selected]}
+            statusOptions={bulkConfig.statusOptions}
+            queryKey={queryKey}
+            onClear={clearSelection}
+          />
+        </div>
+      )}
       {/* ── Table ── */}
       <Card className={cn("mx-6 mt-3 shadow-sm border-border/60 transition-opacity overflow-hidden", isPlaceholderData && !isPending ? "opacity-60" : "opacity-100")}>
         <CardContent className="p-0 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/30 border-b-2 border-border/60">
+              {bulkConfig && (
+                <TableHead className="w-8">
+                  <Checkbox
+                    checked={filtered.length > 0 && filtered.every((i) => selected.has(i._id))}
+                    onCheckedChange={(c) =>
+                      setSelected((prev) => {
+                        const n = new Set(prev);
+                        if (c) filtered.forEach((i) => n.add(i._id));
+                        else filtered.forEach((i) => n.delete(i._id));
+                        return n;
+                      })
+                    }
+                    aria-label="Select all"
+                  />
+                </TableHead>
+              )}
               {headers.map((header) => {
                 const isSortable = sortableHeaders?.includes(header);
                 const isActive   = sortBy === header;
@@ -516,6 +684,7 @@ export function GenericTable<T extends DataItem>({
             {isPending &&
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i} className="hover:bg-transparent animate-pulse">
+                  {bulkConfig && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                   {headers.map((h, hi) => (
                     <TableCell key={h}>
                       <Skeleton className={cn("h-4", SKELETON_WIDTHS[(i + hi) % SKELETON_WIDTHS.length])} />
@@ -527,7 +696,7 @@ export function GenericTable<T extends DataItem>({
 
             {!isPending && filtered.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={headers.length + 1} className="py-20 text-center">
+                <TableCell colSpan={headers.length + 1 + (bulkConfig ? 1 : 0)} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                       <Inbox className="h-6 w-6 text-muted-foreground/50" />
@@ -562,7 +731,13 @@ export function GenericTable<T extends DataItem>({
               </TableRow>
             )}
 
-            {!isPending && filtered.map((item) => renderRow(item, handleDelete))}
+            {!isPending && filtered.map((item) => renderRow(item, handleDelete,
+              bulkConfig ? (
+                <TableCell onClick={(e) => e.stopPropagation()} className="w-8">
+                  <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
+                </TableCell>
+              ) : undefined,
+            ))}
           </TableBody>
         </Table>
           {paginationInfo && (

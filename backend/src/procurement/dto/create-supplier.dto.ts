@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNotEmpty } from 'class-validator';
+import { IsObject, IsOptional, IsString, IsNotEmpty } from 'class-validator';
 
 export class CreateSupplierDto {
   @IsString()
@@ -12,4 +12,5 @@ export class CreateSupplierDto {
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 }

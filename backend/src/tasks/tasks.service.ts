@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { toClient } from '../common/serialize';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
@@ -12,6 +13,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly dispatcher: NotificationDispatcher,
+    private readonly customFields: CustomFieldsService,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -79,6 +81,7 @@ export class TasksService {
     if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
     if (project) data.projectId = project;
     if (milestone) data.milestoneId = milestone;
+    data.customFields = await this.customFields.validateAndClean('tasks', data.customFields);
 
     const task = await this.prisma.task.create({
       data,
@@ -121,6 +124,9 @@ export class TasksService {
     if (linkedTo !== undefined) data.linkedToId = linkedTo;
     if (project !== undefined) data.projectId = project || null;
     if (milestone !== undefined) data.milestoneId = milestone || null;
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean('tasks', data.customFields);
+    }
     const task = await this.prisma.task.update({
       where: { id },
       data,

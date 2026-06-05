@@ -1,7 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { getWorkspaceSettings } from "@/utils/api";
 
-export type FieldType = "text" | "number" | "date" | "select" | "boolean" | "email" | "phone" | "url";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "boolean"
+  | "email"
+  | "phone"
+  | "url";
 
 export interface FieldDef {
   id: string;
@@ -13,6 +22,15 @@ export interface FieldDef {
   isSystem?: boolean;
   filterable?: boolean;
   order?: number;
+  // Optional, additive richer-field props (backward compatible).
+  multiselect?: boolean;   // select: allow multiple values
+  defaultValue?: string;   // prefilled when the value is empty
+  helpText?: string;       // shown under the input
+  placeholder?: string;
+  min?: number;            // number: minimum
+  max?: number;            // number: maximum
+  pattern?: string;        // text/textarea/phone: regex constraint
+  maxLength?: number;      // text/textarea: max length
 }
 
 export interface WorkspaceSettings {

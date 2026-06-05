@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
@@ -35,6 +37,9 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
     deal: cloneData?.deal ?? searchParams.get("deal") ?? "",
     manager: cloneData?.manager ?? "",
   });
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
+  );
 
   const { data: customersData } = useQuery({
     queryKey: ["customers-all"],
@@ -66,6 +71,7 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
         startDate: p.startDate ? p.startDate.split("T")[0] : "", endDate: p.endDate ? p.endDate.split("T")[0] : "",
         customer: p.customer?._id ?? "", deal: p.deal?._id ?? "", manager: p.manager?._id ?? "",
       });
+      setCustomFields(toCustomFieldValues(p.customFields));
     }
   }, [data]);
 
@@ -79,6 +85,7 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
         budget: form.budget ? Number(form.budget) : undefined,
         startDate: form.startDate || undefined, endDate: form.endDate || undefined,
         customer: form.customer || undefined, deal: form.deal || undefined, manager: form.manager || undefined,
+        customFields,
       };
       return mode === "edit" ? updateProject(id!, payload) : createProject(payload);
     },
@@ -160,6 +167,8 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
                 <Input type="date" value={form.endDate} onChange={(e) => set("endDate", e.target.value)} />
               </div>
             </div>
+            <DynamicFields module="projects" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
+
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/projects")}>{tr.common.cancel}</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? tr.common.loading : tr.common.save}</Button>

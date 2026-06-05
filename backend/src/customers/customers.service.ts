@@ -5,6 +5,7 @@ import { toClient } from '../common/serialize';
 import { cleanData } from '../common/clean-data';
 import { paginate, dateRange } from '../common/paginate';
 import { buildCfConditions } from '../common/customFields';
+import { CustomFieldsService } from '../common/custom-fields.service';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -17,11 +18,13 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly visibility: VisibilityService,
+    private readonly customFields: CustomFieldsService,
     private readonly deals: DealsService,
   ) {}
 
   async create(body: CreateCustomerDto, userId: string) {
     const data = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
+    data.customFields = await this.customFields.validateAndClean('customers', data.customFields);
     const customer = await this.prisma.customer.create({ data: data as any });
 
     await this.timeline.log(
@@ -80,6 +83,9 @@ export class CustomersService {
     if (!existing) throw new NotFoundException('Customer not found');
 
     const cleaned = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
+    if ('customFields' in cleaned) {
+      cleaned.customFields = await this.customFields.validateAndClean('customers', cleaned.customFields);
+    }
     const customer = await this.prisma.customer.update({ where: { id }, data: cleaned });
 
     const TRACKED_FIELDS = ['name', 'email', 'phone', 'mobile', 'location', 'status', 'gender', 'source', 'notes'];

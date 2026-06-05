@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LineItemsTable, { LineItemRow, computeTotals } from "@/components/Finance/LineItemsTable";
+import DynamicFields from "@/components/common/DynamicFields";
+import { toCustomFieldValues } from "@/utils/customFields";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
@@ -35,6 +37,9 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
   const [notes, setNotes] = useState(cloneData?.notes ?? "");
   const [items, setItems] = useState<LineItemRow[]>(
     cloneData?.items?.length ? cloneData.items : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]
+  );
+  const [customFields, setCustomFields] = useState<Record<string, string>>(
+    cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
   );
 
   const { data: suppliersData } = useQuery({
@@ -84,6 +89,7 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
       setTaxRate(b.taxRate ?? 0);
       setNotes(b.notes ?? "");
       setItems(b.items?.length ? b.items.map((i: any) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice, discount: i.discount ?? 0 })) : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }]);
+      setCustomFields(toCustomFieldValues(b.customFields));
     }
   }, [data]);
 
@@ -91,7 +97,7 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { title, supplier, purchaseOrder: purchaseOrder || undefined, currency, issueDate, dueDate: dueDate || undefined, taxRate, notes, items };
+      const payload = { title, supplier, purchaseOrder: purchaseOrder || undefined, currency, issueDate, dueDate: dueDate || undefined, taxRate, notes, items, customFields };
       return mode === "edit" ? updateVendorBill(id!, payload) : createVendorBill(payload);
     },
 
@@ -163,6 +169,8 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
               <Label>Notes</Label>
               <textarea className="border rounded-md p-2 text-sm min-h-[70px] bg-background" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
+
+            <DynamicFields module="vendorBills" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => navigate("/procurement/bills")}>{tr.common.cancel}</Button>
