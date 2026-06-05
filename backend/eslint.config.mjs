@@ -17,7 +17,7 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.jest },
     },
     rules: {
-      "@typescript-eslint/no-explicit-any": "on",
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
