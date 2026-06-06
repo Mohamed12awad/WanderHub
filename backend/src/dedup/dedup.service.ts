@@ -61,7 +61,7 @@ export class DedupService {
     const scopeWhere = await this.visibility.ownershipWhere(user, cfg.base, 'ownerId');
 
     const model = entity === 'leads' ? this.prisma.lead : this.prisma.customer;
-    const records = (await (model as any).findMany({
+    const records = (await (model as unknown as { findMany(args: unknown): Promise<unknown[]> }).findMany({
       where: { deletedAt: null, ...scopeWhere },
       select: { id: true, name: true, email: true, phone: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
@@ -105,7 +105,7 @@ export class DedupService {
 
     // Every record involved must exist, be live, and be within the user's scope.
     const all = [surviveId, ...ids];
-    const found = (await (model as any).findMany({
+    const found = (await (model as unknown as { findMany(args: unknown): Promise<unknown[]> }).findMany({
       where: { id: { in: all }, deletedAt: null, ...scopeWhere },
       select: { id: true },
     })) as { id: string }[];
@@ -133,7 +133,9 @@ export class DedupService {
       await tx.timelineEvent.updateMany({ where: poly, data: { linkedToId: surviveId } });
       await tx.attachment.updateMany({ where: poly, data: { linkedToId: surviveId } });
 
-      await (tx as any)[entity === 'leads' ? 'lead' : 'customer'].updateMany({
+      await (tx as unknown as Record<string, { updateMany(args: unknown): Promise<{ count: number }> }>)[
+        entity === 'leads' ? 'lead' : 'customer'
+      ].updateMany({
         where: { id: { in: ids } },
         data: { deletedAt: now },
       });

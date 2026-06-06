@@ -16,15 +16,17 @@ const ALWAYS_STRIP = ['_id', 'id', 'createdAt', 'updatedAt'];
  * Handles the Mongoose-shape legacy where the frontend sends `owner` as either
  * a string id or a `{ _id }` object, and Prisma expects `ownerId`.
  */
-export function cleanData(body: Record<string, any>, opts: CleanOptions = {}): Record<string, any> {
-  const { owner, ...rest } = body;
+export function cleanData(body: object, opts: CleanOptions = {}): Record<string, unknown> {
+  const rest: Record<string, unknown> = { ...body };
+  const owner = rest.owner;
 
-  for (const k of [...ALWAYS_STRIP, ...(opts.relations ?? [])]) {
+  for (const k of ['owner', ...ALWAYS_STRIP, ...(opts.relations ?? [])]) {
     delete rest[k];
   }
 
   if (owner !== undefined) {
-    rest.ownerId = !owner ? null : typeof owner === 'object' ? (owner._id ?? owner.id) : owner;
+    const o = owner as { _id?: string; id?: string } | string | null;
+    rest.ownerId = !o ? null : typeof o === 'object' ? (o._id ?? o.id) : o;
   }
 
   for (const f of opts.emptyToNull ?? []) {

@@ -17,7 +17,7 @@ export class CreateProjectDto {
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 
   // Mapped to customerId / dealId / managerId by the service.
-  @IsOptional() customer?: any;
-  @IsOptional() deal?: any;
-  @IsOptional() manager?: any;
+  @IsOptional() customer?: string | { _id?: string; id?: string };
+  @IsOptional() deal?: string | { _id?: string; id?: string };
+  @IsOptional() manager?: string | { _id?: string; id?: string };
 }

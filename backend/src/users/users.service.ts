@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
@@ -27,7 +28,7 @@ export class UsersService {
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = {};
+    const where: Prisma.UserWhereInput = {};
     if (q) where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
       { email: { contains: q, mode: 'insensitive' } },
@@ -35,9 +36,10 @@ export class UsersService {
     if (active !== undefined && active !== '') where.active = active === 'true';
     if (phone) where.phone = { contains: phone, mode: 'insensitive' };
     if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
+      const range: Prisma.DateTimeFilter = {};
+      if (createdAt_from) range.gte = new Date(createdAt_from);
+      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); range.lte = d; }
+      where.createdAt = range;
     }
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({ where, include: this.userInclude, skip: (p - 1) * limit, take: limit }),
@@ -81,7 +83,7 @@ export class UsersService {
         password: hashed,
         ...(role ? { roleId: role } : {}),
         ...(reportsTo ? { reportsToId: reportsTo } : {}),
-      } as any,
+      } as Prisma.UserUncheckedCreateInput,
       include: this.userInclude,
     });
     return toClient(user);
@@ -92,7 +94,7 @@ export class UsersService {
     if (!existing) return null;
 
     const { password, role, reportsTo, ...rest } = body;
-    const data: Record<string, any> = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if (reportsTo !== undefined) data.reportsToId = reportsTo || null;
 
     if (role) {
@@ -112,7 +114,11 @@ export class UsersService {
       data.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
     }
 
-    const user = await this.prisma.user.update({ where: { id }, data, include: this.userInclude });
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: data as Prisma.UserUncheckedUpdateInput,
+      include: this.userInclude,
+    });
     return toClient(user);
   }
 
@@ -184,7 +190,7 @@ export class UsersService {
   ) {
     const updated = await this.prisma.user.update({
       where: { id },
-      data: { notificationPreferences: prefs as any },
+      data: { notificationPreferences: prefs as Prisma.InputJsonValue },
       select: { notificationPreferences: true },
     });
     return updated.notificationPreferences;

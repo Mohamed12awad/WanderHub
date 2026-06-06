@@ -57,8 +57,9 @@ export class AiService {
     try {
       const text = await callProvider(provider, model, key, system, prompt);
       return { provider, model, text };
-    } catch (e: any) {
-      throw new BadRequestException(`AI request failed: ${e?.message ?? 'unknown error'}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'unknown error';
+      throw new BadRequestException(`AI request failed: ${message}`);
     }
   }
 

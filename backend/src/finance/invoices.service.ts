@@ -34,8 +34,9 @@ export class InvoicesService {
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === module);
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === module);
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -60,7 +61,7 @@ export class InvoicesService {
       _sum: { amount: true },
     });
     const totalPaid = agg._sum.amount ?? 0;
-    const status = deriveInvoiceStatus(invoice.total, totalPaid, invoice.dueDate) as any;
+    const status = deriveInvoiceStatus(invoice.total, totalPaid, invoice.dueDate) as Prisma.InvoiceUpdateInput['status'];
     const updated = await tx.invoice.update({ where: { id: invoiceId }, data: { totalPaid, status } });
 
     // Sync the linked deal's pipeline stage with payment state.
@@ -102,8 +103,8 @@ export class InvoicesService {
 
   async getInvoices(query: Record<string, string>) {
     const { status, customer, deal, page, limit: limitRaw, q } = query;
-    const where: any = { deletedAt: null };
-    if (status) where.status = status;
+    const where: Prisma.InvoiceWhereInput = { deletedAt: null };
+    if (status) where.status = status as Prisma.InvoiceWhereInput['status'];
     if (customer) where.customerId = customer;
     if (deal) where.dealId = deal;
     if (q) where.OR = [{ invoiceNumber: { contains: q, mode: 'insensitive' } }, { title: { contains: q, mode: 'insensitive' } }];
@@ -153,7 +154,7 @@ export class InvoicesService {
         ...(deal ? { dealId: deal } : {}),
         createdById: userId,
         items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
-      } as any,
+      } as Prisma.InvoiceUncheckedCreateInput,
       include: INVOICE_INCLUDE,
     });
 
@@ -163,7 +164,7 @@ export class InvoicesService {
       const overall = await this.approvals.initSteps(this.prisma, 'Invoice', invoice.id, 'invoices', invoice.total);
       if (overall === 'approved') {
         await this.prisma.invoice.update({ where: { id: invoice.id }, data: { approvalStatus: 'approved' } });
-        (invoice as any).approvalStatus = 'approved';
+        (invoice as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
     // A sale draws product-linked items out of stock.
@@ -188,9 +189,12 @@ export class InvoicesService {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
-    const data: any = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('invoices', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'invoices',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     if (invoice.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     // Post-approval edits reset the document back to pending for re-review.
@@ -208,7 +212,7 @@ export class InvoicesService {
         data.total = totals.total;
         data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
       }
-      await tx.invoice.update({ where: { id }, data });
+      await tx.invoice.update({ where: { id }, data: data as Prisma.InvoiceUncheckedUpdateInput });
       // Totals changed → re-derive paid status from the existing payments.
       if (items) await this.recalcInvoiceTotals(tx, id);
       return tx.invoice.findUnique({ where: { id }, include: INVOICE_INCLUDE });
@@ -234,7 +238,7 @@ export class InvoicesService {
     // Deduct stock for product-linked line items (fire-and-forget; non-blocking on soft errors).
     const alreadyDeducted = await this.prisma.stockMovement.findFirst({ where: { refType: 'Invoice', refId: id } });
     if (!alreadyDeducted) {
-      for (const item of invoice.items as any[]) {
+      for (const item of invoice.items) {
         if (item.productId && item.quantity > 0) {
           try {
             await this.inventory.applyMovement({
@@ -343,7 +347,7 @@ export class InvoicesService {
 
     const { payment } = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.invoicePayment.create({
-        data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as any,
+        data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as Prisma.InvoicePaymentUncheckedCreateInput,
         include: { createdBy: { select: { id: true, name: true } } },
       });
 
@@ -400,7 +404,7 @@ export class InvoicesService {
 
       const updated = await tx.invoicePayment.update({
         where: { id: paymentId },
-        data: { ...body, amount: newAmount, currency: newCurrency, date: body.date ? new Date(body.date) : payment.date } as any,
+        data: { ...body, amount: newAmount, currency: newCurrency, date: body.date ? new Date(body.date) : payment.date } as Prisma.InvoicePaymentUncheckedUpdateInput,
       });
 
       await this.applyAccountDelta(tx, newAccountId, newCurrency, newAmount);

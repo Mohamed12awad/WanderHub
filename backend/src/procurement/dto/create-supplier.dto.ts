@@ -7,7 +7,7 @@ export class CreateSupplierDto {
 
   @IsOptional() @IsString() email?: string;
   @IsOptional() @IsString() phone?: string;
-  @IsOptional() address?: any;
+  @IsOptional() address?: Record<string, unknown>;
   @IsOptional() @IsString() taxId?: string;
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() notes?: string;

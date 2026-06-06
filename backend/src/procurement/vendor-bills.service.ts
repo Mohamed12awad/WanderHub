@@ -40,8 +40,9 @@ export class VendorBillsService {
 
   private async getApprovalConfig() {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === 'vendor_bills');
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === 'vendor_bills');
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -50,15 +51,23 @@ export class VendorBillsService {
     return approverRoles.length > 0 && approverRoles.includes(userRole);
   }
 
-  private cleanData(body: Record<string, any>) {
-    const { _id, id, supplier, purchaseOrder, createdAt, updatedAt, items, ...rest } = body;
-    const data: Record<string, any> = { ...rest };
+  private cleanData(body: object) {
+    const { _id, id, supplier, purchaseOrder, createdAt, updatedAt, items, ...rest } =
+      body as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
     if (supplier !== undefined) {
-      data.supplierId = typeof supplier === 'object' ? supplier?._id ?? supplier?.id : supplier;
+      data.supplierId =
+        typeof supplier === 'object'
+          ? ((supplier as { _id?: string; id?: string })?._id ?? (supplier as { _id?: string; id?: string })?.id)
+          : supplier;
     }
     if (purchaseOrder !== undefined) {
-      data.purchaseOrderId = purchaseOrder === '' || purchaseOrder === null ? null
-        : typeof purchaseOrder === 'object' ? purchaseOrder?._id ?? purchaseOrder?.id : purchaseOrder;
+      data.purchaseOrderId =
+        purchaseOrder === '' || purchaseOrder === null
+          ? null
+          : typeof purchaseOrder === 'object'
+            ? ((purchaseOrder as { _id?: string; id?: string })?._id ?? (purchaseOrder as { _id?: string; id?: string })?.id)
+            : purchaseOrder;
     }
     return data;
   }
@@ -68,15 +77,15 @@ export class VendorBillsService {
     if (!bill) return null;
     const agg = await tx.vendorBillPayment.aggregate({ where: { billId }, _sum: { amount: true } });
     const totalPaid = agg._sum.amount ?? 0;
-    const status = deriveBillStatus(bill.total, totalPaid, bill.dueDate) as any;
+    const status = deriveBillStatus(bill.total, totalPaid, bill.dueDate) as Prisma.VendorBillUpdateInput['status'];
     return tx.vendorBill.update({ where: { id: billId }, data: { totalPaid, status } });
   }
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, status, supplierId, purchaseOrderId } = query;
-    const where: any = { deletedAt: null };
+    const where: Prisma.VendorBillWhereInput = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
-    if (status) where.status = status;
+    if (status) where.status = status as Prisma.VendorBillWhereInput['status'];
     if (supplierId) where.supplierId = supplierId;
     if (purchaseOrderId) where.purchaseOrderId = purchaseOrderId;
 
@@ -101,8 +110,11 @@ export class VendorBillsService {
 
   async create(body: CreateVendorBillDto, userId: string) {
     const { items = [], taxRate = 0, ...rest } = body;
-    const data = this.cleanData(rest as any);
-    data.customFields = await this.customFields.validateAndClean('vendorBills', data.customFields);
+    const data = this.cleanData(rest);
+    data.customFields = await this.customFields.validateAndClean(
+      'vendorBills',
+      data.customFields as Record<string, unknown> | undefined,
+    );
     const totals = calcTotals(items, taxRate);
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const enabled = await this.approvals.isEnabled('vendor_bills');
@@ -120,14 +132,14 @@ export class VendorBillsService {
         items: {
           create: totals.items.map((item, idx) => ({ ...item, order: idx })),
         },
-      } as any,
+      } as Prisma.VendorBillUncheckedCreateInput,
       include: BILL_INCLUDE,
     });
     if (enabled) {
       const overall = await this.approvals.initSteps(this.prisma, 'VendorBill', bill.id, 'vendor_bills', bill.total);
       if (overall === 'approved') {
         await this.prisma.vendorBill.update({ where: { id: bill.id }, data: { approvalStatus: 'approved' } });
-        (bill as any).approvalStatus = 'approved';
+        (bill as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
 
@@ -139,10 +151,13 @@ export class VendorBillsService {
     const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
 
-    const { items, taxRate, ...rest } = body as any;
+    const { items, taxRate, ...rest } = body;
     const data = this.cleanData(rest);
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('vendorBills', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'vendorBills',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
 
     const bill = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -160,7 +175,11 @@ export class VendorBillsService {
       }
       if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
       if (items !== undefined && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
-      return tx.vendorBill.update({ where: { id }, data, include: BILL_INCLUDE });
+      return tx.vendorBill.update({
+        where: { id },
+        data: data as Prisma.VendorBillUncheckedUpdateInput,
+        include: BILL_INCLUDE,
+      });
     });
 
     await this.timeline.log('bill.updated', 'Vendor Bill updated', id, 'VendorBill', {}, userId);
@@ -340,7 +359,7 @@ export class VendorBillsService {
             order: idx,
           })),
         },
-      } as any,
+      } as Prisma.VendorBillUncheckedCreateInput,
       include: BILL_INCLUDE,
     });
 
@@ -358,16 +377,17 @@ export class VendorBillsService {
   async getVendorPayments(query: Record<string, string>) {
     const { page, limit, method, currency, supplierId, date_from, date_to, amount_min, amount_max } = query;
 
-    const where: any = {};
+    const where: Prisma.VendorBillPaymentWhereInput = {};
     if (method) where.method = method;
     if (currency) where.currency = currency;
     if (supplierId) where.bill = { supplierId };
     const dr = dateRange(date_from, date_to);
     if (dr) where.date = dr;
     if (amount_min || amount_max) {
-      where.amount = {};
-      if (amount_min) where.amount.gte = parseFloat(amount_min);
-      if (amount_max) where.amount.lte = parseFloat(amount_max);
+      const range: Prisma.FloatFilter = {};
+      if (amount_min) range.gte = parseFloat(amount_min);
+      if (amount_max) range.lte = parseFloat(amount_max);
+      where.amount = range;
     }
 
     return paginate(this.prisma.vendorBillPayment, {

@@ -169,7 +169,7 @@ export default function PipelineStagesSettings() {
   const addStage = () => {
     const label = newLabel.trim();
     if (!label) return;
-    let base = slugify(label) || "stage";
+    const base = slugify(label) || "stage";
     let key = base;
     let i = 2;
     while (stages.some((s) => s.key === key)) key = `${base}_${i++}`;

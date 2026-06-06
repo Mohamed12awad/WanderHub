@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -23,9 +24,14 @@ export class CustomersService {
   ) {}
 
   async create(body: CreateCustomerDto, userId: string) {
-    const data = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
-    data.customFields = await this.customFields.validateAndClean('customers', data.customFields);
-    const customer = await this.prisma.customer.create({ data: data as any });
+    const data = cleanData(body, { emptyToNull: ['dateOfBirth'] });
+    data.customFields = await this.customFields.validateAndClean(
+      'customers',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    const customer = await this.prisma.customer.create({
+      data: data as Prisma.CustomerUncheckedCreateInput,
+    });
 
     await this.timeline.log(
       'contact.created',
@@ -43,7 +49,7 @@ export class CustomersService {
     const { page, limit, q, status, gender, phone, createdAt_from, createdAt_to } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
 
-    const where: any = { deletedAt: null, ...scopeWhere };
+    const where: Prisma.CustomerWhereInput = { deletedAt: null, ...scopeWhere };
     if (q) {
       where.OR = [
         { name:  { contains: q, mode: 'insensitive' } },
@@ -58,7 +64,12 @@ export class CustomersService {
     if (dr) where.createdAt = dr;
 
     const cfConditions = buildCfConditions(query);
-    if (cfConditions.length) where.AND = [...(where.AND ?? []), ...cfConditions];
+    if (cfConditions.length) {
+      where.AND = [
+        ...((where.AND as Prisma.CustomerWhereInput[]) ?? []),
+        ...(cfConditions as Prisma.CustomerWhereInput[]),
+      ];
+    }
 
     return paginate(this.prisma.customer, {
       where,
@@ -82,17 +93,23 @@ export class CustomersService {
     const existing = await this.prisma.customer.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Customer not found');
 
-    const cleaned = cleanData(body as any, { emptyToNull: ['dateOfBirth'] });
+    const cleaned = cleanData(body, { emptyToNull: ['dateOfBirth'] });
     if ('customFields' in cleaned) {
-      cleaned.customFields = await this.customFields.validateAndClean('customers', cleaned.customFields);
+      cleaned.customFields = await this.customFields.validateAndClean(
+        'customers',
+        cleaned.customFields as Record<string, unknown> | undefined,
+      );
     }
-    const customer = await this.prisma.customer.update({ where: { id }, data: cleaned });
+    const customer = await this.prisma.customer.update({
+      where: { id },
+      data: cleaned as Prisma.CustomerUncheckedUpdateInput,
+    });
 
     const TRACKED_FIELDS = ['name', 'email', 'phone', 'mobile', 'location', 'status', 'gender', 'source', 'notes'];
     const changes: Record<string, { from: unknown; to: unknown }> = {};
     for (const field of TRACKED_FIELDS) {
       if (cleaned[field] === undefined) continue;
-      const oldVal = (existing as any)[field];
+      const oldVal = (existing as Record<string, unknown>)[field];
       const newVal = cleaned[field];
       if (String(oldVal ?? '') !== String(newVal ?? '')) changes[field] = { from: oldVal, to: newVal };
     }

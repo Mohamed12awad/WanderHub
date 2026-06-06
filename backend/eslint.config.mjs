@@ -20,7 +20,9 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        // `ignoreRestSiblings` allows the common `const { id, ...rest } = body`
+        // pattern used across services to strip read-only fields before a write.
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
       "@typescript-eslint/no-floating-promises": "error",
       "no-console": "warn",
@@ -30,6 +32,10 @@ export default tseslint.config(
     // Spec files aren't in the main tsconfig; lint them without type info.
     files: ["**/*.spec.ts"],
     extends: [tseslint.configs.disableTypeChecked],
-    rules: { "@typescript-eslint/no-floating-promises": "off" },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
+      // Test mocks legitimately use `any`; typing them is churn, not safety.
+      "@typescript-eslint/no-explicit-any": "off",
+    },
   },
 );

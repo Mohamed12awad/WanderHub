@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { buildCfConditions } from '../common/customFields';
@@ -22,18 +23,24 @@ export class ProductsService {
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = q
+    const where: Prisma.ProductWhereInput = q
       ? { OR: [{ name: { contains: q, mode: 'insensitive' } }, { type: { contains: q, mode: 'insensitive' } }] }
       : {};
     where.deletedAt = null;
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
+      const range: Prisma.DateTimeFilter = {};
+      if (createdAt_from) range.gte = new Date(createdAt_from);
+      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); range.lte = d; }
+      where.createdAt = range;
     }
     const cfConditions = buildCfConditions(query);
-    if (cfConditions.length) where.AND = [...(where.AND ?? []), ...cfConditions];
+    if (cfConditions.length) {
+      where.AND = [
+        ...((where.AND as Prisma.ProductWhereInput[]) ?? []),
+        ...(cfConditions as Prisma.ProductWhereInput[]),
+      ];
+    }
     const [data, total] = await Promise.all([
       this.prisma.product.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (p - 1) * limit, take: limit }),
       this.prisma.product.count({ where }),
@@ -49,20 +56,26 @@ export class ProductsService {
   async create(body: CreateProductDto) {
     // The global ValidationPipe (whitelist) already strips any field not
     // declared on the DTO, so the payload is safe to pass straight through.
-    const data = { ...body } as Record<string, any>;
-    data.customFields = await this.customFields.validateAndClean('products', data.customFields);
-    const product = await this.prisma.product.create({ data: data as any });
+    const data = { ...body } as Record<string, unknown>;
+    data.customFields = await this.customFields.validateAndClean(
+      'products',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    const product = await this.prisma.product.create({ data: data as Prisma.ProductUncheckedCreateInput });
     return toClient(product);
   }
 
   async update(id: string, body: UpdateProductDto) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('product not found');
-    const data = { ...body } as Record<string, any>;
+    const data = { ...body } as Record<string, unknown>;
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('products', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'products',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
-    const product = await this.prisma.product.update({ where: { id }, data: data as any });
+    const product = await this.prisma.product.update({ where: { id }, data: data as Prisma.ProductUncheckedUpdateInput });
     return toClient(product);
   }
 

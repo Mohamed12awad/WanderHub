@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -16,7 +17,7 @@ export class ActivitiesService {
 
   async findAll(query: Record<string, string>) {
     const { linkedTo, linkedModel, month, year } = query;
-    const where: any = {};
+    const where: Prisma.ActivityWhereInput = {};
     if (linkedTo) where.linkedToId = linkedTo;
     if (linkedModel) where.linkedModel = linkedModel;
     if (month && year) {
@@ -39,22 +40,26 @@ export class ActivitiesService {
   }
 
   async create(body: CreateActivityDto, userId: string) {
-    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, customer, deal, linkedTo, ...rest } = body as any;
-    const resolvedLinkedToId = rest.linkedToId ?? linkedTo;
-    const data: any = { ...rest, linkedToId: resolvedLinkedToId, createdById: userId };
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, customer, deal, linkedTo, ...rest } =
+      body as unknown as Record<string, unknown>;
+    const resolvedLinkedToId = (rest.linkedToId ?? linkedTo) as string | undefined;
+    const data: Record<string, unknown> = { ...rest, linkedToId: resolvedLinkedToId, createdById: userId };
     delete data.linkedTo;
     // Prisma requires a proper Date object for DateTime fields
     if (data.date && typeof data.date === 'string') data.date = new Date(data.date);
     // Strip empty description so it's stored as null, not empty string
     if (data.description === '') delete data.description;
-    if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? (assignedTo as { _id?: string })._id : assignedTo;
     if (resolvedLinkedToId && rest.linkedModel === 'Customer') data.customerId = resolvedLinkedToId;
     if (resolvedLinkedToId && rest.linkedModel === 'Deal') data.dealId = resolvedLinkedToId;
     if (resolvedLinkedToId && rest.linkedModel === 'Project') data.projectId = resolvedLinkedToId;
-    data.customFields = await this.customFields.validateAndClean('activities', data.customFields);
+    data.customFields = await this.customFields.validateAndClean(
+      'activities',
+      data.customFields as Record<string, unknown> | undefined,
+    );
 
     const activity = await this.prisma.activity.create({
-      data,
+      data: data as Prisma.ActivityUncheckedCreateInput,
       include: {
         assignedTo: { select: { id: true, name: true } },
         createdBy:  { select: { id: true, name: true } },
@@ -80,15 +85,22 @@ export class ActivitiesService {
   async update(id: string, body: UpdateActivityDto) {
     const existing = await this.prisma.activity.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('activity not found');
-    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } = body as any;
-    const data: any = { ...rest };
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, customer, deal, ...rest } =
+      body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
     if (data.date && typeof data.date === 'string') data.date = new Date(data.date);
     if (data.description === '') delete data.description;
-    if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? (assignedTo as { _id?: string })?._id : assignedTo;
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('activities', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'activities',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
-    const activity = await this.prisma.activity.update({ where: { id }, data });
+    const activity = await this.prisma.activity.update({
+      where: { id },
+      data: data as Prisma.ActivityUncheckedUpdateInput,
+    });
     return toClient(activity);
   }
 

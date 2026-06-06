@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
@@ -50,8 +51,9 @@ export class SalesOrdersService {
 
   private async getApprovalConfig(): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === 'salesOrders');
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === 'salesOrders');
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -63,7 +65,7 @@ export class SalesOrdersService {
 
   // Maps the GenericTable column header (sent as `sort`) to a Prisma orderBy.
   // Defaults to newest-first when no/unknown sort is given.
-  private resolveOrderBy(sort?: string, dir?: string): any {
+  private resolveOrderBy(sort?: string, dir?: string): Prisma.SalesOrderOrderByWithRelationInput {
     const direction = dir === 'asc' ? 'asc' : 'desc';
     const map: Record<string, string> = {
       'Order Number': 'orderNumber',
@@ -71,13 +73,15 @@ export class SalesOrdersService {
       Created: 'createdAt',
     };
     const field = sort ? map[sort] : undefined;
-    return field ? { [field]: direction } : { createdAt: 'desc' };
+    return field
+      ? ({ [field]: direction } as Prisma.SalesOrderOrderByWithRelationInput)
+      : { createdAt: 'desc' };
   }
 
   async getAll(query: Record<string, string>) {
     const { status, customer, deal, page, limit: limitRaw, q } = query;
-    const where: any = { deletedAt: null };
-    if (status) where.status = status;
+    const where: Prisma.SalesOrderWhereInput = { deletedAt: null };
+    if (status) where.status = status as Prisma.SalesOrderWhereInput['status'];
     if (customer) where.customerId = customer;
     if (deal) where.dealId = deal;
     if (q) where.OR = [
@@ -130,7 +134,7 @@ export class SalesOrdersService {
         ...(project ? { projectId: project } : {}),
         createdById: userId,
         items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
-      } as any,
+      } as Prisma.SalesOrderUncheckedCreateInput,
       include: SO_INCLUDE,
     });
 
@@ -138,7 +142,7 @@ export class SalesOrdersService {
       const overall = await this.approvals.initSteps(this.prisma, 'SalesOrder', order.id, 'salesOrders', order.total);
       if (overall === 'approved') {
         await this.prisma.salesOrder.update({ where: { id: order.id }, data: { approvalStatus: 'approved' } });
-        (order as any).approvalStatus = 'approved';
+        (order as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
     await this.timeline.log('salesOrder.created', `Sales order ${order.orderNumber} created`, order.id, 'SalesOrder', { total: order.total, currency: order.currency }, userId);
@@ -152,10 +156,13 @@ export class SalesOrdersService {
       throw new BadRequestException(`A ${order.status} sales order cannot be edited`);
     }
     const { items, taxRate, customer: _customer, deal: _deal, project: _project, expectedDate, ...rest } = body;
-    const data: any = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if (expectedDate !== undefined) data.expectedDate = expectedDate ? new Date(expectedDate) : null;
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('salesOrders', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'salesOrders',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     if (order.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     // Post-approval edits reset the document back to pending for re-review.
@@ -174,7 +181,11 @@ export class SalesOrdersService {
       } else if (taxRate !== undefined) {
         data.taxRate = taxRate;
       }
-      return tx.salesOrder.update({ where: { id }, data, include: SO_INCLUDE });
+      return tx.salesOrder.update({
+        where: { id },
+        data: data as Prisma.SalesOrderUncheckedUpdateInput,
+        include: SO_INCLUDE,
+      });
     });
     return toClient(updated);
   }
@@ -192,7 +203,7 @@ export class SalesOrdersService {
         throw new BadRequestException('Sales order must be approved before it can be confirmed');
       }
     }
-    const updated = await this.prisma.salesOrder.update({ where: { id }, data: { status: status as any }, include: SO_INCLUDE });
+    const updated = await this.prisma.salesOrder.update({ where: { id }, data: { status: status as Prisma.SalesOrderUpdateInput['status'] }, include: SO_INCLUDE });
     await this.timeline.log('salesOrder.status', `Sales order ${order.orderNumber} marked ${status}`, id, 'SalesOrder', { status }, userId);
     return toClient(updated);
   }

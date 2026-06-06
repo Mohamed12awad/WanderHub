@@ -33,7 +33,7 @@ export class TrackController {
 
   @Get('c/:id')
   async click(@Param('id') id: string, @Query('u') u: string, @Res() res: Response) {
-    let target = '';
+    let target: string;
     try {
       target = decodeURIComponent(u ?? '');
     } catch {

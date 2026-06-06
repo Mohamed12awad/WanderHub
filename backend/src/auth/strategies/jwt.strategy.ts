@@ -12,7 +12,7 @@ interface JwtPayload {
  * Accepts the token either as a raw header value or as a `Bearer <token>`
  * value, matching the behaviour of the original `requireSignin` middleware.
  */
-function extractToken(req: any): string | null {
+function extractToken(req: { headers?: { authorization?: string } }): string | null {
   const authHeader = req?.headers?.authorization;
   if (!authHeader) return null;
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {

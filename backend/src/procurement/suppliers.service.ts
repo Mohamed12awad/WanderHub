@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
@@ -15,9 +16,9 @@ export class SuppliersService {
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, status } = query;
-    const where: any = { deletedAt: null };
+    const where: Prisma.SupplierWhereInput = { deletedAt: null };
     if (q) where.name = { contains: q, mode: 'insensitive' };
-    if (status) where.status = status;
+    if (status) where.status = status as Prisma.SupplierWhereInput['status'];
 
     if (!page) {
       const suppliers = await this.prisma.supplier.findMany({
@@ -49,10 +50,15 @@ export class SuppliersService {
   }
 
   async create(body: CreateSupplierDto) {
-    const { address, ...rest } = body as any;
-    rest.customFields = await this.customFields.validateAndClean('suppliers', rest.customFields);
+    const { address, ...rest } = body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
+    data.customFields = await this.customFields.validateAndClean(
+      'suppliers',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    if (address !== undefined) data.address = address;
     const supplier = await this.prisma.supplier.create({
-      data: { ...rest, ...(address !== undefined ? { address } : {}) },
+      data: data as Prisma.SupplierUncheckedCreateInput,
     });
     return toClient(supplier);
   }
@@ -60,13 +66,18 @@ export class SuppliersService {
   async update(id: string, body: UpdateSupplierDto) {
     const existing = await this.prisma.supplier.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
-    const { address, ...rest } = body as any;
-    if ('customFields' in rest) {
-      rest.customFields = await this.customFields.validateAndClean('suppliers', rest.customFields);
+    const { address, ...rest } = body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
+    if ('customFields' in data) {
+      data.customFields = await this.customFields.validateAndClean(
+        'suppliers',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
+    if (address !== undefined) data.address = address;
     const supplier = await this.prisma.supplier.update({
       where: { id },
-      data: { ...rest, ...(address !== undefined ? { address } : {}) },
+      data: data as Prisma.SupplierUncheckedUpdateInput,
     });
     return toClient(supplier);
   }

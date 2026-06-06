@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
@@ -18,9 +19,9 @@ export class TasksService {
 
   async findAll(query: Record<string, string>) {
     const { status, priority, assignedTo, linkedTo, overdue, mine, projectId, page = '1' } = query;
-    const where: any = { deletedAt: null };
-    if (status) where.status = status;
-    if (priority) where.priority = priority;
+    const where: Prisma.TaskWhereInput = { deletedAt: null };
+    if (status) where.status = status as Prisma.TaskWhereInput['status'];
+    if (priority) where.priority = priority as Prisma.TaskWhereInput['priority'];
     if (assignedTo) where.assignedToId = assignedTo;
     if (linkedTo) where.linkedToId = linkedTo;
     if (mine === 'true') where.assignedToId = query._userId;
@@ -74,17 +75,21 @@ export class TasksService {
   }
 
   async create(body: CreateTaskDto, userId: string) {
-    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, project, milestone, ...rest } = body as any;
-    const data: any = { ...rest, createdById: userId };
-    if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    const { _id, id, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, project, milestone, ...rest } =
+      body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest, createdById: userId };
+    if (assignedTo) data.assignedToId = typeof assignedTo === 'object' ? (assignedTo as { _id?: string })._id : assignedTo;
     if (linkedTo && !data.linkedToId) data.linkedToId = linkedTo;
     if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
     if (project) data.projectId = project;
     if (milestone) data.milestoneId = milestone;
-    data.customFields = await this.customFields.validateAndClean('tasks', data.customFields);
+    data.customFields = await this.customFields.validateAndClean(
+      'tasks',
+      data.customFields as Record<string, unknown> | undefined,
+    );
 
     const task = await this.prisma.task.create({
-      data,
+      data: data as Prisma.TaskUncheckedCreateInput,
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, name: true } },
@@ -118,18 +123,22 @@ export class TasksService {
   async update(id: string, body: UpdateTaskDto, userId?: string) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('task not found');
-    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, project, milestone, ...rest } = body as any;
-    const data: any = { ...rest };
-    if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? assignedTo?._id : assignedTo;
+    const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, project, milestone, ...rest } =
+      body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
+    if (assignedTo !== undefined) data.assignedToId = typeof assignedTo === 'object' ? (assignedTo as { _id?: string })?._id : assignedTo;
     if (linkedTo !== undefined) data.linkedToId = linkedTo;
     if (project !== undefined) data.projectId = project || null;
     if (milestone !== undefined) data.milestoneId = milestone || null;
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('tasks', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'tasks',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     const task = await this.prisma.task.update({
       where: { id },
-      data,
+      data: data as Prisma.TaskUncheckedUpdateInput,
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true } },
@@ -138,9 +147,10 @@ export class TasksService {
       },
     });
 
-    if (data.assignedToId && data.assignedToId !== existing.assignedToId && data.assignedToId !== userId) {
+    const newAssignee = data.assignedToId as string | undefined;
+    if (newAssignee && newAssignee !== existing.assignedToId && newAssignee !== userId) {
       await this.dispatcher.dispatch({
-        userId: data.assignedToId,
+        userId: newAssignee,
         type: 'task_assigned',
         title: `Task assigned: ${task.title}`,
         link: task.linkedToId ? `/${task.linkedModel?.toLowerCase()}s/${task.linkedToId}` : undefined,

@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -20,8 +21,9 @@ export class ExpensesService {
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === module);
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === module);
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -40,16 +42,22 @@ export class ExpensesService {
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = { deletedAt: null };
+    const where: Prisma.ExpenseReportWhereInput = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
-    if (approvalStatus !== undefined && approvalStatus !== '') where.approvalStatus = approvalStatus;
+    if (approvalStatus !== undefined && approvalStatus !== '') where.approvalStatus = approvalStatus as Prisma.ExpenseReportWhereInput['approvalStatus'];
     if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
+      const range: Prisma.DateTimeFilter = {};
+      if (createdAt_from) range.gte = new Date(createdAt_from);
+      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); range.lte = d; }
+      where.createdAt = range;
     }
     const cfConditions = buildCfConditions(query);
-    if (cfConditions.length) where.AND = [...(where.AND ?? []), ...cfConditions];
+    if (cfConditions.length) {
+      where.AND = [
+        ...((where.AND as Prisma.ExpenseReportWhereInput[]) ?? []),
+        ...(cfConditions as Prisma.ExpenseReportWhereInput[]),
+      ];
+    }
     const [data, total] = await Promise.all([
       this.prisma.expenseReport.findMany({ where, include: baseInclude, orderBy: { createdAt: 'desc' }, skip: (p - 1) * limit, take: limit }),
       this.prisma.expenseReport.count({ where }),
@@ -66,19 +74,19 @@ export class ExpensesService {
   }
 
   async create(body: CreateExpenseReportDto, userId: string) {
-    const { title, expenses, project, ...rest } = body as any;
-    const total = (expenses ?? []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+    const { title, expenses, project } = body;
+    const total = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
     const enabled = await this.approvals.isEnabled('expenses');
-    const customFields = await this.customFields.validateAndClean('expenses', (rest as any).customFields ?? body.customFields);
+    const customFields = await this.customFields.validateAndClean('expenses', body.customFields);
     const report = await this.prisma.expenseReport.create({
       data: {
         title,
         userId,
         ...(project ? { projectId: project } : {}),
         approvalStatus: enabled ? 'pending' : 'approved',
-        ...(customFields !== undefined ? { customFields: customFields as any } : {}),
+        ...(customFields !== undefined ? { customFields: customFields as Prisma.InputJsonValue } : {}),
         expenses: {
-          create: (expenses ?? []).map((e: any) => ({
+          create: (expenses ?? []).map((e) => ({
             description: e.description,
             amount: Number(e.amount),
             date: new Date(e.date),
@@ -93,7 +101,7 @@ export class ExpensesService {
       const overall = await this.approvals.initSteps(this.prisma, 'ExpenseReport', report.id, 'expenses', total);
       if (overall === 'approved') {
         await this.prisma.expenseReport.update({ where: { id: report.id }, data: { approvalStatus: 'approved' } });
-        (report as any).approvalStatus = 'approved';
+        (report as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
     await this.timeline.log('expense.created', `Expense report "${report.title}" created`, report.id, 'Expense', { total }, userId);
@@ -103,22 +111,25 @@ export class ExpensesService {
   async update(id: string, body: UpdateExpenseReportDto) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('expense report not found');
-    const { expenses, project, ...rest } = body as any;
+    const { expenses, project, ...rest } = body;
     // Map project ID string → Prisma relation connect
-    const data: any = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if (project !== undefined) {
       data.projectId = project || null;
       delete data.project;
     }
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('expenses', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'expenses',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (expenses && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
     if (expenses) {
       await this.prisma.expenseItem.deleteMany({ where: { expenseReportId: id } });
       data.expenses = {
-        create: expenses.map((e: any) => ({
+        create: expenses.map((e) => ({
           description: e.description,
           amount: Number(e.amount),
           date: new Date(e.date),
@@ -129,7 +140,7 @@ export class ExpensesService {
     }
     const report = await this.prisma.expenseReport.update({
       where: { id },
-      data,
+      data: data as Prisma.ExpenseReportUncheckedUpdateInput,
       include: { user: { select: { id: true, name: true } }, expenses: true },
     });
     return toClient(report);

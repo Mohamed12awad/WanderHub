@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
 import { encryptSecret, decryptSecret } from '../common/crypto.util';
@@ -39,7 +40,7 @@ export class AiKeyService {
   async setConfig(patch: Partial<{ provider: string; model: string; enabled: boolean }>) {
     const ws = await this.workspaceConfig.get();
     const cfg = { ...((ws.aiConfig as object) ?? {}), ...patch };
-    await this.prisma.workspaceConfig.update({ where: { id: ws.id }, data: { aiConfig: cfg as any } });
+    await this.prisma.workspaceConfig.update({ where: { id: ws.id }, data: { aiConfig: cfg as Prisma.InputJsonValue } });
     this.workspaceConfig.invalidate();
     return cfg;
   }

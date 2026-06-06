@@ -47,9 +47,11 @@ const RULES: RouteRule[] = [
 
 function extractRecordName(body: unknown): string | undefined {
   if (!body || typeof body !== 'object') return undefined;
-  const b = body as Record<string, any>;
+  const b = body as Record<string, unknown>;
   // Prefer human-readable document names over IDs
-  return b.name ?? b.title ?? b.quoteNumber ?? b.invoiceNumber ?? b.orderNumber ?? undefined;
+  return (b.name ?? b.title ?? b.quoteNumber ?? b.invoiceNumber ?? b.orderNumber ?? undefined) as
+    | string
+    | undefined;
 }
 
 function verb(method: string, resource: string): string {
@@ -80,7 +82,7 @@ function deriveAction(method: string, url: string): string {
 export class LoggingInterceptor implements NestInterceptor {
   constructor(private readonly logs: LogsService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const req = context.switchToHttp().getRequest();
     const { method, originalUrl, user } = req;
 

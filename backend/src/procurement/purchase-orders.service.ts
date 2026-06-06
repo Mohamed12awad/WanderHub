@@ -32,8 +32,9 @@ export class PurchaseOrdersService {
 
   private async getApprovalConfig() {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === 'purchase_orders');
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === 'purchase_orders');
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -43,20 +44,23 @@ export class PurchaseOrdersService {
     return approverRoles.length > 0 && approverRoles.includes(userRole);
   }
 
-  private cleanData(body: Record<string, any>) {
-    const { _id, id, supplier, createdAt, updatedAt, items, ...rest } = body;
-    const data: Record<string, any> = { ...rest };
+  private cleanData(body: object) {
+    const { _id, id, supplier, createdAt, updatedAt, items, ...rest } = body as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
     if (supplier !== undefined) {
-      data.supplierId = typeof supplier === 'object' ? supplier?._id ?? supplier?.id : supplier;
+      data.supplierId =
+        typeof supplier === 'object'
+          ? ((supplier as { _id?: string; id?: string })?._id ?? (supplier as { _id?: string; id?: string })?.id)
+          : supplier;
     }
     return data;
   }
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, status, supplierId } = query;
-    const where: any = { deletedAt: null };
+    const where: Prisma.PurchaseOrderWhereInput = { deletedAt: null };
     if (q) where.title = { contains: q, mode: 'insensitive' };
-    if (status) where.status = status;
+    if (status) where.status = status as Prisma.PurchaseOrderWhereInput['status'];
     if (supplierId) where.supplierId = supplierId;
 
     if (!page) {
@@ -80,8 +84,11 @@ export class PurchaseOrdersService {
 
   async create(body: CreatePurchaseOrderDto, userId: string) {
     const { items = [], taxRate = 0, ...rest } = body;
-    const data = this.cleanData(rest as any);
-    data.customFields = await this.customFields.validateAndClean('purchaseOrders', data.customFields);
+    const data = this.cleanData(rest);
+    data.customFields = await this.customFields.validateAndClean(
+      'purchaseOrders',
+      data.customFields as Record<string, unknown> | undefined,
+    );
     const totals = calcTotals(items, taxRate);
     const poNumber = await this.numberSequence.nextNumber('po', 'PO');
     const enabled = await this.approvals.isEnabled('purchase_orders');
@@ -99,14 +106,14 @@ export class PurchaseOrdersService {
         items: {
           create: totals.items.map((item, idx) => ({ ...item, order: idx })),
         },
-      } as any,
+      } as Prisma.PurchaseOrderUncheckedCreateInput,
       include: PO_INCLUDE,
     });
     if (enabled) {
       const overall = await this.approvals.initSteps(this.prisma, 'PurchaseOrder', po.id, 'purchase_orders', po.total);
       if (overall === 'approved') {
         await this.prisma.purchaseOrder.update({ where: { id: po.id }, data: { approvalStatus: 'approved' } });
-        (po as any).approvalStatus = 'approved';
+        (po as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
 
@@ -118,10 +125,13 @@ export class PurchaseOrdersService {
     const existing = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
 
-    const { items, taxRate, ...rest } = body as any;
+    const { items, taxRate, ...rest } = body;
     const data = this.cleanData(rest);
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('purchaseOrders', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'purchaseOrders',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
 
     const po = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -140,7 +150,11 @@ export class PurchaseOrdersService {
       // Resubmit for approval if already rejected; post-approval edits also reset.
       if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
       if (items !== undefined && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
-      return tx.purchaseOrder.update({ where: { id }, data, include: PO_INCLUDE });
+      return tx.purchaseOrder.update({
+        where: { id },
+        data: data as Prisma.PurchaseOrderUncheckedUpdateInput,
+        include: PO_INCLUDE,
+      });
     });
 
     await this.timeline.log('po.updated', `Purchase Order updated`, id, 'PurchaseOrder', {}, userId);
@@ -157,7 +171,7 @@ export class PurchaseOrdersService {
     const po = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.purchaseOrder.update({
         where: { id },
-        data: { status: status as any },
+        data: { status: status as Prisma.PurchaseOrderUpdateInput['status'] },
         include: PO_INCLUDE,
       });
       // Receiving the PO brings product-linked items into stock — once, on the

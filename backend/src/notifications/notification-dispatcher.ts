@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import * as nodemailer from "nodemailer";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { toClient } from "../common/serialize";
 
@@ -65,7 +66,7 @@ export class NotificationDispatcher {
     const emailEnabled = typePref?.email !== false;
 
     if (inAppEnabled) {
-      await this.prisma.notification.create({ data: payload as any });
+      await this.prisma.notification.create({ data: payload as Prisma.NotificationUncheckedCreateInput });
     }
 
     // Enqueue an email for high-signal event types. Actual delivery is handled

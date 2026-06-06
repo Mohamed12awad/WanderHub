@@ -26,7 +26,7 @@ export class AttachmentsController {
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   upload(
-    @UploadedFile() file: any,
+    @UploadedFile() file: { originalname: string; mimetype: string; size: number; buffer: Buffer },
     @Query('linkedModel') linkedModel: string,
     @Query('linkedToId') linkedToId: string,
     @CurrentUser() user: AuthUser,

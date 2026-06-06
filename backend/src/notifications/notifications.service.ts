@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 
@@ -15,13 +16,13 @@ export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateNotificationDto) {
-    const notif = await this.prisma.notification.create({ data: dto as any });
+    const notif = await this.prisma.notification.create({ data: dto as Prisma.NotificationUncheckedCreateInput });
     return toClient(notif);
   }
 
   async findAll(userId: string, query: Record<string, string>) {
     const { page, limit: limitRaw, unread } = query;
-    const where: any = { userId };
+    const where: Prisma.NotificationWhereInput = { userId };
     if (unread === 'true') where.read = false;
 
     if (!page) {

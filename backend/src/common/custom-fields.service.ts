@@ -144,7 +144,7 @@ export class CustomFieldsService {
           throw new BadRequestException(`Field "${label}" exceeds the maximum length of ${def.maxLength}.`);
         }
         if (def.pattern) {
-          let re: RegExp | null = null;
+          let re: RegExp | null;
           try { re = new RegExp(def.pattern); } catch { re = null; }
           if (re && !re.test(asStr)) throw new BadRequestException(`Field "${label}" is invalid.`);
         }

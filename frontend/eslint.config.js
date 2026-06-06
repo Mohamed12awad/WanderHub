@@ -7,7 +7,7 @@ import globals from "globals";
 // Flat config (ESLint 9/10). Replaces the legacy .eslintrc.cjs.
 export default tseslint.config(
   // Build output and tooling config files are not linted as app source.
-  { ignores: ["dist", "eslint.config.js", "*.config.js", "*.config.cjs"] },
+  { ignores: ["dist", "public", "eslint.config.js", "*.config.js", "*.config.cjs"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
@@ -88,7 +89,7 @@ export class SettingsService {
     const config = await this.getOrCreate();
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
-      data: { approvals: approvals as any },
+      data: { approvals: approvals as Prisma.InputJsonValue },
     });
     this.workspaceConfig.invalidate();
     return updated.approvals;
@@ -123,7 +124,7 @@ export class SettingsService {
     }
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
-      data: data as any,
+      data: data as Prisma.WorkspaceConfigUncheckedUpdateInput,
     });
     this.workspaceConfig.invalidate();
     return {
@@ -147,7 +148,7 @@ export class SettingsService {
     if (body.locale) data.locale = body.locale;
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
-      data: data as any,
+      data: data as Prisma.WorkspaceConfigUncheckedUpdateInput,
     });
     this.workspaceConfig.invalidate();
     this.currency.invalidate();
@@ -190,7 +191,7 @@ export class SettingsService {
     key: string,
     body: { prefix?: string; padLength?: number; separator?: string },
   ) {
-    if (!ALLOWED_SEQ_KEYS.includes(key as any)) {
+    if (!(ALLOWED_SEQ_KEYS as readonly string[]).includes(key)) {
       throw new NotFoundException(`Unknown sequence key: ${key}`);
     }
     return this.prisma.numberSequence.upsert({
@@ -227,7 +228,7 @@ export class SettingsService {
     const merged = { ...existing, ...body };
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
-      data: { invoiceDefaults: merged as any },
+      data: { invoiceDefaults: merged as Prisma.InputJsonValue },
     });
     return updated.invoiceDefaults;
   }
@@ -242,14 +243,14 @@ export class SettingsService {
     if (body.isDefault) {
       await this.prisma.taxRate.updateMany({ data: { isDefault: false } });
     }
-    return this.prisma.taxRate.create({ data: body as any });
+    return this.prisma.taxRate.create({ data: body as Prisma.TaxRateUncheckedCreateInput });
   }
 
   async updateTaxRate(id: string, body: { name?: string; rate?: number; isDefault?: boolean }) {
     if (body.isDefault) {
       await this.prisma.taxRate.updateMany({ where: { id: { not: id } }, data: { isDefault: false } });
     }
-    return this.prisma.taxRate.update({ where: { id }, data: body as any });
+    return this.prisma.taxRate.update({ where: { id }, data: body as Prisma.TaxRateUncheckedUpdateInput });
   }
 
   async deleteTaxRate(id: string) {
@@ -274,7 +275,7 @@ export class SettingsService {
     const merged = { ...existing, ...body };
     const updated = await this.prisma.workspaceConfig.update({
       where: { id: config.id },
-      data: { passwordPolicy: merged as any },
+      data: { passwordPolicy: merged as Prisma.InputJsonValue },
     });
     return updated.passwordPolicy;
   }

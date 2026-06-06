@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -26,7 +27,7 @@ export class TimelineService {
           title,
           linkedToId: linkedTo,
           linkedModel,
-          payload: (payload ?? undefined) as any,
+          payload: payload as Prisma.InputJsonValue | undefined,
           ...(linkedModel === 'Customer' ? { customerId: linkedTo } : {}),
           ...(linkedModel === 'Deal' ? { dealId: linkedTo } : {}),
           ...(linkedModel === 'Project' ? { projectId: linkedTo } : {}),

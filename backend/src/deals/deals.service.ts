@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
@@ -22,28 +23,31 @@ export class DealsService {
   ) {}
 
   /** Maps frontend deal payload (customer/owner as strings) to Prisma data. */
-  private cleanData(body: Record<string, any>) {
+  private cleanData(body: object) {
     const {
       _id, id, customer, product, owner,
       totalPaid, quantity, createdAt, updatedAt,
       quotes, invoices, partialPayments, activities, tasks,
       startDate, endDate,
       ...rest
-    } = body;
-    const data: Record<string, any> = { ...rest };
+    } = body as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
     if (customer !== undefined) {
-      data.customerId = typeof customer === 'object' ? customer?._id : customer;
+      data.customerId = typeof customer === 'object' ? (customer as { _id?: string })?._id : customer;
     }
     if (owner !== undefined) {
-      data.ownerId = owner === '' || owner === null ? null : (typeof owner === 'object' ? owner?._id : owner);
+      data.ownerId = owner === '' || owner === null ? null : (typeof owner === 'object' ? (owner as { _id?: string })?._id : owner);
     }
     return data;
   }
 
   async create(body: CreateDealDto, userId: string) {
     const data = this.cleanData(body);
-    data.customFields = await this.customFields.validateAndClean('deals', data.customFields);
-    const deal = await this.prisma.deal.create({ data: data as any });
+    data.customFields = await this.customFields.validateAndClean(
+      'deals',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    const deal = await this.prisma.deal.create({ data: data as Prisma.DealUncheckedCreateInput });
 
     await this.timeline.log(
       'deal.created',
@@ -75,7 +79,7 @@ export class DealsService {
 
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
-    const where: any = { deletedAt: null, ...scopeWhere };
+    const where: Prisma.DealWhereInput = { deletedAt: null, ...scopeWhere };
     if (customerId) where.customerId = customerId;
     if (q) where.title = { contains: q, mode: 'insensitive' };
     if (status) where.status = status;
@@ -84,22 +88,30 @@ export class DealsService {
     if (priority) where.priority = priority;
     if (ownerId) where.ownerId = ownerId;
     if (closeDate_from || closeDate_to) {
-      where.expectedCloseDate = {};
-      if (closeDate_from) where.expectedCloseDate.gte = new Date(closeDate_from);
-      if (closeDate_to) where.expectedCloseDate.lte = new Date(closeDate_to);
+      const range: Prisma.DateTimeNullableFilter = {};
+      if (closeDate_from) range.gte = new Date(closeDate_from);
+      if (closeDate_to) range.lte = new Date(closeDate_to);
+      where.expectedCloseDate = range;
     }
     if (createdAt_from || createdAt_to) {
-      where.createdAt = {};
-      if (createdAt_from) where.createdAt.gte = new Date(createdAt_from);
-      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); where.createdAt.lte = d; }
+      const range: Prisma.DateTimeFilter = {};
+      if (createdAt_from) range.gte = new Date(createdAt_from);
+      if (createdAt_to) { const d = new Date(createdAt_to); d.setHours(23, 59, 59, 999); range.lte = d; }
+      where.createdAt = range;
     }
     if (price_min || price_max) {
-      where.price = {};
-      if (price_min) where.price.gte = parseFloat(price_min);
-      if (price_max) where.price.lte = parseFloat(price_max);
+      const range: Prisma.FloatFilter = {};
+      if (price_min) range.gte = parseFloat(price_min);
+      if (price_max) range.lte = parseFloat(price_max);
+      where.price = range;
     }
     const cfConditions = buildCfConditions(query);
-    if (cfConditions.length) where.AND = [...(where.AND ?? []), ...cfConditions];
+    if (cfConditions.length) {
+      where.AND = [
+        ...((where.AND as Prisma.DealWhereInput[]) ?? []),
+        ...(cfConditions as Prisma.DealWhereInput[]),
+      ];
+    }
     const [data, total] = await Promise.all([
       this.prisma.deal.findMany({
         where,
@@ -135,7 +147,7 @@ export class DealsService {
 
     // Payments are unified on invoices: pull the payments recorded against
     // this deal's invoices rather than the removed PartialPayment table.
-    let payments: any[] = [];
+    let payments: unknown[] = [];
     if (includePayments) {
       payments = await this.prisma.invoicePayment.findMany({
         where: { invoice: { dealId: id } },
@@ -153,10 +165,16 @@ export class DealsService {
 
     const cleaned = this.cleanData(body);
     if ('customFields' in cleaned) {
-      cleaned.customFields = await this.customFields.validateAndClean('deals', cleaned.customFields);
+      cleaned.customFields = await this.customFields.validateAndClean(
+        'deals',
+        cleaned.customFields as Record<string, unknown> | undefined,
+      );
     }
     const newStatus = body.status as string | undefined;
-    const deal = await this.prisma.deal.update({ where: { id }, data: cleaned });
+    const deal = await this.prisma.deal.update({
+      where: { id },
+      data: cleaned as Prisma.DealUncheckedUpdateInput,
+    });
 
     if (newStatus && newStatus !== oldDeal.status) {
       const eventType =
@@ -176,7 +194,7 @@ export class DealsService {
     const changes: Record<string, { from: unknown; to: unknown }> = {};
     for (const field of TRACKED_FIELDS) {
       if (cleaned[field] === undefined) continue;
-      const oldVal = (oldDeal as any)[field];
+      const oldVal = (oldDeal as Record<string, unknown>)[field];
       const newVal = cleaned[field];
       const oldStr = oldVal instanceof Date ? oldVal.toISOString().slice(0, 10) : String(oldVal ?? '');
       const newStr = newVal instanceof Date ? (newVal as Date).toISOString().slice(0, 10) : String(newVal ?? '');
@@ -211,8 +229,8 @@ export class DealsService {
 
     // Respect the workspace approval config — same behaviour as finance.createQuote.
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const quoteCfg = approvals.find((c: any) => c.module === 'quotes');
+    const approvals = (config?.approvals as Array<{ module?: string; enabled?: boolean }>) ?? [];
+    const quoteCfg = approvals.find((c) => c.module === 'quotes');
     const approvalStatus = quoteCfg?.enabled ? 'pending' : 'approved';
 
     const quote = await this.prisma.quote.create({

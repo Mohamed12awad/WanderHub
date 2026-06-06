@@ -11,6 +11,13 @@ function hashToken(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
+type PublicUserInput = {
+  id: string;
+  email: string;
+  name: string;
+  role: { name: string; permissions: string[] };
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -48,7 +55,7 @@ export class AuthService {
     return raw;
   }
 
-  private publicUser(user: { id: string; email: string; name: string; role: { name: string; permissions: string[] } }) {
+  private publicUser(user: PublicUserInput) {
     return {
       id: user.id,
       email: user.email,
@@ -78,7 +85,7 @@ export class AuthService {
     const token = this.signAccessToken(user.id);
     const refreshToken = await this.issueRefreshToken(user.id, meta);
 
-    return { token, refreshToken, user: this.publicUser(user as any) };
+    return { token, refreshToken, user: this.publicUser(user as PublicUserInput) };
   }
 
   /**
@@ -107,7 +114,7 @@ export class AuthService {
     ]);
     const token = this.signAccessToken(existing.userId);
 
-    return { token, refreshToken, user: this.publicUser(existing.user as any) };
+    return { token, refreshToken, user: this.publicUser(existing.user as PublicUserInput) };
   }
 
   /** Revokes the presented refresh token (idempotent). */

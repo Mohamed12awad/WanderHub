@@ -8,11 +8,21 @@ import { toClient } from './serialize';
 export const UNPAGINATED_MAX = 1000;
 
 export interface PaginateOptions {
-  where: any;
-  include?: any;
-  orderBy?: any;
+  where: unknown;
+  include?: unknown;
+  orderBy?: unknown;
   page?: string;
   limit?: string;
+}
+
+/**
+ * Minimal structural shape of a Prisma model delegate. Method syntax is used
+ * deliberately so parameter checks stay bivariant and any concrete delegate
+ * (CustomerDelegate, DealDelegate, …) is assignable here.
+ */
+interface PaginatableDelegate {
+  findMany(args: unknown): Promise<unknown[]>;
+  count(args: unknown): Promise<number>;
 }
 
 /**
@@ -20,7 +30,7 @@ export interface PaginateOptions {
  * `{ data, total, page, pages }` envelope. Defaults: page=1, limit=25, max=100.
  */
 export async function paginate<T>(
-  model: { findMany: (...args: any[]) => Promise<any[]>; count: (...args: any[]) => Promise<number> },
+  model: PaginatableDelegate,
   opts: PaginateOptions,
 ): Promise<{ data: T[]; total: number; page: number; pages: number }> {
   const p = Math.max(1, parseInt(opts.page ?? '1') || 1);

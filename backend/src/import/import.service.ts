@@ -172,14 +172,14 @@ export class ImportService {
   private async createOne(entity: string, mapped: Record<string, unknown>, user: AuthUser) {
     switch (entity) {
       case 'customers':
-        return this.customers.create(mapped as any, user.id);
+        return this.customers.create(mapped as unknown as Parameters<typeof this.customers.create>[0], user.id);
       case 'leads':
-        return this.leads.create(mapped as any, user.id);
+        return this.leads.create(mapped as unknown as Parameters<typeof this.leads.create>[0], user.id);
       case 'deals': {
         const ref = String(mapped.customerRef);
         delete mapped.customerRef;
         mapped.customer = await this.resolveCustomer(ref, user);
-        return this.deals.create(mapped as any, user.id);
+        return this.deals.create(mapped as unknown as Parameters<typeof this.deals.create>[0], user.id);
       }
       default:
         throw new Error(`Unsupported import target: ${entity}`);

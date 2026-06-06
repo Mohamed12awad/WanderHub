@@ -21,6 +21,8 @@ export function validateEnv(): void {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const lines = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
+    // Bootstrap-time validation runs before the Nest logger exists; print directly.
+    // eslint-disable-next-line no-console
     console.error('❌ Invalid environment configuration:\n' + lines.join('\n'));
     process.exit(1);
   }

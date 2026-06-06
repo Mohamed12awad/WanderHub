@@ -37,7 +37,7 @@ export class AuthController {
   ) {
     const userAgent = (req.headers as Record<string, string>)['user-agent'];
     const forwarded = (req.headers as Record<string, string>)['x-forwarded-for'];
-    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : (req as any).ip;
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : req.ip;
     const { token, refreshToken, user } = await this.authService.signin(
       body.email,
       body.password,

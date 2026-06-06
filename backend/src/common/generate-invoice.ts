@@ -2,14 +2,17 @@ import * as pug from "pug";
 import puppeteer from "puppeteer";
 import * as path from "path";
 import { format } from "date-fns";
+import { Logger } from "@nestjs/common";
+
+const logger = new Logger("generateInvoice");
 
 /**
  * Renders a deal/booking invoice to a PDF buffer using the legacy pug
  * template that still lives under backend/utils/invoice.pug.
  */
 export async function generateInvoice(
-  booking: any,
-  payments: any[],
+  booking: Record<string, unknown>,
+  payments: Record<string, unknown>[],
 ): Promise<Buffer> {
   const templatePath = path.join(process.cwd(), "utils", "invoice.pug");
   const html = pug.renderFile(templatePath, {
@@ -32,7 +35,7 @@ export async function generateInvoice(
     return Buffer.from(pdfBuffer);
   } catch (error) {
     await browser.close();
-    console.error("Error generating PDF:", error);
+    logger.error("Error generating PDF", error instanceof Error ? error.stack : String(error));
     throw error;
   }
 }

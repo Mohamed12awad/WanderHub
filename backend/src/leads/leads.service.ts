@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
@@ -22,20 +23,22 @@ export class LeadsService {
   ) {}
 
   async create(body: CreateLeadDto, userId: string) {
-    const data = cleanData(body as any, {
+    const data = cleanData(body, {
       emptyToNull: ['expectedCloseDate', 'rating'],
       numeric: ['budget'],
     });
 
     // Dedup: warn if phone/email matches an existing Lead or Customer
-    if (data.phone || data.email) {
+    const phone = data.phone as string | undefined;
+    const email = data.email as string | undefined;
+    if (phone || email) {
       const dupLead = await this.prisma.lead.findFirst({
         where: {
           deletedAt: null,
           OR: [
-            data.phone ? { phone: data.phone } : undefined,
-            data.email ? { email: data.email } : undefined,
-          ].filter(Boolean) as any[],
+            phone ? { phone } : undefined,
+            email ? { email } : undefined,
+          ].filter(Boolean) as Prisma.LeadWhereInput[],
         },
       });
       if (dupLead) throw new BadRequestException('A lead with this phone or email already exists');
@@ -44,17 +47,20 @@ export class LeadsService {
         where: {
           deletedAt: null,
           OR: [
-            data.phone ? { phone: data.phone } : undefined,
-            data.email ? { email: data.email } : undefined,
-          ].filter(Boolean) as any[],
+            phone ? { phone } : undefined,
+            email ? { email } : undefined,
+          ].filter(Boolean) as Prisma.CustomerWhereInput[],
         },
       });
       if (dupCustomer) throw new BadRequestException('A customer with this phone or email already exists');
     }
 
     data.createdById = userId;
-    data.customFields = await this.customFields.validateAndClean('leads', data.customFields);
-    const lead = await this.prisma.lead.create({ data: data as any });
+    data.customFields = await this.customFields.validateAndClean(
+      'leads',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    const lead = await this.prisma.lead.create({ data: data as Prisma.LeadUncheckedCreateInput });
 
     if (lead.ownerId && lead.ownerId !== userId) {
       await this.dispatcher.dispatch({
@@ -73,7 +79,7 @@ export class LeadsService {
     const ownerSelect = { select: { id: true, name: true } };
     const scopeWhere = await this.visibility.ownershipWhere(user, 'leads', 'ownerId');
 
-    const where: any = { deletedAt: null, ...scopeWhere };
+    const where: Prisma.LeadWhereInput = { deletedAt: null, ...scopeWhere };
     if (q) {
       where.OR = [
         { name:    { contains: q, mode: 'insensitive' } },
@@ -84,9 +90,9 @@ export class LeadsService {
     }
     // Converted leads are kept but hidden from the active list: the default
     // ("All") view excludes them; selecting the "Converted" tab shows them.
-    if (status) where.status = status;
-    else where.status = { not: 'converted' };
-    if (rating) where.rating = rating;
+    if (status) where.status = status as Prisma.LeadWhereInput['status'];
+    else where.status = { not: 'converted' } as Prisma.LeadWhereInput['status'];
+    if (rating) where.rating = rating as Prisma.LeadWhereInput['rating'];
     if (ownerId) where.ownerId = ownerId;
     if (source) where.source = source;
     const dr = dateRange(createdAt_from, createdAt_to);
@@ -119,19 +125,26 @@ export class LeadsService {
     const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Lead not found');
 
-    const cleaned = cleanData(body as any, {
+    const cleaned = cleanData(body, {
       emptyToNull: ['expectedCloseDate', 'rating'],
       numeric: ['budget'],
     });
     if ('customFields' in cleaned) {
-      cleaned.customFields = await this.customFields.validateAndClean('leads', cleaned.customFields);
+      cleaned.customFields = await this.customFields.validateAndClean(
+        'leads',
+        cleaned.customFields as Record<string, unknown> | undefined,
+      );
     }
     const oldOwnerId = existing.ownerId;
-    const lead = await this.prisma.lead.update({ where: { id }, data: cleaned });
+    const lead = await this.prisma.lead.update({
+      where: { id },
+      data: cleaned as Prisma.LeadUncheckedUpdateInput,
+    });
 
-    if (cleaned.ownerId && cleaned.ownerId !== oldOwnerId && cleaned.ownerId !== userId) {
+    const newOwnerId = cleaned.ownerId as string | undefined;
+    if (newOwnerId && newOwnerId !== oldOwnerId && newOwnerId !== userId) {
       await this.dispatcher.dispatch({
-        userId: cleaned.ownerId,
+        userId: newOwnerId,
         type: 'lead_assigned',
         title: `Lead assigned: ${lead.name}`,
         link: `/leads/${lead.id}`,
@@ -184,7 +197,7 @@ export class LeadsService {
           notes: lead.notes ?? undefined,
           ownerId: lead.ownerId ?? undefined,
           ...((lead.city || lead.country) ? { location: [lead.city, lead.country].filter(Boolean).join(', ') } : {}),
-        } as any,
+        } as Prisma.CustomerUncheckedCreateInput,
       });
       await tx.lead.update({
         where: { id },
@@ -203,7 +216,7 @@ export class LeadsService {
             source: lead.source ?? undefined,
             ownerId: lead.ownerId ?? undefined,
             expectedCloseDate: lead.expectedCloseDate ?? undefined,
-          } as any,
+          } as Prisma.DealUncheckedCreateInput,
         });
       }
 

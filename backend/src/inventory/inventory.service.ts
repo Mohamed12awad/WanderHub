@@ -29,7 +29,7 @@ export class InventoryService {
 
     // Guard: prevent stock going negative on out/adjustment moves.
     if (input.qty < 0) {
-      const current = await (db as any).stockItem.findUnique({ where: { productId: input.productId } });
+      const current = await db.stockItem.findUnique({ where: { productId: input.productId } });
       const onHand: number = current?.quantityOnHand ?? 0;
       if (onHand + input.qty < 0) {
         throw new BadRequestException(
@@ -70,7 +70,7 @@ export class InventoryService {
   }
 
   async lowStock() {
-    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT s.*, p.name AS "productName"
       FROM "StockItem" s
       JOIN "Product" p ON p.id = s."productId"
@@ -112,15 +112,15 @@ export class InventoryService {
 
   async updateDetails(productId: string, body: { reorderLevel?: number; location?: string }) {
     const existing = await this.prisma.stockItem.findUnique({ where: { productId } });
-    const data: any = {};
+    const data: Record<string, unknown> = {};
     if (body.reorderLevel !== undefined) data.reorderLevel = body.reorderLevel;
     if (body.location !== undefined) data.location = body.location;
     if (!Object.keys(data).length) return existing;
     return toClient(
       await this.prisma.stockItem.upsert({
         where: { productId },
-        create: { productId, ...data },
-        update: data,
+        create: { productId, ...data } as Prisma.StockItemUncheckedCreateInput,
+        update: data as Prisma.StockItemUncheckedUpdateInput,
       }),
     );
   }

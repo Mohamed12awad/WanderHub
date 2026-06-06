@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { cleanData } from '../common/clean-data';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 
@@ -14,16 +16,21 @@ export class AccountsService {
   }
 
   async create(body: CreateAccountDto) {
-    const { _id, id, createdAt, updatedAt, ...data } = body as any;
-    const account = await this.prisma.account.create({ data: data as any });
+    const data = cleanData(body);
+    const account = await this.prisma.account.create({
+      data: data as Prisma.AccountUncheckedCreateInput,
+    });
     return toClient(account);
   }
 
   async update(id: string, body: UpdateAccountDto) {
     const existing = await this.prisma.account.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('account not found');
-    const { _id, id: _id2, createdAt, updatedAt, ...data } = body as any;
-    const account = await this.prisma.account.update({ where: { id }, data: data as any });
+    const data = cleanData(body);
+    const account = await this.prisma.account.update({
+      where: { id },
+      data: data as Prisma.AccountUncheckedUpdateInput,
+    });
     return toClient(account);
   }
 

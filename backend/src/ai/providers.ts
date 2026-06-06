@@ -39,9 +39,9 @@ export async function callProvider(
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-    const data: any = await res.json();
+    const data = (await res.json()) as { error?: { message?: string }; content?: Array<{ text?: string }> };
     if (!res.ok) throw new Error(data?.error?.message ?? `Anthropic error ${res.status}`);
-    return (data?.content ?? []).map((b: any) => b?.text ?? '').join('').trim();
+    return (data?.content ?? []).map((b) => b?.text ?? '').join('').trim();
   }
 
   if (provider === 'openai') {
@@ -56,7 +56,10 @@ export async function callProvider(
         ],
       }),
     });
-    const data: any = await res.json();
+    const data = (await res.json()) as {
+      error?: { message?: string };
+      choices?: Array<{ message?: { content?: string } }>;
+    };
     if (!res.ok) throw new Error(data?.error?.message ?? `OpenAI error ${res.status}`);
     return (data?.choices?.[0]?.message?.content ?? '').trim();
   }
@@ -71,7 +74,10 @@ export async function callProvider(
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     }),
   });
-  const data: any = await res.json();
+  const data = (await res.json()) as {
+    error?: { message?: string };
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
   if (!res.ok) throw new Error(data?.error?.message ?? `Gemini error ${res.status}`);
-  return (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text ?? '').join('').trim();
+  return (data?.candidates?.[0]?.content?.parts ?? []).map((p) => p?.text ?? '').join('').trim();
 }

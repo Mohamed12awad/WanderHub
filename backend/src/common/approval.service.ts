@@ -39,8 +39,8 @@ export class ApprovalService {
 
   private async getConfig(module: string): Promise<ModuleConfig | undefined> {
     const config = await this.workspaceConfig.get();
-    const approvals = (config.approvals as any[]) ?? [];
-    return approvals.find((c: any) => c.module === module);
+    const approvals = (config.approvals as unknown as ModuleConfig[]) ?? [];
+    return approvals.find((c) => c.module === module);
   }
 
   async isEnabled(module: string): Promise<boolean> {

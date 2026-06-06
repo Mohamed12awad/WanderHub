@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { VisibilityService } from '../common/visibility.service';
@@ -29,24 +30,30 @@ export class ProjectsService {
     private readonly customFields: CustomFieldsService,
   ) {}
 
-  private cleanData(body: Record<string, any>) {
-    const { _id, id, customer, deal, manager, createdAt, updatedAt, ...rest } = body;
-    const data: Record<string, any> = { ...rest };
-    const ref = (v: any) => (v === '' || v === null ? null : typeof v === 'object' ? v?._id ?? v?.id : v);
+  private cleanData(body: object) {
+    const { _id, id, customer, deal, manager, createdAt, updatedAt, ...rest } =
+      body as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
+    const ref = (v: unknown) =>
+      v === '' || v === null
+        ? null
+        : typeof v === 'object'
+          ? ((v as { _id?: string; id?: string })?._id ?? (v as { _id?: string; id?: string })?.id)
+          : v;
     if (customer !== undefined) data.customerId = ref(customer);
     if (deal !== undefined) data.dealId = ref(deal);
     if (manager !== undefined) data.managerId = ref(manager);
-    if (rest.startDate !== undefined) data.startDate = rest.startDate ? new Date(rest.startDate) : null;
-    if (rest.endDate !== undefined) data.endDate = rest.endDate ? new Date(rest.endDate) : null;
+    if (rest.startDate !== undefined) data.startDate = rest.startDate ? new Date(rest.startDate as string) : null;
+    if (rest.endDate !== undefined) data.endDate = rest.endDate ? new Date(rest.endDate as string) : null;
     return data;
   }
 
   async findAll(query: Record<string, string>, user: AuthUser) {
     const { page, limit: limitRaw, q, status, customerId } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'projects', 'managerId');
-    const where: any = { deletedAt: null, ...scopeWhere };
+    const where: Prisma.ProjectWhereInput = { deletedAt: null, ...scopeWhere };
     if (q) where.name = { contains: q, mode: 'insensitive' };
-    if (status) where.status = status;
+    if (status) where.status = status as Prisma.ProjectWhereInput['status'];
     if (customerId) where.customerId = customerId;
 
     if (!page) {
@@ -102,10 +109,16 @@ export class ProjectsService {
   }
 
   async create(body: CreateProjectDto, userId: string) {
-    const data = this.cleanData(body as any);
+    const data = this.cleanData(body);
     data.createdById = userId;
-    data.customFields = await this.customFields.validateAndClean('projects', data.customFields);
-    const project = await this.prisma.project.create({ data: data as any, include: PROJECT_INCLUDE });
+    data.customFields = await this.customFields.validateAndClean(
+      'projects',
+      data.customFields as Record<string, unknown> | undefined,
+    );
+    const project = await this.prisma.project.create({
+      data: data as Prisma.ProjectUncheckedCreateInput,
+      include: PROJECT_INCLUDE,
+    });
     await this.timeline.log('project.created', `Project "${project.name}" created`, project.id, 'Project', {}, userId);
     return toClient(project);
   }
@@ -113,14 +126,21 @@ export class ProjectsService {
   async update(id: string, body: UpdateProjectDto, userId: string) {
     const existing = await this.prisma.project.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('project not found');
-    const data = this.cleanData(body as any);
+    const data = this.cleanData(body);
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('projects', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'projects',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     // Stamp completedAt when transitioning to completed
     if (data.status === 'completed' && existing.status !== 'completed') data.completedAt = new Date();
     if (data.status && data.status !== 'completed') data.completedAt = null;
-    const project = await this.prisma.project.update({ where: { id }, data, include: PROJECT_INCLUDE });
+    const project = await this.prisma.project.update({
+      where: { id },
+      data: data as Prisma.ProjectUncheckedUpdateInput,
+      include: PROJECT_INCLUDE,
+    });
     await this.timeline.log('project.updated', 'Project updated', id, 'Project', {}, userId);
     return toClient(project);
   }
@@ -142,7 +162,7 @@ export class ProjectsService {
   async createMilestone(projectId: string, body: CreateMilestoneDto) {
     const { dueDate, ...rest } = body;
     const milestone = await this.prisma.projectMilestone.create({
-      data: { ...rest, projectId, ...(dueDate ? { dueDate: new Date(dueDate) } : {}) } as any,
+      data: { ...rest, projectId, ...(dueDate ? { dueDate: new Date(dueDate) } : {}) } as Prisma.ProjectMilestoneUncheckedCreateInput,
     });
     return toClient(milestone);
   }
@@ -150,12 +170,15 @@ export class ProjectsService {
   async updateMilestone(projectId: string, milestoneId: string, body: UpdateMilestoneDto) {
     const existing = await this.prisma.projectMilestone.findFirst({ where: { id: milestoneId, projectId } });
     if (!existing) throw new NotFoundException('project not found');
-    const { dueDate, ...rest } = body as any;
-    const data: any = { ...rest };
-    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+    const { dueDate, ...rest } = body as unknown as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...rest };
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate as string) : null;
     if (data.status === 'completed' && existing.status !== 'completed') data.completedAt = new Date();
     if (data.status && data.status !== 'completed') data.completedAt = null;
-    const milestone = await this.prisma.projectMilestone.update({ where: { id: milestoneId }, data });
+    const milestone = await this.prisma.projectMilestone.update({
+      where: { id: milestoneId },
+      data: data as Prisma.ProjectMilestoneUncheckedUpdateInput,
+    });
     return toClient(milestone);
   }
 

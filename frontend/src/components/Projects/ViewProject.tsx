@@ -29,7 +29,6 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import {
   CircleArrowLeft, Edit, Plus, Trash2, CheckCircle2, Circle, Clock,
   Copy, MoreHorizontal, Check, PlusCircle, Pencil, CalendarDays, User,
-  ChevronRight, ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -265,7 +264,6 @@ export default function ViewProject() {
                 const isOverdue    = m.dueDate && m.status !== "completed" && new Date(m.dueDate) < new Date();
 
                 if (editingMs?.id === m._id) {
-                  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                   const ms = editingMs!;
                   return (
                     <div key={m._id} className="rounded-lg border border-primary/40 px-3 py-2 space-y-2">

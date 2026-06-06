@@ -72,7 +72,8 @@ export class BulkService {
     // Pre-filter to the records the user may actually see; silently dropping the
     // rest avoids leaking which ids exist outside their scope.
     const scopeWhere = await this.visibility.ownershipWhere(user, cfg.base, 'ownerId');
-    const visible = (await (this.prisma as any)[cfg.model].findMany({
+    const delegate = (this.prisma as unknown as Record<string, { findMany(args: unknown): Promise<unknown[]> }>)[cfg.model];
+    const visible = (await delegate.findMany({
       where: { id: { in: ids }, deletedAt: null, ...scopeWhere },
       select: { id: true },
     })) as { id: string }[];
@@ -81,10 +82,10 @@ export class BulkService {
     const result: BulkResult = { updated: 0, failed: [] };
     for (const { id } of visible) {
       try {
-        await (svc as any).remove(id);
+        await svc.remove(id);
         result.updated++;
-      } catch (e: any) {
-        result.failed.push({ id, message: e?.message ?? 'Delete failed' });
+      } catch (e) {
+        result.failed.push({ id, message: e instanceof Error ? e.message : 'Delete failed' });
       }
     }
     return result;
@@ -93,7 +94,8 @@ export class BulkService {
   private async bulkUpdate(cfg: BulkEntityConfig, ids: string[], data: Record<string, unknown>, user: AuthUser): Promise<BulkResult> {
     this.assert(user, 'edit', cfg.base);
     const scopeWhere = await this.visibility.ownershipWhere(user, cfg.base, 'ownerId');
-    const res = await (this.prisma as any)[cfg.model].updateMany({
+    const delegate = (this.prisma as unknown as Record<string, { updateMany(args: unknown): Promise<{ count: number }> }>)[cfg.model];
+    const res = await delegate.updateMany({
       where: { id: { in: ids }, deletedAt: null, ...scopeWhere },
       data,
     });

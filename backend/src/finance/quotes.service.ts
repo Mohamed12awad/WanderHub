@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
@@ -41,8 +42,9 @@ export class QuotesService {
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
-    const approvals = (config?.approvals as any[]) ?? [];
-    const cfg = approvals.find((c: any) => c.module === module);
+    const approvals =
+      (config?.approvals as Array<{ module?: string; enabled?: boolean; approverRoles?: string[] }>) ?? [];
+    const cfg = approvals.find((c) => c.module === module);
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
@@ -54,8 +56,8 @@ export class QuotesService {
   }
 
   async getQuotes(query: Record<string, string>) {
-    const where: any = { deletedAt: null };
-    if (query.status) where.status = query.status;
+    const where: Prisma.QuoteWhereInput = { deletedAt: null };
+    if (query.status) where.status = query.status as Prisma.QuoteWhereInput['status'];
     if (query.customer) where.customerId = query.customer;
     if (query.deal) where.dealId = query.deal;
     const quotes = await this.prisma.quote.findMany({ where, include: QUOTE_INCLUDE, orderBy: { createdAt: 'desc' } });
@@ -87,14 +89,14 @@ export class QuotesService {
         ...(deal ? { dealId: deal } : {}),
         createdById: userId,
         items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
-      } as any,
+      } as Prisma.QuoteUncheckedCreateInput,
       include: QUOTE_INCLUDE,
     });
     if (enabled) {
       const overall = await this.approvals.initSteps(this.prisma, 'Quote', quote.id, 'quotes', quote.total);
       if (overall === 'approved') {
         await this.prisma.quote.update({ where: { id: quote.id }, data: { approvalStatus: 'approved' } });
-        (quote as any).approvalStatus = 'approved';
+        (quote as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
     await this.timeline.log('quote.created', `Quote ${quote.quoteNumber} created`, quote.id, 'Quote', { total: quote.total, currency: quote.currency }, userId);
@@ -108,9 +110,12 @@ export class QuotesService {
     // intentionally does not reassign them. The DTO has already stripped any
     // server-controlled fields, so `rest` is safe to spread.
     const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
-    const data: any = { ...rest };
+    const data: Record<string, unknown> = { ...rest };
     if ('customFields' in data) {
-      data.customFields = await this.customFields.validateAndClean('quotes', data.customFields);
+      data.customFields = await this.customFields.validateAndClean(
+        'quotes',
+        data.customFields as Record<string, unknown> | undefined,
+      );
     }
     if (quote.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     // Post-approval edits reset the document back to pending for re-review.
@@ -130,7 +135,11 @@ export class QuotesService {
       } else if (taxRate !== undefined) {
         data.taxRate = taxRate;
       }
-      return tx.quote.update({ where: { id }, data, include: QUOTE_INCLUDE });
+      return tx.quote.update({
+        where: { id },
+        data: data as Prisma.QuoteUncheckedUpdateInput,
+        include: QUOTE_INCLUDE,
+      });
     });
     return toClient(updated);
   }

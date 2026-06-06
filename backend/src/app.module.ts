@@ -64,7 +64,7 @@ import { SalesOrdersModule } from './sales-orders/sales-orders.module';
           ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
           : undefined,
         redact: ['req.headers.authorization'],
-        autoLogging: { ignore: (req) => (req as any).url?.includes('/health') },
+        autoLogging: { ignore: (req) => (req as { url?: string }).url?.includes('/health') },
       },
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),

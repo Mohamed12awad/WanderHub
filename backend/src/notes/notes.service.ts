@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
@@ -23,16 +24,17 @@ export class NotesService {
   }
 
   async create(body: CreateNoteDto, userId: string) {
-    const { _id, id, createdAt, updatedAt, createdBy, linkedTo, linkedToId: _ltId, ...rest } = body as any;
-    const linkedId: string = _ltId ?? linkedTo;
-    const data: any = { ...rest, linkedToId: linkedId, createdById: userId };
+    const { _id, id, createdAt, updatedAt, createdBy, linkedTo, linkedToId: _ltId, ...rest } =
+      body as unknown as Record<string, unknown>;
+    const linkedId = (_ltId ?? linkedTo) as string;
+    const data: Record<string, unknown> = { ...rest, linkedToId: linkedId, createdById: userId };
     if (rest.linkedModel === 'Customer') data.customerId = linkedId;
     if (rest.linkedModel === 'Deal') data.dealId = linkedId;
     if (rest.linkedModel === 'Product') data.productId = linkedId;
     if (rest.linkedModel === 'Expense') data.expenseReportId = linkedId;
 
     const note = await this.prisma.note.create({
-      data,
+      data: data as Prisma.NoteUncheckedCreateInput,
       include: { createdBy: { select: { id: true, name: true } } },
     });
 

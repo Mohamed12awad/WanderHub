@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
 
@@ -42,7 +43,7 @@ export class LogsService {
 
   async findAll(query: Record<string, string>) {
     const { startDate, endDate, actionType, user } = query;
-    const where: any = {};
+    const where: Prisma.LogWhereInput = {};
 
     if (user) where.userId = user;
 
