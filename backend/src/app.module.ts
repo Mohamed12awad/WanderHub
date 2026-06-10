@@ -56,7 +56,13 @@ import { SalesOrdersModule } from './sales-orders/sales-orders.module';
     { provide: APP_GUARD,       useClass: ThrottlerGuard },
   ],
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        process.env.APP_ENV ? `.env.${process.env.APP_ENV}` : '.env',
+        '.env',
+      ],
+    }),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import './config/load-env';
 import * as Sentry from '@sentry/node';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';

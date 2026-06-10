@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\" "
+    "env:init": "node scripts/init-env-profiles.js",
+    "dev": "node scripts/run-with-env.js development -- concurrently \"npm --prefix backend run dev\" \"npm --prefix frontend run dev -- --mode development\"",
+    "build:dev": "node scripts/run-with-env.js development -- npm --prefix backend run build && node scripts/run-with-env.js development -- npm --prefix frontend run build -- --mode development",
+    "build:prod": "node scripts/run-with-env.js production -- npm --prefix backend run build && node scripts/run-with-env.js production -- npm --prefix frontend run build -- --mode production",
+    "db:migrate:dev": "node scripts/run-with-env.js development -- npm --prefix backend run db:migrate",
+    "db:deploy:prod": "node scripts/run-with-env.js production -- npm --prefix backend exec prisma migrate deploy"
   },
   "keywords": [],
   "author": "",

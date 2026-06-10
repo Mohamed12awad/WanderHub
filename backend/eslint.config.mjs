@@ -22,7 +22,11 @@ export default tseslint.config(
         "warn",
         // `ignoreRestSiblings` allows the common `const { id, ...rest } = body`
         // pattern used across services to strip read-only fields before a write.
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
       ],
       "@typescript-eslint/no-floating-promises": "error",
       "no-console": "warn",
