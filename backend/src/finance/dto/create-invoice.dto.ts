@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -29,7 +28,7 @@ export class CreateInvoiceDto {
   deal?: string;
 
   @IsOptional()
-  @IsIn(['draft', 'sent', 'partially_paid', 'paid', 'overdue', 'cancelled'])
+  @IsString()
   status?: string;
 
   @IsOptional()

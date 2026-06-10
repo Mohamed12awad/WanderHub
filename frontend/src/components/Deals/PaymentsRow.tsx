@@ -52,7 +52,7 @@ const PaymentRow: React.FC<PaymentRowProps> = ({ id, reference, amount, date, me
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'invoices:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>

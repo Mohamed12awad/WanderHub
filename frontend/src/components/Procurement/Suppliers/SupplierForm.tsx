@@ -1,177 +1,153 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { createSupplier, updateSupplier, getSupplierById } from "@/utils/api";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { Form } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { EntityFormPage } from "@/components/common/EntityFormPage";
+import { TextField, TextareaField, FormActions } from "@/components/common/form";
 import DynamicFields from "@/components/common/DynamicFields";
+import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { queryKeys } from "@/lib/queryKeys";
+import { createSupplier, updateSupplier, getSupplierById } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
+import { useLanguage } from "@/contexts/LanguageContext";
+
+const schema = z.object({
+  name:        z.string().min(1, "Supplier name is required"),
+  contactName: z.string().optional(),
+  email:       z.string().email("Invalid email").optional().or(z.literal("")),
+  phone:       z.string().optional(),
+  status:      z.string().min(1),
+  taxId:       z.string().optional(),
+  street:      z.string().optional(),
+  city:        z.string().optional(),
+  state:       z.string().optional(),
+  zip:         z.string().optional(),
+  country:     z.string().optional(),
+  notes:       z.string().optional(),
+});
+
+type FormValues = z.infer<typeof schema>;
 
 export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { tr } = useLanguage();
-  const { toast } = useToast();
-  const s = tr.suppliers || { add: "Add Supplier", title: "Suppliers" };
+  const { id }   = useParams();
+  const { tr }   = useLanguage();
+  const s        = (tr as any).suppliers || {};
 
-  const [formData, setFormData] = useState({
-    name: "",
-    contactName: "",
-    email: "",
-    phone: "",
-    status: "active",
-    taxId: "",
-    address: { street: "", city: "", state: "", zip: "", country: "" },
-    notes: "",
-  });
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      name: "", contactName: "", email: "", phone: "", status: "active",
+      taxId: "", street: "", city: "", state: "", zip: "", country: "", notes: "",
+    },
+  });
+
   const { data: supplierData, isPending: isFetching } = useQuery({
-    queryKey: ["supplier", id],
+    queryKey: queryKeys.suppliers.detail(id!),
     queryFn: () => getSupplierById(id!),
     enabled: mode === "edit" && !!id,
   });
-
-  // v5 removed useQuery onSuccess — prefill the form from the fetched record.
   useEffect(() => {
     if (!supplierData) return;
     const d = supplierData.data;
-    setFormData({
-      name: d.name || "",
-      contactName: d.contactName || "",
-      email: d.email || "",
-      phone: d.phone || "",
-      status: d.status || "active",
-      taxId: d.taxId || "",
-      address: d.address || { street: "", city: "", state: "", zip: "", country: "" },
-      notes: d.notes || "",
+    form.reset({
+      name: d.name ?? "", contactName: d.contactName ?? "", email: d.email ?? "",
+      phone: d.phone ?? "", status: d.status ?? "active", taxId: d.taxId ?? "",
+      street: d.address?.street ?? "", city: d.address?.city ?? "",
+      state: d.address?.state ?? "", zip: d.address?.zip ?? "", country: d.address?.country ?? "",
+      notes: d.notes ?? "",
     });
     setCustomFields(toCustomFieldValues(d.customFields));
-  }, [supplierData]);
+  }, [supplierData, form]);
 
-  const mutation = useMutation({
-    mutationFn: (data: any) => (mode === "add" ? createSupplier(data) : updateSupplier(id!, data)),
+  const backHref = "/procurement/suppliers";
 
-    onSuccess: () => {
-      toast({ title: "Success", description: "Supplier saved successfully." });
-      navigate("/procurement/suppliers");
+  const mutation = useSaveMutation<Record<string, unknown>>({
+    save: (payload) => mode === "add" ? createSupplier(payload as any) : updateSupplier(id!, payload as any),
+    invalidate: [queryKeys.suppliers.all],
+    successMessage: "Supplier saved",
+    errorMessage:   "Failed to save supplier",
+    onSuccess: (res: any) => {
+      const newId = res?.data?._id ?? id;
+      navigate(newId ? `/procurement/suppliers/${newId}` : backHref);
     },
-
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save supplier.", variant: "destructive" });
-    }
   });
 
-  const handleChange = (field: string, value: any) => {
-    if (field.startsWith("address.")) {
-      const addrField = field.split(".")[1];
-      setFormData((p) => ({ ...p, address: { ...p.address, [addrField]: value } }));
-    } else {
-      setFormData((p) => ({ ...p, [field]: value }));
-    }
+  const onSubmit = (values: FormValues) => {
+    const { street, city, state, zip, country, ...rest } = values;
+    mutation.mutate({
+      ...rest,
+      address: { street, city, state, zip, country },
+      customFields,
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate({ ...formData, customFields });
-  };
+  if (isFetching) return <div className="p-6">Loading…</div>;
 
-  if (isFetching) return <div className="p-6">Loading...</div>;
+  const title = mode === "add" ? (s.add ?? "Add Supplier") : "Edit Supplier";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          {mode === "add" ? s.add || "Add Supplier" : "Edit Supplier"}
-        </h1>
-        <Button variant="outline" onClick={() => navigate("/procurement/suppliers")}>
-          {tr.common.cancel}
-        </Button>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-xl border">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Supplier Name *</Label>
-            <Input required value={formData.name} onChange={(e) => handleChange("name", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Contact Name</Label>
-            <Input value={formData.contactName} onChange={(e) => handleChange("contactName", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" value={formData.email} onChange={(e) => handleChange("email", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input value={formData.phone} onChange={(e) => handleChange("phone", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Tax ID</Label>
-            <Input value={formData.taxId} onChange={(e) => handleChange("taxId", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={formData.status}
-              onChange={(e) => handleChange("status", e.target.value)}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t">
-          <h3 className="text-lg font-medium mb-4">Address</h3>
+    <EntityFormPage title={title} backHref={backHref} breadcrumb={[{ label: "Suppliers", href: "/procurement/suppliers" }, { label: mode === "add" ? "New" : "Edit" }]}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
-              <Label>Street</Label>
-              <Input value={formData.address.street} onChange={(e) => handleChange("address.street", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>City</Label>
-              <Input value={formData.address.city} onChange={(e) => handleChange("address.city", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>State/Province</Label>
-              <Input value={formData.address.state} onChange={(e) => handleChange("address.state", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>ZIP/Postal Code</Label>
-              <Input value={formData.address.zip} onChange={(e) => handleChange("address.zip", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Country</Label>
-              <Input value={formData.address.country} onChange={(e) => handleChange("address.country", e.target.value)} />
+            <TextField<FormValues> name="name"        label="Supplier Name" required />
+            <TextField<FormValues> name="contactName" label="Contact Name" />
+            <TextField<FormValues> name="email"       label="Email" type="email" />
+            <TextField<FormValues> name="phone"       label="Phone" />
+            <TextField<FormValues> name="taxId"       label="Tax ID" />
+
+            <FormField control={form.control} name="status" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+              </FormItem>
+            )} />
+          </div>
+
+          <div className="pt-4 border-t">
+            <h3 className="text-base font-medium mb-4">Address</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <TextField<FormValues> name="street" label="Street" />
+              </div>
+              <TextField<FormValues> name="city"    label="City" />
+              <TextField<FormValues> name="state"   label="State / Province" />
+              <TextField<FormValues> name="zip"     label="ZIP / Postal Code" />
+              <TextField<FormValues> name="country" label="Country" />
             </div>
           </div>
-        </div>
 
-        <div className="pt-4 border-t space-y-2">
-          <Label>Notes</Label>
-          <Textarea
-            className="min-h-[100px]"
-            value={formData.notes}
-            onChange={(e) => handleChange("notes", e.target.value)}
+          <div className="pt-4 border-t">
+            <TextareaField<FormValues> name="notes" label="Notes" rows={4} />
+          </div>
+
+          <div className="pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DynamicFields module="suppliers" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
+          </div>
+
+          <FormActions
+            isSubmitting={mutation.isPending}
+            onCancel={() => navigate(backHref)}
+            submitLabel={tr.common.save}
           />
-        </div>
-
-        <div className="pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DynamicFields module="suppliers" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
-        </div>
-
-        <div className="flex justify-end pt-4 border-t">
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : tr.common.save}
-          </Button>
-        </div>
-      </form>
-    </div>
+        </form>
+      </Form>
+    </EntityFormPage>
   );
 }

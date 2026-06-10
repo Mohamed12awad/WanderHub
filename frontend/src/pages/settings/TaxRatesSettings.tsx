@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 interface TaxRate {
   id: string;
@@ -35,6 +36,7 @@ export default function TaxRatesSettings() {
   const [editing, setEditing] = useState<TaxRate | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<TaxRate | null>(null);
 
   const { data } = useQuery({
     queryKey: ["tax-rates"],
@@ -77,7 +79,6 @@ export default function TaxRatesSettings() {
   };
 
   const handleDelete = async (t: TaxRate) => {
-    if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
     try {
       await deleteTaxRate(t.id);
       toast({ title: "Tax rate deleted." });
@@ -130,7 +131,7 @@ export default function TaxRatesSettings() {
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-                          onClick={() => handleDelete(t)}
+                          onClick={() => setPendingDelete(t)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -187,6 +188,17 @@ export default function TaxRatesSettings() {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onConfirm={() => {
+          const taxRate = pendingDelete;
+          setPendingDelete(null);
+          if (taxRate) void handleDelete(taxRate);
+        }}
+        onCancel={() => setPendingDelete(null)}
+        title="Delete Tax Rate"
+        description={pendingDelete ? `Delete "${pendingDelete.name}"? This cannot be undone.` : undefined}
+      />
     </div>
   );
 }

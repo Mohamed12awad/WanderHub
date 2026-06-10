@@ -38,7 +38,7 @@ api.interceptors.request.use(
 // call should run; the rest await its result.
 let refreshPromise: Promise<string | null> | null = null;
 
-export async function refreshAccessToken(): Promise<string | null> {
+async function doRefresh(): Promise<string | null> {
   try {
     // Bare axios (no interceptors) so a 401 here can't recurse. The refresh
     // token is read from the httpOnly cookie, so no body is sent.
@@ -54,6 +54,20 @@ export async function refreshAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// Single-flight: refresh tokens are single-use and rotate on every call, so two
+// concurrent /refresh requests would make the second present an already-revoked
+// token and fail (logging the user out). This collapses all overlapping callers
+// — the response interceptor, multiple 401s, and React StrictMode's double-
+// invoked auth effect — onto one in-flight rotation.
+export function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 function clearSessionAndRedirect() {
@@ -78,12 +92,7 @@ api.interceptors.response.use(
     const original = error.config as (typeof error.config & { _retry?: boolean });
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken().finally(() => {
-          refreshPromise = null;
-        });
-      }
-      const newToken = await refreshPromise;
+      const newToken = await refreshAccessToken();
       if (newToken) {
         original.headers = original.headers ?? {};
         original.headers["Authorization"] = `Bearer ${newToken}`;
@@ -215,7 +224,7 @@ export const updateUser = (userId: string, data: UserData) =>
   api.put(`/users/${userId}`, data);
 export const deleteUser = (userId: string): Promise<void> =>
   api.delete(`/users/${userId}`);
-export const toggleUserState = (id: string) => api.put(`/users/active/${id}`);
+export const toggleUserState = (id: string) => api.patch(`/users/${id}/toggle-active`);
 
 // User API Requests
 export const getCustomers = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
@@ -261,7 +270,7 @@ export const updateExpense = (id: string, data: ExpenseReportData) =>
 export const deleteExpense = (id: string): Promise<void> =>
   api.delete(`/expenses/${id}`);
 export const approveExpense = (id: string, state: boolean) =>
-  api.patch(`/expenses/${id}/approval`, { approved: state });
+  api.patch(`/expenses/${id}/approve`, { approved: state });
 export const approveExpenseReport = (id: string) => api.patch(`/expenses/${id}/approve`);
 export const rejectExpenseReport = (id: string, reason: string) => api.patch(`/expenses/${id}/reject`, { reason });
 // export const updateExpenseReportItem = (id: string, expenseId: string, data) =>
@@ -471,7 +480,7 @@ export const getPurchaseOrders = (params?: { page?: number; limit?: number; stat
 export const getPurchaseOrderById = (id: string) => api.get(`/procurement/purchase-orders/${id}`);
 export const createPurchaseOrder = (data: any) => api.post("/procurement/purchase-orders", data);
 export const updatePurchaseOrder = (id: string, data: any) =>
-  api.patch(`/procurement/purchase-orders/${id}`, data);
+  api.put(`/procurement/purchase-orders/${id}`, data);
 export const deletePurchaseOrder = (id: string): Promise<void> =>
   api.delete(`/procurement/purchase-orders/${id}`);
 export const updatePurchaseOrderStatus = (id: string, status: string) =>
@@ -486,7 +495,7 @@ export const getVendorBills = (params?: { page?: number; limit?: number; status?
 export const getVendorBillById = (id: string) => api.get(`/procurement/vendor-bills/${id}`);
 export const createVendorBill = (data: any) => api.post("/procurement/vendor-bills", data);
 export const updateVendorBill = (id: string, data: any) =>
-  api.patch(`/procurement/vendor-bills/${id}`, data);
+  api.put(`/procurement/vendor-bills/${id}`, data);
 export const deleteVendorBill = (id: string): Promise<void> =>
   api.delete(`/procurement/vendor-bills/${id}`);
 export const approveVendorBill = (id: string) => api.patch(`/procurement/vendor-bills/${id}/approve`);
@@ -506,7 +515,7 @@ export const getProjects = (params?: { page?: number; limit?: number; status?: s
 export const getProjectById = (id: string) => api.get(`/projects/${id}`);
 export const createProject = (data: any) => api.post("/projects", data);
 export const updateProject = (id: string, data: any) =>
-  api.patch(`/projects/${id}`, data);
+  api.put(`/projects/${id}`, data);
 export const deleteProject = (id: string): Promise<void> =>
   api.delete(`/projects/${id}`);
 

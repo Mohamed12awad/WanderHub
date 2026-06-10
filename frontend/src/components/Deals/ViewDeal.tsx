@@ -1,29 +1,24 @@
-import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { getDealById, deleteDeal, getNotes, getActivities, getQuotes, getInvoices } from "@/utils/api";
+import { Badge } from "@/components/ui/badge";
+import { getDealById, deleteDeal, getQuotes, getInvoices } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { CircleArrowLeft, Edit, FileText, ArrowRight, MoreHorizontal, Trash2, Copy, FolderKanban } from "lucide-react";
+import { Edit, FileText, ArrowRight, Trash2, Copy, FolderKanban } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useAuth } from "@/contexts/authContext";
 import { Button } from "../ui/button";
-import { ActivityList } from "@/components/Activities/ActivityList";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { EmailsPanel } from "@/components/common/EmailsPanel";
 import { AiInsights } from "@/components/common/AiInsights";
 import FinanceTab from "@/components/Finance/FinanceTab";
-import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
+import LoadingSpinner from "@/components/common/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { InfoRow } from "@/components/common/InfoRow";
 
 function oneWeekFromNow() {
   const d = new Date();
@@ -77,7 +72,7 @@ const ViewDeal = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'deals:delete');
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: dealData, isPending, error } = useQuery({
@@ -114,16 +109,6 @@ const ViewDeal = () => {
     });
   }, [dealData]);
 
-  const { data: notesData }      = useQuery({
-    queryKey: ["notes", dealId, "Deal"],
-    queryFn: () => getNotes({ linkedTo: dealId!, linkedModel: "Deal" }),
-    enabled: !!dealId
-  });
-  const { data: activitiesData } = useQuery({
-    queryKey: ["activities", dealId],
-    queryFn: () => getActivities(dealId!, "Deal"),
-    enabled: !!dealId
-  });
   const { data: quotesData }     = useQuery({
     queryKey: ["quotes",   { deal: dealId }],
     queryFn: () => getQuotes({ deal: dealId }),
@@ -135,8 +120,6 @@ const ViewDeal = () => {
     enabled: !!dealId
   });
 
-  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
-  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
   const quotesCount     = ((quotesData?.data)     as any[])?.length ?? 0;
   const invoicesCount   = ((invoicesData?.data)   as any[])?.length ?? 0;
 
@@ -195,118 +178,67 @@ const ViewDeal = () => {
     });
   };
 
-  if (isPending || !formData) {
-    return (
-      <main className="p-4 space-y-4">
-        <Card>
-          <CardHeader className="flex flex-row justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-6 w-48" />
-            </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-8 w-24" />
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-8 w-8" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[0, 1].map((col) => (
-                <div key={col} className="space-y-3">
-                  <Skeleton className="h-4 w-28 mb-4" />
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-2 gap-2">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-4 w-28" />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
+  if (isPending || !formData) return <LoadingSpinner loading />;
 
   if (error) return <div className="p-4">Error loading deal</div>;
 
   const nextStep = NEXT_STEPS[formData.status];
+  const linkedProject = dealData?.data?.deal?.project;
+
+  const menuItems: DetailMenuItem[] = [
+    { label: "New Quote", icon: <FileText className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/finance/quotes/new?deal=${dealId}&customer=${formData.customerID}`) },
+    { label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone },
+    linkedProject
+      ? { label: "View Project", icon: <FolderKanban className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/projects/${linkedProject._id}`) }
+      : { label: "Create Project", icon: <FolderKanban className="h-3.5 w-3.5 me-2" />, onClick: handleCreateProject },
+  ];
+  if (canDelete) {
+    menuItems.push({ label: "Delete", icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setConfirmOpen(true), destructive: true, separatorBefore: true });
+  }
+
+  const header = (
+    <div className="print:hidden">
+      <DetailHeader
+        crumbs={[{ label: "Deals", href: "/deals" }, { label: formData.title }]}
+        title={formData.title}
+        badges={
+          <Badge className={`${STATUS_COLORS[formData.status] ?? ""} w-fit capitalize`} variant="outline">
+            {formData.status}
+          </Badge>
+        }
+        primaryAction={
+          <Button size="sm" className="gap-1" onClick={() => navigate(`/deals/${dealId}/edit`)}>
+            <Edit className="h-3.5 w-3.5" />Edit
+          </Button>
+        }
+        menuItems={menuItems}
+      />
+      {nextStep && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs text-foreground/50 font-medium">Next step:</span>
+          {nextStep.href ? (
+            <Link to={nextStep.href(dealId!, formData.customerID)}>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 font-medium">
+                {nextStep.label}
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          ) : (
+            <span className="text-xs text-foreground/50 italic">{nextStep.label}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const contextPanel = (
+    <RecordContextPanel linkedTo={dealId!} linkedModel="Deal" />
+  );
 
   return (
-    <main className="p-4 space-y-5">
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap print:hidden">
-          <div className="min-w-0">
-            <AppBreadcrumb crumbs={[{ label: "Deals", href: "/deals" }, { label: formData.title }]} />
-            <CardTitle className="flex items-center gap-3 mt-1">
-              <Link to="/deals"><CircleArrowLeft /></Link>
-              <span className="truncate">{formData.title}</span>
-            </CardTitle>
-            {nextStep && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs text-foreground/50 font-medium">Next step:</span>
-                {nextStep.href ? (
-                  <Link to={nextStep.href(dealId!, formData.customerID)}>
-                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 font-medium">
-                      {nextStep.label}
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <span className="text-xs text-foreground/50 italic">{nextStep.label}</span>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2 flex-wrap shrink-0">
-            <Link to={`/finance/quotes/new?deal=${dealId}&customer=${formData.customerID}`}>
-              <Button size="sm" variant="outline" className="h-8 px-4">
-                <FileText className="h-3.5 w-3.5 me-1" />New Quote
-              </Button>
-            </Link>
-            <Link to={`/deals/${dealId}/edit`}>
-              <Button size="sm" className="h-8 px-4">
-                <Edit className="h-3.5 w-3.5 me-1" />Edit
-              </Button>
-            </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">More actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="h-3.5 w-3.5 me-2" />Clone
-                </DropdownMenuItem>
-                {(() => {
-                  const linkedProject = dealData?.data?.deal?.project;
-                  return linkedProject ? (
-                    <DropdownMenuItem onClick={() => navigate(`/projects/${linkedProject._id}`)}>
-                      <FolderKanban className="h-3.5 w-3.5 me-2" />View Project
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={handleCreateProject}>
-                      <FolderKanban className="h-3.5 w-3.5 me-2" />Create Project
-                    </DropdownMenuItem>
-                  );
-                })()}
-                {canDelete && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5 me-2" />Delete
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Deal details */}
             <div>
@@ -385,36 +317,20 @@ const ViewDeal = () => {
         </CardContent>
       </Card>
 
-      <Card className="print:hidden">
+      <Card>
         <CardContent className="py-5">
-          <Tabs defaultValue="timeline">
-            <TabsList className="mb-4 flex-wrap h-auto">
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="quotes">Quotes<Cnt n={quotesCount} /></TabsTrigger>
-              <TabsTrigger value="invoices">Invoices<Cnt n={invoicesCount} /></TabsTrigger>
-              <TabsTrigger value="notes">Notes<Cnt n={notesCount} /></TabsTrigger>
-              <TabsTrigger value="activities">Activities<Cnt n={activitiesCount} /></TabsTrigger>
-              <TabsTrigger value="attachments">Attachments</TabsTrigger>
+          <Tabs defaultValue="quotes">
+            <TabsList className="mb-4 flex h-auto w-full justify-start gap-1 overflow-x-auto [&>button]:shrink-0">
+              <TabsTrigger value="quotes">Quotes{quotesCount > 0 && ` (${quotesCount})`}</TabsTrigger>
+              <TabsTrigger value="invoices">Invoices{invoicesCount > 0 && ` (${invoicesCount})`}</TabsTrigger>
               <TabsTrigger value="emails">Emails</TabsTrigger>
               <TabsTrigger value="ai">AI</TabsTrigger>
             </TabsList>
-            <TabsContent value="timeline">
-              <RecordTimeline linkedTo={dealId!} linkedModel="Deal" />
-            </TabsContent>
             <TabsContent value="quotes">
               <FinanceTab linkedModel="Deal" linkedId={dealId!} customerId={formData.customerID} view="quotes" />
             </TabsContent>
             <TabsContent value="invoices">
               <FinanceTab linkedModel="Deal" linkedId={dealId!} customerId={formData.customerID} view="invoices" />
-            </TabsContent>
-            <TabsContent value="notes">
-              <NotesPanel linkedTo={dealId!} linkedModel="Deal" />
-            </TabsContent>
-            <TabsContent value="activities">
-              <ActivityList linkedTo={dealId!} linkedModel="Deal" />
-            </TabsContent>
-            <TabsContent value="attachments">
-              <AttachmentsPanel linkedModel="Deal" linkedToId={dealId!} />
             </TabsContent>
             <TabsContent value="emails">
               <EmailsPanel linkedTo={dealId!} linkedModel="Deal" />
@@ -433,20 +349,8 @@ const ViewDeal = () => {
         title="Delete Deal"
         description="Delete this deal? This action cannot be undone."
       />
-    </main>
+    </DetailPageLayout>
   );
 };
-
-const Cnt: React.FC<{ n: number }> = ({ n }) =>
-  n > 0 ? <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{n}</span> : null;
-
-const InfoRow: React.FC<{ label: string; value?: string | number | null; children?: React.ReactNode }> = ({ label, value, children }) => (
-  <div className="mb-2 grid grid-cols-[160px_1fr] items-start gap-2">
-    <Label className="text-sm font-medium text-foreground/60 pt-0.5">{label}</Label>
-    <div className="flex items-start">
-      {children ?? <p className="text-sm text-foreground">{value ?? "—"}</p>}
-    </div>
-  </div>
-);
 
 export default ViewDeal;

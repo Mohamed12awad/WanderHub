@@ -42,7 +42,7 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
 
   const isAdminOrOwner = (note: Note) =>
     note.createdBy._id === user?.id ||
-    ["admin", "super admin"].includes(user?.role ?? "");
+    (user?.permissions ?? []).some((p) => p === '*' || p === 'notes:edit');
 
   const createMut = useMutation({
     mutationFn: () => createNote({ content: draft.trim(), linkedTo, linkedModel }),

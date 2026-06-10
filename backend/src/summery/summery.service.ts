@@ -16,7 +16,7 @@ export class SummeryService {
       _sum: { price: true },
     });
     return rows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.currency] = r._sum.price ?? 0;
+      acc[r.currency] = Number(r._sum.price ?? 0);
       return acc;
     }, {});
   }
@@ -38,7 +38,7 @@ export class SummeryService {
       _sum: { total: true, totalPaid: true },
     });
     return rows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.currency] = (r._sum.total ?? 0) - (r._sum.totalPaid ?? 0);
+      acc[r.currency] = Number(r._sum.total ?? 0) - Number(r._sum.totalPaid ?? 0);
       return acc;
     }, {});
   }
@@ -57,10 +57,10 @@ export class SummeryService {
       }),
     ]);
     const categories = catRows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.category] = r._sum.amount ?? 0;
+      acc[r.category] = Number(r._sum.amount ?? 0);
       return acc;
     }, {});
-    return { total: totalAgg._sum.amount ?? 0, categories };
+    return { total: Number(totalAgg._sum.amount ?? 0), categories };
   }
 
   async getSummery(timePeriod?: string) {

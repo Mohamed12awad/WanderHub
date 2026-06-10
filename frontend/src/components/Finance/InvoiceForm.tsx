@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams, useLocation, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
+import { TaxRateSelect } from "@/components/common/TaxRateSelect";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoTextarea } from "@/components/ui/auto-textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
-import { CircleArrowLeft } from "lucide-react";
+import { EntityFormPage } from "@/components/common/EntityFormPage";
+import { StickyFormBar } from "@/components/common/StickyFormBar";
 import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice, getProjects } from "@/utils/api";
 import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
@@ -154,6 +154,8 @@ const InvoiceForm: React.FC = () => {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       discount: i.discount,
+      ...(i.taxRate !== undefined && i.taxRate !== null ? { taxRate: i.taxRate } : {}),
+      ...(i.productId ? { productId: i.productId } : {}),
     })));
     setExchangeRate(inv.exchangeRate ?? "");
     setCustomFields(toCustomFieldValues(inv.customFields));
@@ -184,12 +186,9 @@ const InvoiceForm: React.FC = () => {
         items,
         customFields,
       };
-      if (isEdit) {
-        await updateInvoice(id!, payload);
-      } else {
-        await createInvoice(payload);
-      }
-      navigate("/finance/invoices");
+      const res = isEdit ? await updateInvoice(id!, payload) : await createInvoice(payload);
+      const newId = (res as any)?.data?._id ?? id;
+      navigate(newId ? `/finance/invoices/${newId}` : "/finance/invoices");
     } catch {
       toast({ title: "Failed to save invoice", variant: "destructive" });
     } finally {
@@ -198,19 +197,16 @@ const InvoiceForm: React.FC = () => {
   };
 
   return (
-    <main className="p-4">
+    <EntityFormPage
+      title={isEdit ? "Edit Invoice" : f.newInvoice}
+      backHref="/finance/invoices"
+      breadcrumb={[
+        { label: "Invoices", href: "/finance/invoices" },
+        { label: isEdit ? "Edit" : "New" },
+      ]}
+    >
       <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-3">
-              <Link to="/finance/invoices"><CircleArrowLeft /></Link>
-              {isEdit ? "Edit Invoice" : f.newInvoice}
-            </CardTitle>
-            <Button type="submit" size="sm" className="h-8 px-5" disabled={saving}>
-              {saving ? tr.common.loading : tr.common.save}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="space-y-6">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Title *</Label>
@@ -251,7 +247,7 @@ const InvoiceForm: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>{f.status}</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as InvoiceStatus)}>
+                <Select key={status} value={status} onValueChange={(v) => setStatus(v as InvoiceStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(f.invoiceStatuses).map(([k, v]) => (
@@ -314,14 +310,7 @@ const InvoiceForm: React.FC = () => {
               </div>
               <div className="flex gap-8 items-center">
                 <span className="text-muted-foreground">{f.taxRate}</span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(Number(e.target.value))}
-                  className="h-7 w-20 text-right"
-                />
+                <TaxRateSelect value={taxRate} onChange={setTaxRate} compact />
               </div>
               <div className="flex gap-8">
                 <span className="text-muted-foreground">{f.tax}</span>
@@ -329,9 +318,9 @@ const InvoiceForm: React.FC = () => {
                   {tax.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
                 </span>
               </div>
-              <div className="flex gap-8 border-t pt-1 font-semibold">
-                <span>{f.total}</span>
-                <span className="w-32 text-right">
+              <div className="flex items-baseline gap-8 border-t pt-1">
+                <span className="font-medium">{f.total}</span>
+                <span className="w-32 text-right text-xl font-bold tabular-nums">
                   {total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
                 </span>
               </div>
@@ -340,19 +329,19 @@ const InvoiceForm: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{f.notes}</Label>
-                <Textarea
+                <AutoTextarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
+                  minRows={3}
                   placeholder="Internal notes…"
                 />
               </div>
               <div className="space-y-2">
                 <Label>{f.terms}</Label>
-                <Textarea
+                <AutoTextarea
                   value={terms}
                   onChange={(e) => setTerms(e.target.value)}
-                  rows={3}
+                  minRows={3}
                   placeholder="Terms & conditions…"
                 />
               </div>
@@ -361,15 +350,11 @@ const InvoiceForm: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <DynamicFields module="invoices" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex justify-end mt-4 py-3">
-          <Button type="submit" size="sm" className="h-8 px-5" disabled={saving}>
-            {saving ? tr.common.loading : tr.common.save}
-          </Button>
+
+          <StickyFormBar isSubmitting={saving} onCancel={() => navigate("/finance/invoices")} />
         </div>
       </form>
-    </main>
+    </EntityFormPage>
   );
 };
 

@@ -1,6 +1,5 @@
 import {
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -20,11 +19,11 @@ export class CreateTaskDto {
   description?: string;
 
   @IsOptional()
-  @IsIn(['low', 'medium', 'high', 'urgent'])
+  @IsString()
   priority?: string;
 
   @IsOptional()
-  @IsIn(['todo', 'in_progress', 'review', 'done', 'cancelled'])
+  @IsString()
   status?: string;
 
   @IsOptional()

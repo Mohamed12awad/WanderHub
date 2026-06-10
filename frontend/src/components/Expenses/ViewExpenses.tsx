@@ -1,33 +1,29 @@
-import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense, getNotes,
+  getExpenseById, deleteExpenseReportItem, approveExpenseReport, rejectExpenseReport, deleteExpense,
 } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreHorizontal, Trash2, Copy } from "lucide-react";
+import { Edit, CheckCircle, XCircle, Clock, Trash2, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { ApprovalBadge } from "@/components/Finance/FinanceStatusBadge";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import type { ApprovalStatus } from "@/types/types";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
+import { InfoRow } from "@/components/common/InfoRow";
+import { AuditRows } from "@/components/common/AuditRows";
 
 interface ExpenseItem {
   _id: string;
@@ -50,6 +46,8 @@ interface ExpenseData {
   approvedAt?: string;
   rejectionReason?: string;
   createdAt: string;
+  updatedAt?: string;
+  updatedBy?: { _id: string; name: string };
 }
 
 const ViewExpense = () => {
@@ -61,20 +59,14 @@ const ViewExpense = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
-  const isAdmin = ["admin", "super admin"].includes(user!.role);
-  const canDelete = isAdmin;
+  const perms = user?.permissions ?? [];
+  const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
+  const canDelete = hasPerm('expenses:delete');
 
   const { data: expenseData, isLoading, error } = useQuery({
     queryKey: ["expenses", expenseId],
     queryFn: async () => (await getExpenseById(expenseId!)).data
   });
-  const { data: notesData } = useQuery({
-    queryKey: ["notes", expenseId, "Expense"],
-    queryFn: () => getNotes({ linkedTo: expenseId!, linkedModel: "Expense" }),
-    enabled: !!expenseId
-  });
-  const notesCount = ((notesData?.data) as any[])?.length ?? 0;
-
   const [formData, setFormData] = useState<ExpenseData | null>(null);
   useEffect(() => { if (expenseData) setFormData(expenseData); }, [expenseData]);
 
@@ -140,17 +132,62 @@ const ViewExpense = () => {
   if (isLoading) return <LoadingSpinner loading />;
   if (error || !formData) return <div className="p-4 text-sm text-destructive">Could not load expense report.</div>;
 
-  const canDeleteItem = ["admin", "super admin"].includes(user!.role);
+  const canDeleteItem = hasPerm('expenses:edit');
   const approvalStatus = formData.approvalStatus ?? (formData.approved ? "approved" : "pending");
   const approvalEnabled = isApprovalEnabled("expenses");
   const isPending = approvalStatus === "pending";
   const isRejected = approvalStatus === "rejected";
-  const canEdit = isAdmin || !approvalEnabled || isRejected;
-  const userCanApprove = canUserApprove("expenses", user!.role);
+  const canEdit = hasPerm('expenses:edit') || !approvalEnabled || isRejected;
+  const userCanApprove = canUserApprove("expenses", user!.role, perms);
+
+  const menuItems: DetailMenuItem[] = [
+    { label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone },
+  ];
+  if (userCanApprove && approvalStatus === "approved") {
+    menuItems.push({ label: "Reject", icon: <XCircle className="h-3.5 w-3.5 me-2" />, onClick: () => setRejectOpen(true), destructive: true, separatorBefore: true });
+  }
+  if (canDelete) {
+    menuItems.push({ label: "Delete", icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setConfirmOpen(true), destructive: true, separatorBefore: true });
+  }
+
+  const header = (
+    <DetailHeader
+      crumbs={[{ label: "Expenses", href: "/expenses" }, { label: formData.title }]}
+      title={formData.title}
+      badges={approvalEnabled ? <ApprovalBadge status={approvalStatus} rejectionReason={formData.rejectionReason} /> : undefined}
+      primaryAction={
+        <Button size="sm" className="gap-1" disabled={!canEdit} title={isPending ? "Pending approval — cannot edit." : undefined} onClick={() => canEdit && navigate(`/expenses/${expenseId}/edit`)}>
+          <Edit className="h-3.5 w-3.5" />Edit
+        </Button>
+      }
+      menuItems={menuItems}
+    />
+  );
+
+  const contextPanel = expenseId ? (
+    <RecordContextPanel
+      linkedTo={expenseId}
+      linkedModel="Expense"
+      filesModel="ExpenseReport"
+      showActivities={false}
+      approvalsContent={approvalEnabled ? (
+        <ApprovalStepsTimeline
+          entityType="ExpenseReport"
+          entityId={expenseId}
+          embedded
+          outcome={{
+            status: approvalStatus,
+            actorName: typeof formData.approvedBy === "object" ? formData.approvedBy?.name : undefined,
+            actedAt: formData.approvedAt,
+            reason: approvalStatus === "rejected" ? formData.rejectionReason : undefined,
+          }}
+        />
+      ) : undefined}
+    />
+  ) : undefined;
 
   return (
-    <main className="p-4 space-y-5">
-      <ApprovalStepsTimeline entityType="ExpenseReport" entityId={expenseId!} />
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
@@ -201,52 +238,7 @@ const ViewExpense = () => {
       />
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between flex-wrap gap-3">
-          <div className="min-w-0">
-            <AppBreadcrumb crumbs={[{ label: "Expenses", href: "/expenses" }, { label: formData.title }]} />
-            <CardTitle className="flex items-center gap-2 mt-1">
-              <Link to="/expenses"><CircleArrowLeft /></Link>
-              {formData.title}
-            </CardTitle>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <Link to={canEdit ? `/expenses/${expenseId}/edit` : "#"}>
-              <Button size="sm" className="h-8 px-4" disabled={!canEdit} title={isPending ? "Pending approval — cannot edit." : undefined}>
-                <Edit className="h-3.5 w-3.5 me-1" />Edit
-              </Button>
-            </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">More actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="h-3.5 w-3.5 me-2" />Clone
-                </DropdownMenuItem>
-                {userCanApprove && approvalStatus === "approved" && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
-                      <XCircle className="h-3.5 w-3.5 me-2" />Reject
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {canDelete && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5 me-2" />Delete
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Report Information</h2>
@@ -278,7 +270,7 @@ const ViewExpense = () => {
                   {formData.expenses.reduce((t, i) => t + i.amount, 0).toLocaleString()}
                 </span>
               </InfoRow>
-              <InfoRow label="Created At" value={new Date(formData.createdAt).toLocaleDateString()} />
+              <AuditRows record={formData} createdByField={formData.userId} />
             </div>
           </div>
         </CardContent>
@@ -328,43 +320,8 @@ const ViewExpense = () => {
           </div>
         </CardContent>
       </Card>
-
-      <Card>
-        <CardContent className="py-5">
-          <Tabs defaultValue="timeline">
-            <TabsList className="mb-4">
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="notes">
-                Notes
-                {notesCount > 0 && (
-                  <span className="ms-1.5 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-semibold leading-none">{notesCount}</span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="attachments">Attachments</TabsTrigger>
-            </TabsList>
-            <TabsContent value="timeline">
-              {expenseId && <RecordTimeline linkedTo={expenseId} linkedModel="Expense" />}
-            </TabsContent>
-            <TabsContent value="notes">
-              {expenseId && <NotesPanel linkedTo={expenseId} linkedModel="Expense" />}
-            </TabsContent>
-            <TabsContent value="attachments">
-              {expenseId && <AttachmentsPanel linkedModel="ExpenseReport" linkedToId={expenseId} />}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </main>
+    </DetailPageLayout>
   );
 };
-
-const InfoRow: React.FC<{ label: string; value?: string | number | null; children?: React.ReactNode }> = ({ label, value, children }) => (
-  <div className="mb-2 grid grid-cols-[160px_1fr] items-start gap-2">
-    <Label className="text-sm font-medium text-foreground/60 pt-0.5">{label}</Label>
-    <div className="flex items-start">
-      {children ?? <p className="text-sm text-foreground">{value ?? "—"}</p>}
-    </div>
-  </div>
-);
 
 export default ViewExpense;

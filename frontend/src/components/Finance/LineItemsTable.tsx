@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TaxRateSelect } from "@/components/common/TaxRateSelect";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -34,6 +35,24 @@ function rowTotal(item: LineItemRow) {
  * line carries a taxRate, otherwise the document-level rate is applied to each
  * line. Keeps the form preview consistent with what the server stores.
  */
+/**
+ * Strips a line-item list down to the fields the API accepts (LineItemDto).
+ * Items loaded from a saved document carry server-only fields (_id, total,
+ * order, parent foreign keys) that the backend rejects under
+ * `forbidNonWhitelisted`, so payloads must be cleaned before sending.
+ */
+export function toLineItemPayload(items: LineItemRow[]): LineItemRow[] {
+  return items.map((i) => ({
+    description: i.description,
+    quantity: i.quantity,
+    unitPrice: i.unitPrice,
+    discount: i.discount,
+    ...(i.taxRate !== undefined && i.taxRate !== null ? { taxRate: i.taxRate } : {}),
+    ...(i.taxCode ? { taxCode: i.taxCode } : {}),
+    ...(i.productId ? { productId: i.productId } : {}),
+  }));
+}
+
 export function computeTotals(items: LineItemRow[], docTaxRate = 0) {
   const perLine = items.some((i) => i.taxRate !== undefined && i.taxRate !== null);
   let tax = 0;
@@ -91,14 +110,18 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
           </TableHeader>
           <TableBody>
             {items.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
-                  {f.noItems}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={8} className="py-8 text-center">
+                  <p className="mb-3 text-sm text-muted-foreground">{f.noItems}</p>
+                  <Button type="button" size="sm" onClick={addRow}>
+                    <Plus className="h-3.5 w-3.5 me-1" />
+                    {f.addItem}
+                  </Button>
                 </TableCell>
               </TableRow>
             )}
             {items.map((item, idx) => (
-              <TableRow key={idx}>
+              <TableRow key={idx} className="hover:bg-muted/50">
                 <TableCell>
                   <AsyncSearchableSelect
                     value=""
@@ -157,13 +180,10 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                   />
                 </TableCell>
                 <TableCell>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
+                  <TaxRateSelect
                     value={item.taxRate ?? 0}
-                    onChange={(e) => update(idx, "taxRate", e.target.value)}
-                    className="h-8 text-right"
+                    onChange={(rate) => update(idx, "taxRate", rate)}
+                    compact
                   />
                 </TableCell>
                 <TableCell className="text-right font-medium">
@@ -185,10 +205,12 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
           </TableBody>
         </Table>
       </div>
-      <Button type="button" variant="outline" size="sm" className="mt-3" onClick={addRow}>
-        <Plus className="h-3.5 w-3.5 me-1" />
-        {f.addItem}
-      </Button>
+      {items.length > 0 && (
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={addRow}>
+          <Plus className="h-3.5 w-3.5 me-1" />
+          {f.addItem}
+        </Button>
+      )}
     </div>
   );
 };

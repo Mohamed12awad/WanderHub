@@ -71,7 +71,7 @@ const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete, selection
             <Link to={`/customers/${item._id}/edit`}>
               <DropdownMenuItem>{tr.common.edit}</DropdownMenuItem>
             </Link>
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'contacts:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

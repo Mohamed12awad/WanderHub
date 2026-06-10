@@ -116,6 +116,7 @@ export class ImportService {
     this.assertCanImport(user, cfg.permission);
 
     const { mapping, rows } = body;
+    if (rows.length > 1000) throw new BadRequestException('Import limit is 1000 rows.');
     const fields = await this.resolveFields(cfg);
 
     // Required fields must be mapped to a column before we touch any row.

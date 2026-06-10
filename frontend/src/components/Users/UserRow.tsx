@@ -64,7 +64,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
             <DropdownMenuItem disabled={user?.id === id} onClick={handleToggleState}>
               {active ? "Deactivate" : "Activate"}
             </DropdownMenuItem>
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'users:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

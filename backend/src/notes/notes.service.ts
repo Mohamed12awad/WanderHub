@@ -2,8 +2,10 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
+import { LinkedAccessService } from '../common/linked-access.service';
 import { toClient } from '../common/serialize';
 import { CreateNoteDto } from './dto/create-note.dto';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 const TIMELINE_MODELS = new Set(['Customer', 'Deal']);
 
@@ -12,9 +14,11 @@ export class NotesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly linkedAccess: LinkedAccessService,
   ) {}
 
-  async findAll(linkedTo: string, linkedModel: string) {
+  async findAll(linkedTo: string, linkedModel: string, user: AuthUser) {
+    await this.linkedAccess.assertCanAccess(user, linkedModel, linkedTo);
     const notes = await this.prisma.note.findMany({
       where: { linkedToId: linkedTo, linkedModel },
       include: { createdBy: { select: { id: true, name: true } } },
@@ -53,12 +57,13 @@ export class NotesService {
     return toClient(note);
   }
 
-  async update(id: string, content: string, requestingUserId: string, requestingUserRole: string, requestingPermissions: string[]) {
+  async update(id: string, content: string, user: AuthUser) {
     const note = await this.prisma.note.findUnique({ where: { id } });
     if (!note) return null;
-    const canModify = requestingUserId === note.createdById ||
-      requestingPermissions.includes('*') ||
-      requestingUserRole === 'admin';
+    const canModify =
+      user.id === note.createdById ||
+      user.permissions.includes('*') ||
+      user.permissions.includes('notes:edit');
     if (!canModify) throw new ForbiddenException('You can only edit your own notes');
     const updated = await this.prisma.note.update({
       where: { id },
@@ -68,12 +73,13 @@ export class NotesService {
     return toClient(updated);
   }
 
-  async remove(id: string, requestingUserId: string, requestingUserRole: string, requestingPermissions: string[]) {
+  async remove(id: string, user: AuthUser) {
     const note = await this.prisma.note.findUnique({ where: { id } });
     if (!note) return null;
-    const canModify = requestingUserId === note.createdById ||
-      requestingPermissions.includes('*') ||
-      requestingUserRole === 'admin';
+    const canModify =
+      user.id === note.createdById ||
+      user.permissions.includes('*') ||
+      user.permissions.includes('notes:edit');
     if (!canModify) throw new ForbiddenException('You can only delete your own notes');
     await this.prisma.note.delete({ where: { id } });
     return true;

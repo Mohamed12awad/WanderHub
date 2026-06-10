@@ -94,7 +94,7 @@ const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete, selectionCell }) 
             <Link to={`/leads/${item._id}/edit`}>
               <DropdownMenuItem>{tr.common.edit}</DropdownMenuItem>
             </Link>
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'leads:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

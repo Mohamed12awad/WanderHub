@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
+import { LinkedAccessService } from '../common/linked-access.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { SendEmailDto } from './dto/send-email.dto';
 import { bodyToHtml, instrumentEmail } from './tracking.util';
@@ -10,6 +11,7 @@ export class EmailsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly linkedAccess: LinkedAccessService,
   ) {}
 
   /** Records a tracked email and enqueues the instrumented HTML for delivery. */
@@ -56,7 +58,8 @@ export class EmailsService {
   }
 
   /** Tracked emails for a record, with delivery status reconciled from the outbox. */
-  async list(linkedToId: string, linkedModel: string) {
+  async list(linkedToId: string, linkedModel: string, user: AuthUser) {
+    await this.linkedAccess.assertCanAccess(user, linkedModel, linkedToId);
     const emails = await this.prisma.trackedEmail.findMany({
       where: { linkedToId, linkedModel },
       orderBy: { createdAt: 'desc' },

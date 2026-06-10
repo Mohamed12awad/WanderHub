@@ -49,10 +49,6 @@ function NavLinks() {
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname.startsWith(path);
-  const isAdminOrAbove = ["admin", "manager", "super admin"].includes(
-    user!.role,
-  );
-
   // Mirror the backend PermissionGuard: "*" grants everything, and a scoped
   // grant (e.g. "deals:view:own") satisfies the broader "deals:view".
   const perms: string[] = user?.permissions ?? [];
@@ -75,8 +71,7 @@ function NavLinks() {
   const showTasks = modules.tasks && can("tasks:view");
   const showProjects = modules.projects && can("projects:view");
   const showCalendar = modules.calendar && can("activities:view");
-  const showProducts =
-    isAdminOrAbove && modules.products && can("products:view");
+  const showProducts = modules.products && can("products:view");
   const showReports = modules.reports && can("reports:view");
 
   const hasCRM = showLeads || showContacts || showDeals || showPipeline;

@@ -18,7 +18,7 @@ export class TasksController {
   @Get()
   @RequirePermission('tasks:view')
   findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser) {
-    return this.tasks.findAll({ ...query, _userId: user.id });
+    return this.tasks.findAll(query, user);
   }
 
   @Get('summary')
@@ -29,8 +29,8 @@ export class TasksController {
 
   @Get(':id')
   @RequirePermission('tasks:view')
-  findOne(@Param('id') id: string) {
-    return this.tasks.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.tasks.findOne(id, user);
   }
 
   @Post()

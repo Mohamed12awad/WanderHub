@@ -120,7 +120,7 @@ const UserDialog: React.FC<Props> = ({ open, onClose, editId }) => {
     isEdit ? updateMutation.mutate() : createMutation.mutate();
   };
 
-  if (!currentUser || !["admin", "super admin"].includes(currentUser.role)) return null;
+  if (!currentUser || !(currentUser.permissions ?? []).some((p) => p === '*' || p === 'users:create')) return null;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>

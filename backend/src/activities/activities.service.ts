@@ -36,7 +36,64 @@ export class ActivitiesService {
       },
       orderBy: { date: 'desc' },
     });
+    await this.backfillLinkedNames(activities);
     return toClient(activities);
+  }
+
+  // Resolve each activity's linked record name so the UI can render
+  // "module · record name" with a clickable name. The typed relations
+  // (customer/deal/project) are populated via the include, but legacy/seed rows
+  // may have linkedToId set without the FK column, and activities can also point
+  // at modules with no typed relation (Lead, Supplier, finance, procurement).
+  // We batch one lookup per model, attach a generic `linkedName`, and also graft
+  // the customer/deal/project relation when missing.
+  private async backfillLinkedNames(
+    activities: Array<{
+      linkedToId: string | null;
+      linkedModel: string | null;
+      linkedName?: string;
+      customer?: { id: string; name: string } | null;
+      deal?: { id: string; title: string } | null;
+      project?: { id: string; name: string } | null;
+    }>,
+  ) {
+    // Per-model batched name fetchers (id -> display name).
+    const fetchers: Record<string, (ids: string[]) => Promise<Array<{ id: string; label: string }>>> = {
+      Customer: (ids) => this.prisma.customer.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.name }))),
+      Deal: (ids) => this.prisma.deal.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.title }))),
+      Project: (ids) => this.prisma.project.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.name }))),
+      Lead: (ids) => this.prisma.lead.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.name }))),
+      Supplier: (ids) => this.prisma.supplier.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.name }))),
+      Invoice: (ids) => this.prisma.invoice.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.title }))),
+      Quote: (ids) => this.prisma.quote.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.title }))),
+      PurchaseOrder: (ids) => this.prisma.purchaseOrder.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } }).then((r) => r.map((x) => ({ id: x.id, label: x.title }))),
+    };
+
+    const idsByModel = new Map<string, Set<string>>();
+    for (const a of activities) {
+      if (!a.linkedToId || !a.linkedModel || !fetchers[a.linkedModel]) continue;
+      if (!idsByModel.has(a.linkedModel)) idsByModel.set(a.linkedModel, new Set());
+      idsByModel.get(a.linkedModel)!.add(a.linkedToId);
+    }
+    if (idsByModel.size === 0) return;
+
+    const nameByModel = new Map<string, Map<string, string>>();
+    await Promise.all(
+      [...idsByModel.entries()].map(async ([model, idSet]) => {
+        const rows = await fetchers[model]([...idSet]);
+        nameByModel.set(model, new Map(rows.map((r) => [r.id, r.label])));
+      }),
+    );
+
+    for (const a of activities) {
+      if (!a.linkedToId || !a.linkedModel) continue;
+      const name = nameByModel.get(a.linkedModel)?.get(a.linkedToId);
+      if (!name) continue;
+      a.linkedName = name;
+      if (a.linkedModel === 'Customer' && !a.customer) a.customer = { id: a.linkedToId, name };
+      else if (a.linkedModel === 'Deal' && !a.deal) a.deal = { id: a.linkedToId, title: name };
+      else if (a.linkedModel === 'Project' && !a.project) a.project = { id: a.linkedToId, name };
+    }
   }
 
   async create(body: CreateActivityDto, userId: string) {

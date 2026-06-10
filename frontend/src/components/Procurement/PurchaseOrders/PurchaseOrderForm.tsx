@@ -1,238 +1,210 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useForm, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { createPurchaseOrder, updatePurchaseOrder, getPurchaseOrderById, getSuppliers } from "@/utils/api";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import LineItemsTable, { LineItemRow, computeTotals } from "@/components/Finance/LineItemsTable";
+import { TextField, TextareaField } from "@/components/common/form";
+import { EntityFormPage } from "@/components/common/EntityFormPage";
+import { StickyFormBar } from "@/components/common/StickyFormBar";
+import LineItemsTable, { LineItemRow, toLineItemPayload } from "@/components/Finance/LineItemsTable";
 import DynamicFields from "@/components/common/DynamicFields";
+import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { queryKeys } from "@/lib/queryKeys";
+import { createPurchaseOrder, updatePurchaseOrder, getPurchaseOrderById, getSuppliers } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
-export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const location = useLocation();
-  const cloneData = mode === "add" ? (location.state as any)?.clone : undefined;
-  const { tr } = useLanguage();
-  const { toast } = useToast();
+const PO_STATUSES = [
+  { value: "draft",     label: "Draft" },
+  { value: "sent",      label: "Sent" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "received",  label: "Received" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
-  const [formData, setFormData] = useState({
-    supplierId: cloneData?.supplierId ?? "",
-    status: "draft",
-    currency: cloneData?.currency ?? "EGP",
-    issueDate: new Date().toISOString().split("T")[0],
-    expectedDeliveryDate: "",
-    notes: cloneData?.notes ?? "",
-    items: (cloneData?.items ?? []) as LineItemRow[],
-    subtotal: 0,
-    taxRate: cloneData?.taxRate ?? 14,
-    tax: 0,
-    total: 0,
-  });
+const schema = z.object({
+  title:        z.string().min(1, "Title is required"),
+  supplierId:   z.string().min(1, "Supplier is required"),
+  status:       z.string().min(1),
+  currency:     z.string().min(1),
+  expectedDate: z.string().optional(),
+  notes:        z.string().optional(),
+  taxRate:      z.coerce.number().min(0).max(100),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
+  const navigate   = useNavigate();
+  const { id }     = useParams();
+  const location   = useLocation();
+  const cloneData  = mode === "add" ? (location.state as any)?.clone : undefined;
+
+  const [items, setItems]               = useState<LineItemRow[]>(cloneData?.items ?? []);
+  const [itemsError, setItemsError]     = useState("");
   const [customFields, setCustomFields] = useState<Record<string, string>>(
     cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
   );
+  const [supplierLabel, setSupplierLabel] = useState(cloneData?.supplierLabel ?? "");
 
-  const { data: suppliersData } = useQuery({
-    queryKey: ["suppliers-all"],
-    queryFn: () => getSuppliers({ limit: 1000 })
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema) as Resolver<FormValues>,
+    defaultValues: {
+      title: cloneData?.title ?? "", supplierId: cloneData?.supplierId ?? "", status: "draft",
+      currency: cloneData?.currency ?? "EGP",
+      expectedDate: "",
+      notes: cloneData?.notes ?? "", taxRate: cloneData?.taxRate ?? 14,
+    },
   });
-  const suppliers = suppliersData?.data?.data || [];
+
+  const fetchSuppliers = useCallback(
+    (q: string) => getSuppliers({ page: 1, limit: 20, q }).then((r) =>
+      ((Array.isArray(r?.data) ? r.data : (r as any)?.data?.data ?? []) as any[]).map((s) => ({ value: s._id, label: s.name }))
+    ), [],
+  );
 
   const { data: poData, isPending: isFetching } = useQuery({
-    queryKey: ["purchase-order", id],
+    queryKey: queryKeys.purchaseOrders.detail(id!),
     queryFn: () => getPurchaseOrderById(id!),
     enabled: mode === "edit" && !!id,
   });
-
-  // v5 removed useQuery onSuccess — prefill the form from the fetched record.
   useEffect(() => {
     if (!poData) return;
     const d = poData.data;
-    setFormData({
-      supplierId: d.supplier?._id || "",
-      status: d.status || "draft",
-      currency: d.currency || "EGP",
-      issueDate: d.issueDate ? new Date(d.issueDate).toISOString().split("T")[0] : "",
-      expectedDeliveryDate: d.expectedDeliveryDate ? new Date(d.expectedDeliveryDate).toISOString().split("T")[0] : "",
-      notes: d.notes || "",
-      items: d.items || [],
-      subtotal: d.subtotal || 0,
-      taxRate: d.taxRate || 14,
-      tax: d.tax || 0,
-      total: d.total || 0,
+    form.reset({
+      title: d.title ?? "", supplierId: d.supplier?._id ?? "", status: d.status ?? "draft",
+      currency: d.currency ?? "EGP",
+      expectedDate: d.expectedDate ? new Date(d.expectedDate).toISOString().split("T")[0] : "",
+      notes: d.notes ?? "", taxRate: d.taxRate ?? 14,
     });
+    setItems(d.items ?? []);
     setCustomFields(toCustomFieldValues(d.customFields));
-  }, [poData]);
+    setSupplierLabel(d.supplier?.name ?? "");
+  }, [poData, form]);
 
-  const mutation = useMutation({
-    mutationFn: (data: any) => (mode === "add" ? createPurchaseOrder(data) : updatePurchaseOrder(id!, data)),
+  const backHref = "/procurement/purchase-orders";
 
-    onSuccess: () => {
-      toast({ title: "Success", description: "Purchase Order saved successfully." });
-      navigate("/procurement/purchase-orders");
+  const mutation = useSaveMutation<Record<string, unknown>>({
+    save: (payload) => mode === "add" ? createPurchaseOrder(payload as any) : updatePurchaseOrder(id!, payload as any),
+    invalidate: [queryKeys.purchaseOrders.all],
+    successMessage: "Purchase order saved",
+    errorMessage:   "Failed to save purchase order",
+    onSuccess: (res: any) => {
+      const newId = res?.data?._id ?? id;
+      navigate(newId ? `/procurement/purchase-orders/${newId}` : backHref);
     },
-
-    onError: (e: any) => {
-      toast({ title: e?.response?.data?.message ?? "Failed to save Purchase Order.", variant: "destructive" });
-    }
   });
 
-  const handleChange = (field: string, value: any) => {
-    setFormData((p) => ({ ...p, [field]: value }));
+  const onSubmit = (values: FormValues) => {
+    if (items.length === 0) { setItemsError("Please add at least one item"); return; }
+    setItemsError("");
+    mutation.mutate({
+      title: values.title.trim(), supplier: values.supplierId, status: values.status, currency: values.currency,
+      ...(values.expectedDate ? { expectedDate: values.expectedDate } : {}),
+      notes: values.notes, items: toLineItemPayload(items), taxRate: values.taxRate, customFields,
+    });
   };
 
-  const handleItemsChange = (items: LineItemRow[]) => {
-    setFormData((prev) => ({ ...prev, items }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.supplierId) {
-      toast({ title: "Validation Error", description: "Please select a supplier.", variant: "destructive" });
-      return;
-    }
-    if (formData.items.length === 0) {
-      toast({ title: "Validation Error", description: "Please add at least one item.", variant: "destructive" });
-      return;
-    }
-    
-    const { subtotal, tax, total } = computeTotals(formData.items, formData.taxRate);
-    const payload = { ...formData, supplier: formData.supplierId, subtotal, tax, total, customFields };
-    mutation.mutate(payload);
-  };
-
-  if (mode === "edit" && isFetching) return <div className="p-6">Loading...</div>;
+  if (mode === "edit" && isFetching) return <div className="p-6">Loading…</div>;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {mode === "add" ? "New Purchase Order" : "Edit Purchase Order"}
-        </h1>
-        <Button variant="outline" onClick={() => navigate("/procurement/purchase-orders")}>
-          {tr.common.cancel}
-        </Button>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
+    <EntityFormPage
+      title={mode === "add" ? "New Purchase Order" : "Edit Purchase Order"}
+      backHref={backHref}
+      breadcrumb={[
+        { label: "Purchase Orders", href: backHref },
+        { label: mode === "add" ? "New" : "Edit" },
+      ]}
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Details</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-lg">Details</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Supplier *</Label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={formData.supplierId}
-                      onChange={(e) => handleChange("supplierId", e.target.value)}
-                      required
-                    >
-                      <option value="">Select Supplier</option>
-                      {suppliers.map((sup: any) => (
-                        <option key={sup._id} value={sup._id}>{sup.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={formData.currency}
-                      onChange={(e) => handleChange("currency", e.target.value)}
-                    >
-                      {CURRENCIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Issue Date</Label>
-                    <Input type="date" value={formData.issueDate} onChange={(e) => handleChange("issueDate", e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Expected Delivery Date</Label>
-                    <Input type="date" value={formData.expectedDeliveryDate} onChange={(e) => handleChange("expectedDeliveryDate", e.target.value)} />
-                  </div>
+                <TextField<FormValues> name="title" label="Title" required placeholder="e.g. Q3 hardware restock" />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Supplier */}
+                  <FormField control={form.control} name="supplierId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supplier <span className="text-destructive ms-1">*</span></FormLabel>
+                      <FormControl>
+                        <AsyncSearchableSelect value={field.value ?? ""} onChange={field.onChange}
+                          fetchFn={fetchSuppliers} selectedLabel={supplierLabel}
+                          placeholder="Select Supplier" searchPlaceholder="Search suppliers…"
+                          onSelectItem={(item) => setSupplierLabel(item.label)} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {/* Currency */}
+                  <FormField control={form.control} name="currency" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <FormControl>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                    </FormItem>
+                  )} />
+
+                  <TextField<FormValues> name="expectedDate" label="Expected Date" type="date" />
+
+                  {/* Status */}
+                  <FormField control={form.control} name="status" render={({ field }) => {
+                    const value = field.value ?? "";
+                    const opts = value && !PO_STATUSES.some((s) => s.value === value)
+                      ? [...PO_STATUSES, { value, label: value }]
+                      : PO_STATUSES;
+                    return (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                        <Select key={value} value={value} onValueChange={field.onChange}>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectContent>
+                            {opts.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                    </FormItem>
+                    );
+                  }} />
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  <Label>Notes</Label>
-                  <Textarea value={formData.notes} onChange={(e) => handleChange("notes", e.target.value)} placeholder="Terms, conditions, or shipping notes..." />
-                </div>
+                <TextareaField<FormValues> name="notes" label="Notes" placeholder="Terms, conditions, or shipping notes…" />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <DynamicFields module="purchaseOrders" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
-                </div>
+                <DynamicFields module="purchaseOrders" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="p-0">
                 <LineItemsTable
-                  items={formData.items}
-                  currency={formData.currency}
-                  onChange={handleItemsChange}
+                  items={items} currency={form.watch("currency")}
+                  onChange={(next) => { setItems(next); setItemsError(""); }}
                 />
+                {itemsError && <p className="text-sm text-destructive px-4 pb-3">{itemsError}</p>}
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-3">
-                  <Label className="shrink-0">Tax Rate (%)</Label>
-                  <input
-                    type="number"
-                    className="flex h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                    value={formData.taxRate}
-                    onChange={(e) => handleChange("taxRate", Number(e.target.value))}
-                    min={0}
-                    max={100}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+
           </div>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Status & Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData.status}
-                    onChange={(e) => handleChange("status", e.target.value)}
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="received">Received</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <div className="pt-4 border-t">
-                  <Button type="submit" className="w-full" disabled={mutation.isPending}>
-                    {mutation.isPending ? "Saving..." : tr.common.save}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </form>
-    </div>
+          <StickyFormBar isSubmitting={mutation.isPending} onCancel={() => navigate(backHref)} />
+        </form>
+      </Form>
+    </EntityFormPage>
   );
 }

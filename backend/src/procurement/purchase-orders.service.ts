@@ -17,6 +17,7 @@ const PO_INCLUDE = {
   items: { orderBy: { order: 'asc' as const } },
   createdBy: { select: { id: true, name: true } },
   approvedBy: { select: { id: true, name: true } },
+  updatedBy: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -85,6 +86,7 @@ export class PurchaseOrdersService {
   async create(body: CreatePurchaseOrderDto, userId: string) {
     const { items = [], taxRate = 0, ...rest } = body;
     const data = this.cleanData(rest);
+    if (typeof data.expectedDate === 'string') data.expectedDate = data.expectedDate ? new Date(data.expectedDate) : null;
     data.customFields = await this.customFields.validateAndClean(
       'purchaseOrders',
       data.customFields as Record<string, unknown> | undefined,
@@ -110,7 +112,7 @@ export class PurchaseOrdersService {
       include: PO_INCLUDE,
     });
     if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'PurchaseOrder', po.id, 'purchase_orders', po.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'PurchaseOrder', po.id, 'purchase_orders', Number(po.total));
       if (overall === 'approved') {
         await this.prisma.purchaseOrder.update({ where: { id: po.id }, data: { approvalStatus: 'approved' } });
         (po as { approvalStatus: string }).approvalStatus = 'approved';
@@ -127,6 +129,7 @@ export class PurchaseOrdersService {
 
     const { items, taxRate, ...rest } = body;
     const data = this.cleanData(rest);
+    if (typeof data.expectedDate === 'string') data.expectedDate = data.expectedDate ? new Date(data.expectedDate) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'purchaseOrders',

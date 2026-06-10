@@ -9,6 +9,8 @@ import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { calcTotals } from './finance.math';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { VisibilityService } from '../common/visibility.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -20,6 +22,7 @@ const QUOTE_INCLUDE = {
   items: { orderBy: { order: 'asc' as const } },
   convertedToInvoice: { select: { id: true, invoiceNumber: true } },
   salesOrder: { select: { id: true, orderNumber: true } },
+  updatedBy: { select: { id: true, name: true } },
 };
 
 // Minimal include for the invoice returned by quote→invoice conversion.
@@ -38,6 +41,7 @@ export class QuotesService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -48,15 +52,16 @@ export class QuotesService {
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
-  private canUserApprove(approverRoles: string[], userRole: string): boolean {
-    if (['admin', 'super admin'].includes(userRole)) return true;
+  private canUserApprove(approverRoles: string[], userRole: string, permissions: string[]): boolean {
+    if (permissions.includes('*')) return true;
     // Empty approverRoles with approvals enabled means admins-only; don't let anyone through.
     if (!approverRoles.length) return false;
     return approverRoles.includes(userRole);
   }
 
-  async getQuotes(query: Record<string, string>) {
-    const where: Prisma.QuoteWhereInput = { deletedAt: null };
+  async getQuotes(query: Record<string, string>, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'quotes', 'createdById');
+    const where: Prisma.QuoteWhereInput = { deletedAt: null, ...scopeWhere };
     if (query.status) where.status = query.status as Prisma.QuoteWhereInput['status'];
     if (query.customer) where.customerId = query.customer;
     if (query.deal) where.dealId = query.deal;
@@ -64,8 +69,9 @@ export class QuotesService {
     return toClient(quotes);
   }
 
-  async getQuoteById(id: string) {
-    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null }, include: QUOTE_INCLUDE });
+  async getQuoteById(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'quotes', 'createdById');
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null, ...scopeWhere }, include: QUOTE_INCLUDE });
     return quote ? toClient(quote) : null;
   }
 
@@ -93,7 +99,7 @@ export class QuotesService {
       include: QUOTE_INCLUDE,
     });
     if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'Quote', quote.id, 'quotes', quote.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'Quote', quote.id, 'quotes', Number(quote.total));
       if (overall === 'approved') {
         await this.prisma.quote.update({ where: { id: quote.id }, data: { approvalStatus: 'approved' } });
         (quote as { approvalStatus: string }).approvalStatus = 'approved';
@@ -103,14 +109,16 @@ export class QuotesService {
     return toClient(quote);
   }
 
-  async updateQuote(id: string, body: UpdateQuoteDto) {
-    const quote = await this.prisma.quote.findUnique({ where: { id } });
+  async updateQuote(id: string, body: UpdateQuoteDto, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'quotes', 'createdById');
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!quote) throw new NotFoundException('Quote not found');
     // customer/deal are extracted to keep them out of `rest`; the update path
     // intentionally does not reassign them. The DTO has already stripped any
     // server-controlled fields, so `rest` is safe to spread.
-    const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
+    const { items, taxRate, customer: _customer, deal: _deal, validUntil, ...rest } = body;
     const data: Record<string, unknown> = { ...rest };
+    if (validUntil !== undefined) data.validUntil = validUntil ? new Date(validUntil) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'quotes',
@@ -144,14 +152,14 @@ export class QuotesService {
     return toClient(updated);
   }
 
-  async approveQuote(id: string, userId: string, userRole: string) {
+  async approveQuote(id: string, userId: string, userRole: string, userPermissions: string[] = []) {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) throw new NotFoundException('Quote not found');
     if (quote.approvalStatus === 'approved') return toClient(quote);
 
     const steps = await this.approvals.listSteps('Quote', id);
     if (steps.length) {
-      const result = await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'approve');
+      const result = await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'approve', undefined, userPermissions);
       const finalApproved = result.status === 'approved';
       const updated = await this.prisma.quote.update({
         where: { id },
@@ -162,9 +170,8 @@ export class QuotesService {
     }
 
     const { approverRoles } = await this.getApprovalConfig('quotes');
-    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve quotes');
-    // Separation of duties: the creator cannot approve their own quote.
-    if (quote.createdById === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot approve a quote you created');
+    if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to approve quotes');
+    if (quote.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot approve a quote you created');
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -173,14 +180,14 @@ export class QuotesService {
     return toClient(updated);
   }
 
-  async rejectQuote(id: string, userId: string, reason: string, userRole: string) {
+  async rejectQuote(id: string, userId: string, reason: string, userRole: string, userPermissions: string[] = []) {
     const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
     if (!quote) throw new NotFoundException('Quote not found');
     if (quote.approvalStatus === 'rejected') return toClient(quote);
 
     const steps = await this.approvals.listSteps('Quote', id);
     if (steps.length) {
-      await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'reject', reason);
+      await this.approvals.act('Quote', id, userId, userRole, quote.createdById, 'reject', reason, userPermissions);
       const updated = await this.prisma.quote.update({
         where: { id },
         data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -190,8 +197,8 @@ export class QuotesService {
     }
 
     const { approverRoles } = await this.getApprovalConfig('quotes');
-    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject quotes');
-    if (quote.createdById === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot reject a quote you created');
+    if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to reject quotes');
+    if (quote.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject a quote you created');
     const updated = await this.prisma.quote.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -200,8 +207,9 @@ export class QuotesService {
     return toClient(updated);
   }
 
-  async deleteQuote(id: string) {
-    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null } });
+  async deleteQuote(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'quotes', 'createdById');
+    const quote = await this.prisma.quote.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!quote) throw new NotFoundException('Quote not found');
     await this.prisma.quote.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
@@ -340,7 +348,7 @@ export class QuotesService {
     await this.prisma.quote.update({ where: { id }, data: { status: 'accepted' } });
 
     if (soApprovalEnabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'SalesOrder', order.id, 'salesOrders', order.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'SalesOrder', order.id, 'salesOrders', Number(order.total));
       if (overall === 'approved') {
         await this.prisma.salesOrder.update({ where: { id: order.id }, data: { approvalStatus: 'approved' } });
       }

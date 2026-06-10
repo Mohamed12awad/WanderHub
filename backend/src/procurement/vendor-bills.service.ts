@@ -19,6 +19,7 @@ const BILL_INCLUDE = {
   payments: { orderBy: { date: 'asc' as const } },
   createdBy: { select: { id: true, name: true } },
   approvedBy: { select: { id: true, name: true } },
+  updatedBy: { select: { id: true, name: true } },
 };
 
 function deriveBillStatus(total: number, totalPaid: number, dueDate?: Date | null): string {
@@ -76,8 +77,8 @@ export class VendorBillsService {
     const bill = await tx.vendorBill.findUnique({ where: { id: billId } });
     if (!bill) return null;
     const agg = await tx.vendorBillPayment.aggregate({ where: { billId }, _sum: { amount: true } });
-    const totalPaid = agg._sum.amount ?? 0;
-    const status = deriveBillStatus(bill.total, totalPaid, bill.dueDate) as Prisma.VendorBillUpdateInput['status'];
+    const totalPaid = Number(agg._sum.amount ?? 0);
+    const status = deriveBillStatus(Number(bill.total), totalPaid, bill.dueDate) as Prisma.VendorBillUpdateInput['status'];
     return tx.vendorBill.update({ where: { id: billId }, data: { totalPaid, status } });
   }
 
@@ -136,7 +137,7 @@ export class VendorBillsService {
       include: BILL_INCLUDE,
     });
     if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'VendorBill', bill.id, 'vendor_bills', bill.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'VendorBill', bill.id, 'vendor_bills', Number(bill.total));
       if (overall === 'approved') {
         await this.prisma.vendorBill.update({ where: { id: bill.id }, data: { approvalStatus: 'approved' } });
         (bill as { approvalStatus: string }).approvalStatus = 'approved';
@@ -153,6 +154,8 @@ export class VendorBillsService {
 
     const { items, taxRate, ...rest } = body;
     const data = this.cleanData(rest);
+    if (typeof data.issueDate === 'string') data.issueDate = data.issueDate ? new Date(data.issueDate) : undefined;
+    if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'vendorBills',
@@ -262,18 +265,22 @@ export class VendorBillsService {
     const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
     if (!bill) return null;
     if (bill.approvalStatus !== 'approved') throw new BadRequestException('Vendor bill must be approved before recording payment');
+    if (bill.status === 'cancelled') throw new BadRequestException('Cannot record a payment against a cancelled vendor bill');
 
-    // Reject payments that would push totalPaid past the bill total. The
-    // persisted totalPaid is authoritative (kept in sync by recalcBillTotals).
-    const outstanding = bill.total - (bill.totalPaid ?? 0);
     const payCurrency = body.currency ?? bill.currency;
-    if (payCurrency === bill.currency && body.amount > outstanding + 0.005) {
-      throw new BadRequestException(
-        `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${bill.currency}`,
-      );
-    }
 
     const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Re-fetch inside the serializable transaction so concurrent payments
+      // cannot both pass the outstanding check on a stale snapshot.
+      const fresh = await tx.vendorBill.findUnique({ where: { id: billId } });
+      if (!fresh) throw new BadRequestException('Vendor bill not found');
+      const outstanding = Number(fresh.total) - Number(fresh.totalPaid ?? 0);
+      if (body.amount > outstanding + 0.005) {
+        throw new BadRequestException(
+          `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${fresh.currency}`,
+        );
+      }
+
       await tx.vendorBillPayment.create({
         data: {
           billId,
@@ -300,7 +307,7 @@ export class VendorBillsService {
       }
 
       return this.recalcBillTotals(tx, billId);
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return updated ? toClient(updated) : null;
   }
@@ -329,6 +336,19 @@ export class VendorBillsService {
     });
     if (!po) throw new BadRequestException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before creating a bill');
+
+    // A PO must not be billed more than once: a second full-value bill for the
+    // same goods would create a duplicate AP liability (the supplier could be
+    // paid twice). Block creation when an active bill already exists.
+    const existingBill = await this.prisma.vendorBill.findFirst({
+      where: { purchaseOrderId: po.id, deletedAt: null },
+      select: { id: true, billNumber: true },
+    });
+    if (existingBill) {
+      throw new BadRequestException(
+        `Purchase order already has a bill (${existingBill.billNumber}). Delete it before creating another.`,
+      );
+    }
 
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const { enabled } = await this.getApprovalConfig();
@@ -370,6 +390,13 @@ export class VendorBillsService {
   async remove(id: string) {
     const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
+    // Deleting a bill that has recorded payments would hide the document while
+    // its payments — and the account balance they moved — remain. Require the
+    // payments to be voided first so the ledger stays reconciled.
+    const paymentCount = await this.prisma.vendorBillPayment.count({ where: { billId: id } });
+    if (paymentCount > 0) {
+      throw new BadRequestException('Cannot delete a vendor bill that has payments. Delete its payments first.');
+    }
     await this.prisma.vendorBill.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }

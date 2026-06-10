@@ -83,14 +83,15 @@ export class CustomersService {
     const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
     const customer = await this.prisma.customer.findFirst({
       where: { id, deletedAt: null, ...scopeWhere },
-      include: { deals: { where: { deletedAt: null } }, owner: true },
+      include: { deals: { where: { deletedAt: null } }, owner: true, updatedBy: { select: { id: true, name: true } } },
     });
     if (!customer) throw new NotFoundException('Customer not found');
     return toClient(customer);
   }
 
-  async update(id: string, body: UpdateCustomerDto, userId?: string) {
-    const existing = await this.prisma.customer.findUnique({ where: { id } });
+  async update(id: string, body: UpdateCustomerDto, user: AuthUser, userId?: string) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
+    const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!existing) throw new NotFoundException('Customer not found');
 
     const cleaned = cleanData(body, { emptyToNull: ['dateOfBirth'] });
@@ -120,8 +121,9 @@ export class CustomersService {
     return toClient(customer);
   }
 
-  async remove(id: string) {
-    const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'contacts', 'ownerId');
+    const existing = await this.prisma.customer.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!existing) throw new NotFoundException('Customer not found');
 
     // Block deletion while the customer still has financially-open invoices —

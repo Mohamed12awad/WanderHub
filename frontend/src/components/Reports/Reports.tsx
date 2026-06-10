@@ -86,7 +86,7 @@ const ChartEmpty: React.FC = () => (
 
 const Reports: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = ["admin", "super admin"].includes(user!.role);
+  const isAdmin = (user?.permissions ?? []).some((p) => p === '*' || p === 'reports:view');
 
   const [dateRange, setDateRange] = useState<DateRange>({ start: defaultStart(), end: defaultEnd() });
 

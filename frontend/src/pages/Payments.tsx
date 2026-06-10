@@ -63,7 +63,7 @@ function paginate<T>(list: T[], page: number, limit: number) {
 const Payments: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'invoices:delete');
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
   const invoiceMapRef = useRef<Map<string, string>>(new Map());
 

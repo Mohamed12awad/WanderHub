@@ -1,17 +1,13 @@
 import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getProjectById, deleteProject, getProjectInvoices, getProjectExpenses,
   getProjectTasks, getProjectMilestones, createMilestone, updateMilestone, deleteMilestone,
   getProjectMembers, addProjectMember, removeProjectMember, getUsers,
-  getNotes, getActivities, createProject,
+  createProject,
 } from "@/utils/api";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { CustomFieldsView } from "@/components/common/CustomFieldsView";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
-import { ActivityList } from "@/components/Activities/ActivityList";
 import { AddTaskPanel } from "@/components/Tasks/AddTaskPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,14 +18,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import {
-  CircleArrowLeft, Edit, Plus, Trash2, CheckCircle2, Circle, Clock,
-  Copy, MoreHorizontal, Check, PlusCircle, Pencil, CalendarDays, User,
+  Edit, Plus, Trash2, CheckCircle2, Circle, Clock,
+  Copy, Check, PlusCircle, Pencil, CalendarDays, User,
+  ChevronRight, ListChecks,
 } from "lucide-react";
+import { InfoRow } from "@/components/common/InfoRow";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/common/spinner";
@@ -75,11 +73,6 @@ export default function ViewProject() {
   const { data: msData }   = useQuery({ queryKey: ["project-milestones", id], queryFn: () => getProjectMilestones(id!), enabled: !!id });
   const { data: memData }  = useQuery({ queryKey: ["project-members",    id], queryFn: () => getProjectMembers(id!),   enabled: !!id });
   const { data: usersData } = useQuery({ queryKey: ["users-all"], queryFn: () => getUsers() });
-  const { data: notesData }      = useQuery({ queryKey: ["notes", id, "Project"],  queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Project" }), enabled: !!id });
-  const { data: activitiesData } = useQuery({ queryKey: ["activities", id],        queryFn: () => getActivities(id!, "Project"),                      enabled: !!id });
-
-  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
-  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   const invoices   = invData?.data  ?? [];
   const expenses   = expData?.data  ?? [];
@@ -92,9 +85,11 @@ export default function ViewProject() {
   const [newMember, setNewMember]           = useState("");
   const [editingMs, setEditingMs]           = useState<{ id: string; title: string; description?: string; dueDate?: string } | null>(null);
   const [deleteMsId, setDeleteMsId]         = useState<string | null>(null);
+  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [taskPanelOpen, setTaskPanelOpen]   = useState(false);
   const [editTask, setEditTask]             = useState<Task | null>(null);
   const [presetMs, setPresetMs]             = useState<string | undefined>(undefined);
+  const [expandedMs, setExpandedMs]         = useState<Record<string, boolean>>({});
 
   const refresh = (key: string) => queryClient.invalidateQueries({ queryKey: [key, id] });
 
@@ -153,7 +148,6 @@ export default function ViewProject() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this project?")) return;
     try { await deleteProject(id!); navigate("/projects"); }
     catch { toast({ title: "Delete failed", variant: "destructive" }); }
   };
@@ -166,50 +160,74 @@ export default function ViewProject() {
   const doneTasks  = tasks.filter((t) => t.status === "done").length;
   const taskProgress = tasks.length > 0 ? Math.round((doneTasks / tasks.length) * 100) : 0;
 
-  return (
-    <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Link to="/projects"><CircleArrowLeft /></Link>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              {project.name}
-              <Badge variant="outline" className={`${STATUS_COLORS[project.status] ?? ""} capitalize`}>{project.status?.replace("_", " ")}</Badge>
-            </h1>
-            {project.customer && <p className="text-sm text-muted-foreground">{project.customer.name}</p>}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Link to={`/projects/${id}/edit`}>
-            <Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button>
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleClone}><Copy className="h-3.5 w-3.5 me-2" />Clone</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+  const menuItems: DetailMenuItem[] = [
+    { label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone },
+    { label: tr.common.delete, icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setDeleteProjectOpen(true), destructive: true, separatorBefore: true },
+  ];
 
+  const header = (
+    <div>
+      <DetailHeader
+        crumbs={[{ label: "Projects", href: "/projects" }, { label: project.name }]}
+        title={project.name}
+        badges={<Badge variant="outline" className={`${STATUS_COLORS[project.status] ?? ""} capitalize`}>{project.status?.replace("_", " ")}</Badge>}
+        primaryAction={
+          <Button size="sm" className="gap-1" onClick={() => navigate(`/projects/${id}/edit`)}>
+            <Edit className="h-3.5 w-3.5" />{tr.common.edit}
+          </Button>
+        }
+        menuItems={menuItems}
+      />
+      {project.customer && <p className="text-sm text-muted-foreground mt-1">{project.customer.name}</p>}
+    </div>
+  );
+
+  const contextPanel = id ? (
+    <RecordContextPanel linkedTo={id} linkedModel="Project" />
+  ) : undefined;
+
+  return (
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       <Tabs defaultValue="overview">
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="overview"  className="text-xs">Overview</TabsTrigger>
           <TabsTrigger value="tasks"     className="text-xs">Tasks ({tasks.length})</TabsTrigger>
           <TabsTrigger value="finance"   className="text-xs">Finance</TabsTrigger>
           <TabsTrigger value="team"      className="text-xs">Team ({members.length})</TabsTrigger>
-          <TabsTrigger value="timeline"  className="text-xs">Timeline</TabsTrigger>
-          <TabsTrigger value="notes"     className="text-xs">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
-          <TabsTrigger value="activities" className="text-xs">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
-          <TabsTrigger value="attachments" className="text-xs">Attachments</TabsTrigger>
         </TabsList>
 
         {/* ── Overview ──────────────────────────────────────────────────── */}
         <TabsContent value="overview" className="mt-5 space-y-5">
+          {/* Project details — read-only, no need to open the edit form */}
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Details</CardTitle></CardHeader>
+            <CardContent className="pt-2">
+              {project.description && (
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap mb-4">{project.description}</p>
+              )}
+              <div className="grid sm:grid-cols-2 sm:gap-x-8">
+                <InfoRow label="Status">
+                  <Badge variant="outline" className={cn("capitalize", STATUS_COLORS[project.status] ?? "")}>
+                    {project.status?.replace("_", " ")}
+                  </Badge>
+                </InfoRow>
+                {project.priority && (
+                  <InfoRow label="Priority">
+                    <Badge variant="secondary" className={cn("capitalize", PRIORITY_STYLE[project.priority] ?? "")}>
+                      {project.priority}
+                    </Badge>
+                  </InfoRow>
+                )}
+                <InfoRow label="Manager" value={project.manager?.name} />
+                <InfoRow label="Customer" value={project.customer?.name} />
+                <InfoRow label="Start Date" value={project.startDate ? new Date(project.startDate).toLocaleDateString() : undefined} />
+                <InfoRow label="End Date" value={project.endDate ? new Date(project.endDate).toLocaleDateString() : undefined} />
+                <InfoRow label="Budget" value={project.budget != null ? `${Number(project.budget).toLocaleString()} ${project.currency ?? ""}` : undefined} />
+                <InfoRow label="Created" value={project.createdAt ? new Date(project.createdAt).toLocaleDateString() : undefined} />
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid sm:grid-cols-4 gap-4">
             {[
               { label: "Budget", value: `${(fin.budget ?? 0).toLocaleString()} ${fin.currency}` },
@@ -262,6 +280,9 @@ export default function ViewProject() {
                 const Icon = MILESTONE_ICON[m.status] ?? Circle;
                 const nextStatus = m.status === "pending" ? "in_progress" : m.status === "in_progress" ? "completed" : "pending";
                 const isOverdue    = m.dueDate && m.status !== "completed" && new Date(m.dueDate) < new Date();
+                const msTasks      = tasks.filter((t) => t.milestone?._id === m._id);
+                const msDone       = msTasks.filter((t) => t.status === "done").length;
+                const expanded     = !!expandedMs[m._id];
 
                 if (editingMs?.id === m._id) {
                   const ms = editingMs!;
@@ -294,15 +315,27 @@ export default function ViewProject() {
                 }
 
                 return (
-                  <div key={m._id} className="rounded-lg border border-border/50">
+                  <div key={m._id} className="rounded-lg border border-border/50 overflow-hidden">
                     <div className="flex items-center gap-2 px-3 py-2 group">
                       <button onClick={() => toggleMsMutation.mutate({ msId: m._id, status: nextStatus })} className="shrink-0" title="Cycle milestone status">
                         <Icon className={`h-4 w-4 ${m.status === "completed" ? "text-emerald-500" : m.status === "in_progress" ? "text-amber-500" : "text-muted-foreground"}`} />
                       </button>
-                      <div className="flex-1 min-w-0 text-start">
-                        <span className={`text-sm ${m.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{m.title}</span>
-                        {m.description && <p className="text-xs text-muted-foreground truncate">{m.description}</p>}
-                      </div>
+                      <button
+                        onClick={() => setExpandedMs((prev) => ({ ...prev, [m._id]: !prev[m._id] }))}
+                        className="flex flex-1 min-w-0 items-center gap-1.5 text-start"
+                        title={expanded ? "Hide tasks" : "Show tasks"}
+                      >
+                        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} />
+                        <span className="flex-1 min-w-0">
+                          <span className={`text-sm ${m.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{m.title}</span>
+                          {m.description && <p className="text-xs text-muted-foreground truncate">{m.description}</p>}
+                        </span>
+                        {msTasks.length > 0 && (
+                          <span className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground shrink-0">
+                            <ListChecks className="h-3 w-3" />{msDone}/{msTasks.length}
+                          </span>
+                        )}
+                      </button>
                       {m.dueDate && (
                         <span className={`text-xs whitespace-nowrap ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
                           {new Date(m.dueDate).toLocaleDateString()}
@@ -320,6 +353,29 @@ export default function ViewProject() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Embedded tasks for this milestone */}
+                    {expanded && (
+                      <div className="border-t bg-muted/20 px-3 py-2.5 space-y-1.5">
+                        {msTasks.length === 0 ? (
+                          <p className="text-xs text-muted-foreground px-1">No tasks in this milestone yet.</p>
+                        ) : (
+                          msTasks.map((task) => (
+                            <ProjectTaskRow
+                              key={task._id}
+                              task={task}
+                              onToggleDone={(tid) => completeMut.mutate(tid)}
+                              onStatus={(tid, status) => taskStatusMut.mutate({ taskId: tid, status })}
+                              onEdit={openEditTask}
+                              onDelete={(tid) => deleteTaskMut.mutate(tid)}
+                            />
+                          ))
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground" onClick={() => openNewTask(m._id)}>
+                          <Plus className="h-3 w-3" />Add task to this milestone
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -330,68 +386,41 @@ export default function ViewProject() {
             </CardContent>
           </Card>
 
-          {/* Tasks summary */}
+          {/* Recent tasks */}
           {tasks.length > 0 && (
             <Card>
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Recent Tasks</CardTitle>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
-                  const trigger = document.querySelector('[value="tasks"]') as HTMLButtonElement;
-                  trigger?.click();
-                }}>
-                  View all
-                </Button>
+                <CardTitle className="text-base flex items-center gap-2">
+                  Recent Tasks
+                  <span className="text-xs font-normal text-muted-foreground">{doneTasks}/{tasks.length} done</span>
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => openNewTask()}>
+                    <Plus className="h-3.5 w-3.5" />New
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => {
+                    const trigger = document.querySelector('[value="tasks"]') as HTMLButtonElement;
+                    trigger?.click();
+                  }}>
+                    View all
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-1.5">
-                {tasks.slice(0, 5).map((task) => {
-                  const taskOverdue = task.dueDate && task.status !== "done" && task.status !== "cancelled" && new Date(task.dueDate) < new Date();
-                  return (
-                    <div key={task._id} className="group/task flex items-center gap-2 rounded-md border bg-card px-2 py-1.5">
-                      <button
-                        onClick={() => completeMut.mutate(task._id)}
-                        title="Toggle done"
-                        className={cn(
-                          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-                          task.status === "done" ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40 hover:border-primary"
-                        )}
-                      >
-                        {task.status === "done" && <Check className="h-2 w-2 text-white" />}
-                      </button>
-                      <button
-                        className={cn("flex-1 min-w-0 truncate text-start text-sm hover:underline", task.status === "done" && "line-through text-muted-foreground")}
-                        onClick={() => openEditTask(task)}
-                      >
-                        {task.title}
-                      </button>
-                      {task.priority && (
-                        <Badge variant="secondary" className={cn("hidden sm:inline-flex text-xs px-1.5 py-0", PRIORITY_STYLE[task.priority] ?? "")}>
-                          {task.priority}
-                        </Badge>
-                      )}
-                      {task.dueDate && (
-                        <span className={cn("hidden sm:inline text-xs whitespace-nowrap", taskOverdue ? "text-destructive" : "text-muted-foreground")}>
-                          {new Date(task.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
-                      <Select value={task.status} onValueChange={(v) => taskStatusMut.mutate({ taskId: task._id, status: v })}>
-                        <SelectTrigger className={cn("h-6 w-[124px] text-xs capitalize border-0", TASK_STATUS_STYLE[task.status] ?? "")}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TASK_STATUSES.map((st) => (
-                            <SelectItem key={st} value={st} className="text-xs capitalize">{st.replace("_", " ")}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <button onClick={() => openEditTask(task)} className="p-1 rounded hover:bg-muted opacity-0 group-hover/task:opacity-100" title="Edit task">
-                        <Pencil className="h-3 w-3 text-muted-foreground" />
-                      </button>
-                      <button onClick={() => deleteTaskMut.mutate(task._id)} className="p-1 rounded hover:bg-muted text-destructive opacity-0 group-hover/task:opacity-100" title="Delete task">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  );
-                })}
+              <CardContent className="space-y-2">
+                {[...tasks]
+                  .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0).getTime() - new Date(a.updatedAt ?? a.createdAt ?? 0).getTime())
+                  .slice(0, 5)
+                  .map((task) => (
+                    <ProjectTaskRow
+                      key={task._id}
+                      task={task}
+                      showMilestone
+                      onToggleDone={(tid) => completeMut.mutate(tid)}
+                      onStatus={(tid, status) => taskStatusMut.mutate({ taskId: tid, status })}
+                      onEdit={openEditTask}
+                      onDelete={(tid) => deleteTaskMut.mutate(tid)}
+                    />
+                  ))}
               </CardContent>
             </Card>
           )}
@@ -510,12 +539,6 @@ export default function ViewProject() {
           </Card>
         </TabsContent>
 
-        {/* ── Timeline ──────────────────────────────────────────────────── */}
-        <TabsContent value="timeline"   className="mt-5"><RecordTimeline linkedTo={id!} linkedModel="Project" /></TabsContent>
-        <TabsContent value="notes"      className="mt-5"><NotesPanel     linkedTo={id!} linkedModel="Project" /></TabsContent>
-        <TabsContent value="activities" className="mt-5"><ActivityList   linkedTo={id!} linkedModel="Project" /></TabsContent>
-        <TabsContent value="attachments" className="mt-5"><AttachmentsPanel linkedModel="Project" linkedToId={id!} /></TabsContent>
-
         {/* ── Team ──────────────────────────────────────────────────────── */}
         <TabsContent value="team" className="mt-5 space-y-4">
           <Card><CardContent className="pt-4">
@@ -559,6 +582,16 @@ export default function ViewProject() {
         onConfirm={() => delMsMutation.mutate(deleteMsId!)}
         onCancel={() => setDeleteMsId(null)}
       />
+      <ConfirmDialog
+        open={deleteProjectOpen}
+        title="Delete Project"
+        description="Delete this project? This action cannot be undone."
+        onConfirm={() => {
+          setDeleteProjectOpen(false);
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteProjectOpen(false)}
+      />
 
       {/* Task panel — locked to this project */}
       <AddTaskPanel
@@ -569,6 +602,90 @@ export default function ViewProject() {
         projectName={project?.name}
         presetMilestoneId={presetMs}
       />
-    </main>
+    </DetailPageLayout>
+  );
+}
+
+// ── Shared task row — used by Recent Tasks and milestone-embedded tasks ─────────
+interface ProjectTaskRowProps {
+  task: Task;
+  onToggleDone: (id: string) => void;
+  onStatus: (id: string, status: string) => void;
+  onEdit: (task: Task) => void;
+  onDelete: (id: string) => void;
+  showMilestone?: boolean;
+}
+
+function ProjectTaskRow({ task, onToggleDone, onStatus, onEdit, onDelete, showMilestone }: ProjectTaskRowProps) {
+  const done = task.status === "done";
+  const overdue = task.dueDate && !done && task.status !== "cancelled" && new Date(task.dueDate) < new Date();
+  const hasMeta = (showMilestone && task.milestone) || task.dueDate || task.assignedTo;
+
+  return (
+    <div className="group/task flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-all hover:border-primary/30 hover:shadow-sm">
+      <button
+        onClick={() => onToggleDone(task._id)}
+        title="Toggle done"
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          done ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40 hover:border-primary"
+        )}
+      >
+        {done && <Check className="h-2.5 w-2.5 text-white" />}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={() => onEdit(task)}
+          className={cn(
+            "block max-w-full truncate text-start text-sm font-medium transition-colors hover:text-primary",
+            done && "line-through text-muted-foreground"
+          )}
+        >
+          {task.title}
+        </button>
+        {hasMeta && (
+          <div className="mt-0.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
+            {showMilestone && task.milestone && (
+              <span className="inline-flex min-w-0 items-center gap-0.5 truncate"><ListChecks className="h-3 w-3 shrink-0" />{task.milestone.title}</span>
+            )}
+            {task.dueDate && (
+              <span className={cn("inline-flex items-center gap-0.5 whitespace-nowrap", overdue && "text-destructive")}>
+                <CalendarDays className="h-3 w-3" />{new Date(task.dueDate).toLocaleDateString()}
+              </span>
+            )}
+            {task.assignedTo && (
+              <span className="inline-flex min-w-0 items-center gap-0.5 truncate"><User className="h-3 w-3 shrink-0" />{task.assignedTo.name}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {task.priority && (
+        <Badge variant="secondary" className={cn("hidden capitalize sm:inline-flex text-xs px-1.5 py-0", PRIORITY_STYLE[task.priority] ?? "")}>
+          {task.priority}
+        </Badge>
+      )}
+
+      <Select value={task.status} onValueChange={(v) => onStatus(task._id, v)}>
+        <SelectTrigger className={cn("h-7 w-[118px] text-xs capitalize border-0", TASK_STATUS_STYLE[task.status] ?? "")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {TASK_STATUSES.map((st) => (
+            <SelectItem key={st} value={st} className="text-xs capitalize">{st.replace("_", " ")}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <div className="flex shrink-0 gap-0.5">
+        <button onClick={() => onEdit(task)} className="rounded p-1 opacity-0 hover:bg-muted group-hover/task:opacity-100" title="Edit task">
+          <Pencil className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <button onClick={() => onDelete(task._id)} className="rounded p-1 text-destructive opacity-0 hover:bg-muted group-hover/task:opacity-100" title="Delete task">
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
   );
 }

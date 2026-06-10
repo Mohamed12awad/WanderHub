@@ -6,19 +6,30 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, Search, LogOut, Settings } from "lucide-react";
+import { Menu, Search, LogOut, Settings, Globe, Check, Sun, Moon, Monitor } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/authContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeProvider";
+import { LANGUAGES, Lang } from "@/i18n/translations";
 import NavLinks from "./NavLinks";
-import { ModeToggle } from "@/components/common/toggleTheme";
 import { NotificationBell } from "./NotificationBell";
+
+const THEME_OPTIONS = [
+  { value: "light" as const, label: "Light", icon: Sun },
+  { value: "dark" as const, label: "Dark", icon: Moon },
+  { value: "system" as const, label: "System", icon: Monitor },
+];
 
 export default function NavBar() {
   const { logout, user } = useAuth();
-  const { lang, tr } = useLanguage();
+  const { lang, setLang, tr } = useLanguage();
+  const { theme, setTheme } = useTheme();
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
@@ -69,7 +80,11 @@ export default function NavBar() {
 
       <div className="flex items-center gap-1.5 ms-auto shrink-0">
         <NotificationBell />
-        <ModeToggle />
+        <Link to="/settings">
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Settings">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </Link>
 
         {/* User avatar dropdown */}
         <DropdownMenu>
@@ -94,6 +109,43 @@ export default function NavBar() {
                 Settings
               </DropdownMenuItem>
             </Link>
+            <DropdownMenuSeparator />
+
+            {/* Language */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2">
+                <Globe className="h-4 w-4" />
+                {lang === "ar" ? "اللغة" : "Language"}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {(Object.entries(LANGUAGES) as [Lang, typeof LANGUAGES[Lang]][]).map(([code, meta]) => (
+                  <DropdownMenuItem key={code} onClick={() => setLang(code)} className="gap-2 cursor-pointer">
+                    <span className="text-base leading-none">{meta.flag}</span>
+                    <span>{meta.native}</span>
+                    {code === lang && <Check className="ms-auto h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {/* Theme */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2">
+                <Sun className="h-4 w-4 dark:hidden" />
+                <Moon className="hidden h-4 w-4 dark:block" />
+                {lang === "ar" ? "المظهر" : "Theme"}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                  <DropdownMenuItem key={value} onClick={() => setTheme(value)} className="gap-2 cursor-pointer">
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                    {theme === value && <Check className="ms-auto h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={logout}

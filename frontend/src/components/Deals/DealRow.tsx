@@ -81,7 +81,7 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority
             <Link to={`/deals/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'deals:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>

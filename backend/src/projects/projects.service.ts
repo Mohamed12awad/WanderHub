@@ -17,6 +17,7 @@ const PROJECT_INCLUDE = {
   customer: { select: { id: true, name: true } },
   deal: { select: { id: true, title: true } },
   manager: { select: { id: true, name: true } },
+  updatedBy: { select: { id: true, name: true } },
   milestones: { orderBy: { order: 'asc' as const } },
   members: { include: { user: { select: { id: true, name: true, email: true } } } },
 };
@@ -70,8 +71,9 @@ export class ProjectsService {
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }
 
-  async findOne(id: string) {
-    const project = await this.prisma.project.findFirst({ where: { id, deletedAt: null }, include: PROJECT_INCLUDE });
+  async findOne(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'projects', 'managerId');
+    const project = await this.prisma.project.findFirst({ where: { id, deletedAt: null, ...scopeWhere }, include: PROJECT_INCLUDE });
     if (!project) throw new NotFoundException('project not found');
     const financials = await this.getFinancials(id, project.budget, project.currency);
     return toClient({ ...project, financials });
@@ -88,9 +90,9 @@ export class ProjectsService {
         _sum: { amount: true },
       }),
     ]);
-    const billed = invoiceAgg._sum.total ?? 0;
-    const collected = invoiceAgg._sum.totalPaid ?? 0;
-    const costs = expenseAgg._sum.amount ?? 0;
+    const billed = Number(invoiceAgg._sum.total ?? 0);
+    const collected = Number(invoiceAgg._sum.totalPaid ?? 0);
+    const costs = Number(expenseAgg._sum.amount ?? 0);
     return {
       budget: budget ?? 0,
       currency: currency ?? 'EGP',
@@ -239,7 +241,10 @@ export class ProjectsService {
   async getProjectTasks(projectId: string) {
     const tasks = await this.prisma.task.findMany({
       where: { projectId, deletedAt: null },
-      include: { assignedTo: { select: { id: true, name: true } } },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        milestone: { select: { id: true, title: true } },
+      },
       orderBy: [{ status: 'asc' }, { dueDate: 'asc' }],
     });
     return toClient(tasks);

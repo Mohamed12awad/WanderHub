@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAccounts, createAccount, updateAccount, deleteAccount } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Account, AccountType } from "@/types/types";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const TYPE_ICONS: Record<AccountType, React.ElementType> = {
   bank: Landmark,
@@ -56,6 +57,7 @@ export default function AccountsSettings() {
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
 
   const { data } = useQuery({
     queryKey: ["accounts"],
@@ -111,7 +113,6 @@ export default function AccountsSettings() {
   };
 
   const handleDelete = async (acc: Account) => {
-    if (!confirm(`Delete account "${acc.name}"? This cannot be undone.`)) return;
     try {
       await deleteAccount(acc._id);
       toast({ title: "Account deleted." });
@@ -169,7 +170,7 @@ export default function AccountsSettings() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(acc)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(acc)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setPendingDelete(acc)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -245,6 +246,17 @@ export default function AccountsSettings() {
           </form>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onConfirm={() => {
+          const acc = pendingDelete;
+          setPendingDelete(null);
+          if (acc) void handleDelete(acc);
+        }}
+        onCancel={() => setPendingDelete(null)}
+        title="Delete Account"
+        description={pendingDelete ? `Delete account "${pendingDelete.name}"? This cannot be undone.` : undefined}
+      />
     </div>
   );
 }

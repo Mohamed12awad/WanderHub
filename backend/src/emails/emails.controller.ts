@@ -19,7 +19,8 @@ export class EmailsController {
   list(
     @Query('linkedToId') linkedToId: string,
     @Query('linkedModel') linkedModel: string,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.emails.list(linkedToId, linkedModel);
+    return this.emails.list(linkedToId, linkedModel, user);
   }
 }

@@ -43,7 +43,7 @@ function clientPaginate<T>(list: T[], page: number, limit: number) {
 export const VendorPayments: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete');
 
   // Map payment._id → billId so the delete handler can pass both
   const billMapRef = useRef<Map<string, string>>(new Map());

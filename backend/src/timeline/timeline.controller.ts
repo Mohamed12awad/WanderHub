@@ -1,19 +1,26 @@
 import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { LinkedAccessService } from '../common/linked-access.service';
 import { toClient } from '../common/serialize';
 
 @Controller('timeline')
 @UseGuards(JwtAuthGuard)
 export class TimelineController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly linkedAccess: LinkedAccessService,
+  ) {}
 
   @Get()
   async getTimeline(
     @Query('linkedTo') linkedTo: string,
     @Query('linkedModel') linkedModel: string,
+    @CurrentUser() user: AuthUser,
   ) {
     if (!linkedTo || !linkedModel) throw new BadRequestException('linkedTo and linkedModel are required');
+    await this.linkedAccess.assertCanAccess(user, linkedModel, linkedTo);
 
     const [events, activities] = await Promise.all([
       this.prisma.timelineEvent.findMany({

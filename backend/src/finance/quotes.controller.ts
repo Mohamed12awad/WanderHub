@@ -17,14 +17,14 @@ export class QuotesController {
 
   @Get()
   @RequirePermission('quotes:view')
-  findAll(@Query() query: Record<string, string>) {
-    return this.quotes.getQuotes(query);
+  findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser) {
+    return this.quotes.getQuotes(query, user);
   }
 
   @Get(':id')
   @RequirePermission('quotes:view')
-  findOne(@Param('id') id: string) {
-    return this.quotes.getQuoteById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quotes.getQuoteById(id, user);
   }
 
   @Post()
@@ -36,28 +36,28 @@ export class QuotesController {
 
   @Put(':id')
   @RequirePermission('quotes:edit')
-  update(@Param('id') id: string, @Body() body: UpdateQuoteDto) {
-    return this.quotes.updateQuote(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateQuoteDto, @CurrentUser() user: AuthUser) {
+    return this.quotes.updateQuote(id, body, user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('quotes:delete')
-  remove(@Param('id') id: string) {
-    return this.quotes.deleteQuote(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.quotes.deleteQuote(id, user);
   }
 
   @Patch(':id/approve')
   @RequirePermission('quotes:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.quotes.approveQuote(id, user.id, user.role);
+    return this.quotes.approveQuote(id, user.id, user.role, user.permissions);
   }
 
   @Patch(':id/reject')
   @RequirePermission('quotes:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.quotes.rejectQuote(id, user.id, body.reason.trim(), user.role);
+    return this.quotes.rejectQuote(id, user.id, body.reason.trim(), user.role, user.permissions);
   }
 
   @Post(':id/convert')

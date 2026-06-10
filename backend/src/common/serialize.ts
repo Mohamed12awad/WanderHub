@@ -7,6 +7,8 @@
  * These helpers recursively rename those keys on any nested object/array.
  */
 
+import { Prisma } from '@prisma/client';
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === 'object' &&
@@ -25,6 +27,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function toClient<T>(input: T): T {
   if (Array.isArray(input)) {
     return input.map((item) => toClient(item)) as unknown as T;
+  }
+  // Money columns are Prisma Decimal; the frontend expects plain JS numbers.
+  // Convert here (before isPlainObject) so a Decimal isn't recursed into as a
+  // generic object, which would corrupt the response.
+  if (Prisma.Decimal.isDecimal(input)) {
+    return (input as unknown as Prisma.Decimal).toNumber() as unknown as T;
   }
   if (isPlainObject(input)) {
     const out: Record<string, unknown> = {};

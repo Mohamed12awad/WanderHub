@@ -13,9 +13,9 @@ export class NotesController {
   constructor(private readonly notes: NotesService) {}
 
   @Get()
-  findAll(@Query('linkedTo') linkedTo: string, @Query('linkedModel') linkedModel: string) {
+  findAll(@Query('linkedTo') linkedTo: string, @Query('linkedModel') linkedModel: string, @CurrentUser() user: AuthUser) {
     if (!linkedTo || !linkedModel) throw new BadRequestException('linkedTo and linkedModel are required');
-    return this.notes.findAll(linkedTo, linkedModel);
+    return this.notes.findAll(linkedTo, linkedModel, user);
   }
 
   @Post()
@@ -26,7 +26,7 @@ export class NotesController {
 
   @Put(':id')
   async update(@Param('id') id: string, @Body() body: { content: string }, @CurrentUser() user: AuthUser) {
-    const result = await this.notes.update(id, body.content, user.id, user.role, user.permissions);
+    const result = await this.notes.update(id, body.content, user);
     if (!result) throw new NotFoundException('Note not found');
     return result;
   }
@@ -34,7 +34,7 @@ export class NotesController {
   @Delete(':id')
   @HttpCode(204)
   async remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    const ok = await this.notes.remove(id, user.id, user.role, user.permissions);
+    const ok = await this.notes.remove(id, user);
     if (!ok) throw new NotFoundException('Note not found');
     return;
   }

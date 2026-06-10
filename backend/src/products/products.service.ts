@@ -49,7 +49,10 @@ export class ProductsService {
   }
 
   async findOne(id: string) {
-    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
+    const product = await this.prisma.product.findFirst({
+      where: { id, deletedAt: null },
+      include: { updatedBy: { select: { id: true, name: true } } },
+    });
     return product ? toClient(product) : null;
   }
 

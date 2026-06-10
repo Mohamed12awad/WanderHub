@@ -141,6 +141,7 @@ export class DealsService {
         },
         owner: { select: { id: true, name: true } },
         project: { select: { id: true, name: true, status: true } },
+        updatedBy: { select: { id: true, name: true } },
       },
     });
     if (!deal) throw new NotFoundException('deal not found');
@@ -159,8 +160,9 @@ export class DealsService {
     return { deal: toClient(deal), payments: toClient(payments) };
   }
 
-  async update(id: string, body: UpdateDealDto, userId: string) {
-    const oldDeal = await this.prisma.deal.findUnique({ where: { id } });
+  async update(id: string, body: UpdateDealDto, user: AuthUser, userId: string) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'deals', 'ownerId');
+    const oldDeal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!oldDeal) throw new NotFoundException('deal not found');
 
     const cleaned = this.cleanData(body);
@@ -224,7 +226,7 @@ export class DealsService {
       },
     ];
 
-    const subtotal = items.reduce((s, i) => s + i.total, 0);
+    const subtotal = items.reduce((s, i) => s + Number(i.total), 0);
     const quoteNumber = await this.numberSequence.nextNumber('quote', 'QUO');
 
     // Respect the workspace approval config — same behaviour as finance.createQuote.
@@ -267,8 +269,9 @@ export class DealsService {
     return toClient(quote);
   }
 
-  async remove(id: string) {
-    const deal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'deals', 'ownerId');
+    const deal = await this.prisma.deal.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!deal) throw new NotFoundException('deal not found');
 
     // Block deletion while the deal still has financially-open invoices.

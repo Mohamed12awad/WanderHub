@@ -52,7 +52,7 @@ const ProductRow: React.FC<ProductRowProps> = ({
             <Link to={`/products/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'products:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>

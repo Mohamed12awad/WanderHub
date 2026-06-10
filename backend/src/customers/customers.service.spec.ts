@@ -25,6 +25,7 @@ function buildPrisma() {
 
 const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
 const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as any;
+const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
 const dealsMock = {} as any;
 
 const mockUser: any = { id: 'user-1', role: 'admin', permissions: ['*'] };
@@ -54,7 +55,7 @@ describe('CustomersService.create', () => {
   it('creates a customer and returns the serialized record', async () => {
     const prisma = buildPrisma();
     prisma.customer.create.mockResolvedValue(sampleCustomer);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     const result: any = await svc.create({ name: 'Acme Corp', phone: '01099999999' } as any, 'user-1');
 
@@ -66,7 +67,7 @@ describe('CustomersService.create', () => {
   it('logs a timeline event after creation', async () => {
     const prisma = buildPrisma();
     prisma.customer.create.mockResolvedValue(sampleCustomer);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     await svc.create({ name: 'Acme Corp', phone: '01099999999' } as any, 'user-1');
 
@@ -87,14 +88,14 @@ describe('CustomersService.findOne', () => {
   it('throws NotFoundException when customer does not exist', async () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(null);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
     await expect(svc.findOne('missing', mockUser)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns the serialized customer when found', async () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(sampleCustomer);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     const result: any = await svc.findOne('cust-1', mockUser);
 
@@ -109,7 +110,7 @@ describe('CustomersService.update', () => {
   it('throws NotFoundException when customer does not exist', async () => {
     const prisma = buildPrisma();
     prisma.customer.findUnique.mockResolvedValue(null);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
     await expect(svc.update('missing', { name: 'New' } as any, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.customer.update).not.toHaveBeenCalled();
   });
@@ -118,7 +119,7 @@ describe('CustomersService.update', () => {
     const prisma = buildPrisma();
     prisma.customer.findUnique.mockResolvedValue(sampleCustomer);
     prisma.customer.update.mockResolvedValue({ ...sampleCustomer, name: 'New Name' });
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     const result: any = await svc.update('cust-1', { name: 'New Name' } as any, 'user-1');
 
@@ -133,7 +134,7 @@ describe('CustomersService.remove', () => {
   it('throws NotFoundException when customer does not exist', async () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(null);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
     await expect(svc.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -141,7 +142,7 @@ describe('CustomersService.remove', () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(sampleCustomer);
     prisma.invoice.count.mockResolvedValue(2);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
     await expect(svc.remove('cust-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -149,7 +150,7 @@ describe('CustomersService.remove', () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(sampleCustomer);
     prisma.invoice.count.mockResolvedValue(0);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     const result = await svc.remove('cust-1');
 
@@ -165,7 +166,7 @@ describe('CustomersService.findAll', () => {
     const prisma = buildPrisma();
     prisma.customer.findMany.mockResolvedValue([sampleCustomer]);
     prisma.customer.count.mockResolvedValue(1);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     const result: any = await svc.findAll({ page: '1', limit: '25' }, mockUser);
 
@@ -177,7 +178,7 @@ describe('CustomersService.findAll', () => {
     const prisma = buildPrisma();
     prisma.customer.findMany.mockResolvedValue([]);
     prisma.customer.count.mockResolvedValue(0);
-    const svc = new CustomersService(prisma, timelineMock, visibilityMock, dealsMock);
+    const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
     await svc.findAll({ q: 'acme', page: '1', limit: '25' }, mockUser);
 

@@ -50,7 +50,7 @@ export class PublicApiController {
   @Put('customers/:id')
   @RequirePermission('contacts:edit')
   updateCustomer(@Param('id') id: string, @Body() body: UpdateCustomerDto, @CurrentUser() user: AuthUser) {
-    return this.customers.update(id, body, user.id);
+    return this.customers.update(id, body, user);
   }
 
   // ── Leads ──────────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ export class PublicApiController {
   @Put('leads/:id')
   @RequirePermission('leads:edit')
   updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto, @CurrentUser() user: AuthUser) {
-    return this.leads.update(id, body, user.id);
+    return this.leads.update(id, body, user, user.id);
   }
 
   // ── Deals ──────────────────────────────────────────────────────────────────
@@ -102,6 +102,6 @@ export class PublicApiController {
   @Put('deals/:id')
   @RequirePermission('deals:edit')
   updateDeal(@Param('id') id: string, @Body() body: UpdateDealDto, @CurrentUser() user: AuthUser) {
-    return this.deals.update(id, body, user.id);
+    return this.deals.update(id, body, user, user.id);
   }
 }

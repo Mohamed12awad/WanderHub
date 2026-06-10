@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -32,7 +31,7 @@ export class CreateSalesOrderDto {
   project?: string;
 
   @IsOptional()
-  @IsIn(['draft', 'confirmed'])
+  @IsString()
   status?: string;
 
   @IsOptional()

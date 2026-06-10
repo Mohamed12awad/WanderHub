@@ -27,6 +27,7 @@ const SO_INCLUDE = {
   fromQuote: { select: { id: true, quoteNumber: true } },
   items: { orderBy: { order: 'asc' as const } },
   invoices: { select: { id: true, invoiceNumber: true, status: true, total: true } },
+  updatedBy: { select: { id: true, name: true } },
 };
 
 // Allowed manual status transitions (conversion to `invoiced` is handled
@@ -139,7 +140,7 @@ export class SalesOrdersService {
     });
 
     if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'SalesOrder', order.id, 'salesOrders', order.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'SalesOrder', order.id, 'salesOrders', Number(order.total));
       if (overall === 'approved') {
         await this.prisma.salesOrder.update({ where: { id: order.id }, data: { approvalStatus: 'approved' } });
         (order as { approvalStatus: string }).approvalStatus = 'approved';
@@ -155,8 +156,11 @@ export class SalesOrdersService {
     if (['invoiced', 'cancelled'].includes(order.status)) {
       throw new BadRequestException(`A ${order.status} sales order cannot be edited`);
     }
-    const { items, taxRate, customer: _customer, deal: _deal, project: _project, expectedDate, ...rest } = body;
+    const { items, taxRate, customer, deal, project, expectedDate, ...rest } = body;
     const data: Record<string, unknown> = { ...rest };
+    if (customer !== undefined) data.customerId = customer;
+    if (deal !== undefined) data.dealId = deal || null;
+    if (project !== undefined) data.projectId = project || null;
     if (expectedDate !== undefined) data.expectedDate = expectedDate ? new Date(expectedDate) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(

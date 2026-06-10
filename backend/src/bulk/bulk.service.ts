@@ -82,7 +82,7 @@ export class BulkService {
     const result: BulkResult = { updated: 0, failed: [] };
     for (const { id } of visible) {
       try {
-        await svc.remove(id);
+        await svc.remove(id, user);
         result.updated++;
       } catch (e) {
         result.failed.push({ id, message: e instanceof Error ? e.message : 'Delete failed' });

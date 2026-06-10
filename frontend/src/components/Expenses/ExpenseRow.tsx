@@ -72,12 +72,12 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
             <Link to={`/expenses/${id}/edit`}>
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </Link>
-            {["admin", "manager"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'expenses:approve')) && (
               <DropdownMenuItem disabled={approvalStatus === "approved"} onClick={handleApprove}>
                 Approve
               </DropdownMenuItem>
             )}
-            {["admin", "super admin"].includes(user!.role) && (
+            {(user!.permissions?.some((p) => p === '*' || p === 'expenses:delete')) && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(id)}>

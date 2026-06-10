@@ -106,9 +106,6 @@ export function Dashboard() {
   const { tr } = useLanguage();
   const d = tr.dashboard;
 
-  const { data: lowStockData } = useQuery({ queryKey: ["low-stock"], queryFn: getLowStock, staleTime: 30000 });
-  const lowStock: any[] = lowStockData?.data ?? [];
-
   const { data: summeryData, isPending: summeryLoading } = useQuery({
     queryKey: ["summery"],
     queryFn: () => getSummery("month")
@@ -129,27 +126,37 @@ export function Dashboard() {
     staleTime: 60000,
     enabled: canViewAccounts,
   });
+  const canViewReports = (user?.permissions ?? []).some((p) => p === "*" || p === "reports:view");
+  const canViewInvoices = (user?.permissions ?? []).some((p) => p === "*" || p === "invoices:view" || p.startsWith("invoices:view:"));
+  const canViewLeads = (user?.permissions ?? []).some((p) => p === "*" || p === "leads:view" || p.startsWith("leads:view:"));
+  const canViewDeals = (user?.permissions ?? []).some((p) => p === "*" || p === "deals:view" || p.startsWith("deals:view:"));
+  const { data: lowStockData } = useQuery({ queryKey: ["low-stock"], queryFn: getLowStock, staleTime: 30000, enabled: canViewReports });
   const { data: pendingData } = useQuery({
     queryKey: ["pending-approvals"],
     queryFn: getPendingApprovals,
-    staleTime: 30000
+    staleTime: 30000,
+    enabled: canViewInvoices,
   });
   const { data: outstandingData } = useQuery({
     queryKey: ["outstanding"],
     queryFn: getOutstandingReport,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: canViewInvoices,
   });
   const { data: leadsData } = useQuery({
     queryKey: ["leads-report"],
     queryFn: getLeadsReport,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: canViewLeads,
   });
   const { data: pipelineData } = useQuery({
     queryKey: ["pipeline-report"],
     queryFn: getPipelineReport,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: canViewDeals,
   });
   const accounts: Account[] = accountsData?.data ?? [];
+  const lowStock: any[] = lowStockData?.data ?? [];
   const pending = pendingData?.data ?? { total: 0, quotes: [], invoices: [], expenses: [] };
   const outstanding: { _id: string; invoiceNumber: string; dealTitle: string; total: number; totalPaid: number; currency: string; dueDate: string; status: string }[] = outstandingData?.data ?? [];
   const leadStats: { status: string; count: number }[] = leadsData?.data ? Object.entries(leadsData.data).map(([status, count]) => ({ status, count: count as number })) : [];

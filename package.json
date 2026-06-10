@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "concurrently": "^8.2.2",
+    "concurrently": "^10.0.3",
     "lodash": "^4.17.21",
     "react-select": "^5.8.0"
   },

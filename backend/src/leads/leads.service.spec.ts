@@ -26,9 +26,8 @@ function buildPrisma() {
 
 const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
 const notifMock    = { dispatch: jest.fn().mockResolvedValue(undefined) } as any;
-const visibilityMock = {
-  ownershipWhere: jest.fn().mockResolvedValue({}),
-} as any;
+const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as any;
+const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
 
 const sampleLead = {
   id: 'lead-1',
@@ -53,7 +52,7 @@ describe('LeadsService.create', () => {
   it('creates a lead and returns the serialized record', async () => {
     const prisma = buildPrisma();
     prisma.lead.create.mockResolvedValue(sampleLead);
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     const result: any = await svc.create({ name: 'Jane Doe', phone: '0501234567', email: 'jane@example.com' }, 'user-1');
     expect(result._id).toBe('lead-1');
@@ -64,7 +63,7 @@ describe('LeadsService.create', () => {
   it('throws 400 when a lead with the same phone already exists', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue({ ...sampleLead, id: 'dup' });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await expect(
       svc.create({ name: 'Dup', phone: '0501234567' }, 'user-1'),
@@ -76,7 +75,7 @@ describe('LeadsService.create', () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null); // no dup lead
     prisma.customer.findFirst.mockResolvedValue({ id: 'cust-1', name: 'Existing' });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await expect(
       svc.create({ name: 'Dup', email: 'jane@example.com' }, 'user-1'),
@@ -86,7 +85,7 @@ describe('LeadsService.create', () => {
   it('fires a lead_assigned notification when owner differs from creator', async () => {
     const prisma = buildPrisma();
     prisma.lead.create.mockResolvedValue({ ...sampleLead, ownerId: 'owner-99' });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await svc.create({ name: 'Jane', owner: 'owner-99' }, 'creator-1');
     expect(notifMock.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'lead_assigned', userId: 'owner-99' }));
@@ -96,7 +95,7 @@ describe('LeadsService.create', () => {
     const prisma = buildPrisma();
     prisma.lead.create.mockResolvedValue({ ...sampleLead, ownerId: 'user-1' });
     notifMock.dispatch.mockClear();
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await svc.create({ name: 'Jane', owner: 'user-1' }, 'user-1');
     expect(notifMock.dispatch).not.toHaveBeenCalled();
@@ -108,7 +107,7 @@ describe('LeadsService.convertToCustomer', () => {
   it('throws 400 if the lead is already converted', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue({ ...sampleLead, status: 'converted' });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await expect(svc.convertToCustomer('lead-1', 'user-1')).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -116,7 +115,7 @@ describe('LeadsService.convertToCustomer', () => {
   it('throws NotFoundException when the lead does not exist', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null);
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await expect(svc.convertToCustomer('lead-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -126,7 +125,7 @@ describe('LeadsService.convertToCustomer', () => {
     prisma.lead.findFirst.mockResolvedValue(sampleLead);
     prisma.customer.create.mockResolvedValue({ id: 'cust-new', name: 'Jane Doe' });
     prisma.lead.update.mockResolvedValue({ ...sampleLead, status: 'converted' });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     const customer: any = await svc.convertToCustomer('lead-1', 'user-1');
     expect(customer._id).toBe('cust-new');
@@ -142,7 +141,7 @@ describe('LeadsService.remove', () => {
   it('throws NotFoundException when lead is not found', async () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(null);
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     await expect(svc.remove('lead-missing')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -151,7 +150,7 @@ describe('LeadsService.remove', () => {
     const prisma = buildPrisma();
     prisma.lead.findFirst.mockResolvedValue(sampleLead);
     prisma.lead.update.mockResolvedValue({ ...sampleLead, deletedAt: new Date() });
-    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock);
+    const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
     const result = await svc.remove('lead-1');
     expect(result).toBe(true);

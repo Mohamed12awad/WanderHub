@@ -104,6 +104,7 @@ export interface Activity {
   customer?: { _id: string; name: string };
   deal?: { _id: string; title: string };
   project?: { _id: string; name: string };
+  linkedName?: string; // resolved name of the linked record (any module)
   assignedTo?: { _id: string; name: string };
   createdBy?: { _id: string; name: string };
   createdAt: string;
@@ -112,11 +113,11 @@ export interface Activity {
 export interface ActivityFormData {
   type: ActivityType;
   title: string;
-  description?: string;
   date: string;
   status: ActivityStatus;
   linkedTo: string;
   linkedModel: string;
+  assignedTo?: string;
   customFields?: Record<string, string>;
 }
 

@@ -1,21 +1,12 @@
 import { Link } from "react-router-dom";
 import NavLinks from "./NavLinks";
 import { useAuth } from "@/contexts/authContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { LANGUAGES, Lang } from "@/i18n/translations";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Globe, Check, LogOut, Settings, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useOrgLogo } from "@/hooks/useOrgLogo";
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const { lang, setLang } = useLanguage();
+  const { user } = useAuth();
   const { collapsed, toggle } = useSidebar();
   const { logo } = useOrgLogo();
 
@@ -48,46 +39,15 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-2 py-3 shrink-0 border-t border-white/[0.06] space-y-0.5">
-        {/* Collapse toggle */}
-        <button
-          onClick={toggle}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="w-full flex items-center rounded-md px-3 py-2 text-xs font-medium text-white/35 hover:bg-white/[0.07] hover:text-white/65 transition-colors"
-          style={{ justifyContent: collapsed ? "center" : "flex-start" }}
-        >
-          {collapsed ? (
+        {/* Expand toggle — standalone only when collapsed (there's no room in the user row). */}
+        {collapsed && (
+          <button
+            onClick={toggle}
+            title="Expand sidebar"
+            className="w-full flex items-center justify-center rounded-md px-3 py-2 text-white/35 hover:bg-white/[0.07] hover:text-white/65 transition-colors"
+          >
             <PanelLeftOpen className="h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <>
-              <PanelLeftClose className="h-3.5 w-3.5 shrink-0 me-2.5" />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
-
-        {/* Language picker */}
-        {!collapsed && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="w-full flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium text-white/35 hover:bg-white/[0.07] hover:text-white/65 transition-colors">
-                <Globe className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{LANGUAGES[lang].native}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-48">
-              {(Object.entries(LANGUAGES) as [Lang, typeof LANGUAGES[Lang]][]).map(([code, meta]) => (
-                <DropdownMenuItem
-                  key={code}
-                  onClick={() => setLang(code)}
-                  className="gap-2 cursor-pointer"
-                >
-                  <span className="text-base leading-none">{meta.flag}</span>
-                  <span>{meta.native}</span>
-                  {code === lang && <Check className="ms-auto h-3.5 w-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          </button>
         )}
 
         {/* User row */}
@@ -104,19 +64,13 @@ export default function Sidebar() {
                 <p className="text-xs font-semibold text-white/75 truncate">{user?.name}</p>
                 <p className="text-[10px] text-white/35 capitalize truncate">{user?.role}</p>
               </div>
-              <Link
-                to="/settings"
-                className="shrink-0 text-white/30 hover:text-white/65 transition-colors"
-                title="Settings"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Link>
+              {/* Collapse toggle — sits beside the name (Settings/Sign out now live in the top-bar avatar menu). */}
               <button
-                onClick={logout}
-                className="shrink-0 text-white/30 hover:text-red-400 transition-colors"
-                title="Sign out"
+                onClick={toggle}
+                className="shrink-0 text-white/30 hover:text-white/65 transition-colors"
+                title="Collapse sidebar"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </button>
             </>
           )}

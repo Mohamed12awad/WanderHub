@@ -1,7 +1,6 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -29,7 +28,7 @@ export class CreateQuoteDto {
   deal?: string;
 
   @IsOptional()
-  @IsIn(['draft', 'sent', 'accepted', 'rejected', 'expired'])
+  @IsString()
   status?: string;
 
   @IsOptional()

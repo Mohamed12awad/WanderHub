@@ -24,7 +24,7 @@ const VendorBillRow: React.FC<Props> = ({ _id, billNumber, title, supplier, stat
   const navigate = useNavigate();
   const { tr } = useLanguage();
   const { user } = useAuth();
-  const canDelete = ["admin", "super admin"].includes(user?.role ?? "");
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete');
   const supplierName = typeof supplier === "object" ? supplier?.name : supplier;
   const outstanding = (total ?? 0) - (totalPaid ?? 0);
 

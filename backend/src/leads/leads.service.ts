@@ -115,14 +115,16 @@ export class LeadsService {
         owner: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         convertedTo: { select: { id: true, name: true } },
+        updatedBy: { select: { id: true, name: true } },
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
     return toClient(lead);
   }
 
-  async update(id: string, body: UpdateLeadDto, userId: string) {
-    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
+  async update(id: string, body: UpdateLeadDto, user: AuthUser, userId: string) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'leads', 'ownerId');
+    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!existing) throw new NotFoundException('Lead not found');
 
     const cleaned = cleanData(body, {
@@ -154,8 +156,9 @@ export class LeadsService {
     return toClient(lead);
   }
 
-  async remove(id: string) {
-    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'leads', 'ownerId');
+    const existing = await this.prisma.lead.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!existing) throw new NotFoundException('Lead not found');
     await this.prisma.lead.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;

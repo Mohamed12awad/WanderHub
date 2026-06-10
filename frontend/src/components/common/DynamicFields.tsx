@@ -19,10 +19,11 @@ const splitOptions = (options?: string) =>
   (options ?? "").split(",").map((o) => o.trim()).filter(Boolean);
 
 export const DynamicFields: React.FC<Props> = ({ module, values, onChange }) => {
-  const { getFieldsForModule } = useWorkspaceSettings();
+  const { getFieldsForModule, getSectionsForModule } = useWorkspaceSettings();
   const fields = getFieldsForModule(module)
     .filter((f) => !f.isSystem)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const sections = getSectionsForModule(module);
 
   // Seed any empty fields that declare a default value (once, on mount/field change).
   React.useEffect(() => {
@@ -36,14 +37,31 @@ export const DynamicFields: React.FC<Props> = ({ module, values, onChange }) => 
 
   if (fields.length === 0) return null;
 
+  // Group custom fields by their section, preserving section order. Fields with
+  // no/unknown section collapse under a generic "Custom Fields" heading.
+  const sectionLabel = new Map(sections.map((s) => [s.id, s.label]));
+  const groups: { key: string; label: string; fields: FieldDef[] }[] = [];
+  const indexOf = (key: string) => groups.findIndex((g) => g.key === key);
+  for (const f of fields) {
+    const key = f.section && sectionLabel.has(f.section) ? f.section : "__custom__";
+    const label = key === "__custom__" ? "Custom Fields" : sectionLabel.get(key)!;
+    const i = indexOf(key);
+    if (i < 0) groups.push({ key, label, fields: [f] });
+    else groups[i].fields.push(f);
+  }
+
   return (
-    <div className="col-span-2">
-      <h2 className="text-lg font-semibold mb-2 mt-4">Custom Fields</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {fields.map((field) => (
-          <FieldInput key={field.id} field={field} value={values[field.id] ?? ""} onChange={onChange} />
-        ))}
-      </div>
+    <div className="col-span-2 space-y-4 mt-4">
+      {groups.map((group) => (
+        <div key={group.key}>
+          <h2 className="text-lg font-semibold mb-2">{group.label}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {group.fields.map((field) => (
+              <FieldInput key={field.id} field={field} value={values[field.id] ?? ""} onChange={onChange} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -57,7 +75,7 @@ const FieldInput: React.FC<{
   const labelEl = (
     <Label className="my-3" htmlFor={inputId}>
       {field.label}
-      {field.required && <span className="text-red-700 font-bold ms-1">*</span>}
+      {field.required && <span className="text-destructive font-bold ms-1">*</span>}
     </Label>
   );
   const help = field.helpText ? (

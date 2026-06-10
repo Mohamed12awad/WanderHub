@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateActivity, deleteActivity } from "@/utils/api";
 import { CheckCircle2, Circle, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const TYPE_EMOJIS: Record<ActivityType, string> = {
   call: "📞",
@@ -71,6 +72,7 @@ export function ActivitiesPage() {
   const [statusFilter, setStatus] = useState<string>("all");
   const [detail, setDetail] = useState<Activity | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const queryKey = ["activities-all"];
   const { data, isPending } = useQuery({
@@ -292,10 +294,7 @@ export function ActivitiesPage() {
                     variant="ghost"
                     className="h-7 w-7 text-destructive hover:text-destructive"
                     title="Delete"
-                    onClick={() => {
-                      if (confirm("Delete this activity?"))
-                        deleteMut.mutate(a._id);
-                    }}
+                    onClick={() => setDeleteId(a._id)}
                     disabled={deleteMut.isPending}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -314,6 +313,17 @@ export function ActivitiesPage() {
           if (!v) setDetail(null);
         }}
         invalidateKeys={["activities-all"]}
+      />
+      <ConfirmDialog
+        open={deleteId !== null}
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          if (id) deleteMut.mutate(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+        title="Delete Activity"
+        description="Delete this activity? This action cannot be undone."
       />
     </div>
   );

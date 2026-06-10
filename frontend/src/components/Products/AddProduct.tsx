@@ -1,18 +1,20 @@
 import React, { useState, ChangeEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AutoTextarea } from "@/components/ui/auto-textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createProduct } from "@/utils/api";
 import { productSchema, zodFieldErrors } from "@/validations/schemas";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { CircleArrowLeft } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import LoadingSpinner from "../common/spinner";
 import DynamicFields from "@/components/common/DynamicFields";
+import { EntityFormPage } from "@/components/common/EntityFormPage";
+import { StickyFormBar } from "@/components/common/StickyFormBar";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
+import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { queryKeys } from "@/lib/queryKeys";
 
 const DEFAULT_TYPES = ["service", "physical", "digital", "subscription"];
 
@@ -35,7 +37,6 @@ const AddProduct = () => {
   const cloneData = (location.state as any)?.clone;
   const [formData, setFormData] = useState<typeof initialFormData>(cloneData ? { ...initialFormData, ...cloneData } : initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { getFieldsForModule } = useWorkspaceSettings();
   const typeOptions = getFieldsForModule("products")
@@ -51,6 +52,14 @@ const AddProduct = () => {
 
   const validate = (): FormErrors => zodFieldErrors(productSchema, formData);
 
+  const saveMutation = useSaveMutation<any>({
+    save: createProduct,
+    invalidate: [queryKeys.products.all],
+    successMessage: "Product created",
+    errorMessage: "Failed to create product",
+    onSuccess: () => navigate("/products"),
+  });
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const errs = validate();
@@ -58,29 +67,17 @@ const AddProduct = () => {
       setErrors(errs);
       return;
     }
-    try {
-      setIsLoading(true);
-      await createProduct({ ...formData, capacity: Number(formData.capacity) });
-      navigate("/products");
-    } catch (error) {
-      console.error("Error adding product:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    saveMutation.mutate({ ...formData, capacity: Number(formData.capacity) });
   };
 
   return (
-    <main className="p-4">
-      <LoadingSpinner loading={isLoading} />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex">
-            <Link to="/products"><CircleArrowLeft className="me-3" /></Link>
-            Add Product / Service
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <EntityFormPage
+      title="Add Product / Service"
+      backHref="/products"
+      breadcrumb={[{ label: "Products", href: "/products" }, { label: "New" }]}
+    >
+      <LoadingSpinner loading={saveMutation.isPending} />
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col col-span-2 md:col-span-1">
               <Label className="my-3" htmlFor="name">Name</Label>
               <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
@@ -110,12 +107,12 @@ const AddProduct = () => {
             </div>
             <div className="flex flex-col col-span-2">
               <Label className="my-3" htmlFor="notes">Notes</Label>
-              <textarea
+              <AutoTextarea
                 id="notes"
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
-                className="border border-input rounded-lg p-2 min-h-[80px]"
+                minRows={2}
               />
             </div>
             <DynamicFields
@@ -125,14 +122,14 @@ const AddProduct = () => {
             />
 
             <div className="col-span-2">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Adding..." : "Add Product"}
-              </Button>
+              <StickyFormBar
+                isSubmitting={saveMutation.isPending}
+                onCancel={() => navigate("/products")}
+                submitLabel="Add Product"
+              />
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </main>
+    </EntityFormPage>
   );
 };
 

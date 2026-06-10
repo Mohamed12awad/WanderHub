@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,13 +19,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
-import { createActivity } from "@/utils/api";
+import { createActivity, getUsers } from "@/utils/api";
 import { ActivityFormData, ActivityType } from "@/types/types";
 import DynamicFields from "@/components/common/DynamicFields";
 
 interface ActivityDialogProps {
   linkedTo: string;
   linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder";
+  /** Render a full-width trigger (used in the narrow context panel). */
+  fullWidth?: boolean;
 }
 
 const ACTIVITY_ICONS: Record<ActivityType, string> = {
@@ -39,14 +41,18 @@ const ACTIVITY_ICONS: Record<ActivityType, string> = {
 export const ActivityDialog: React.FC<ActivityDialogProps> = ({
   linkedTo,
   linkedModel,
+  fullWidth = false,
 }) => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<ActivityType>("call");
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [assignedTo, setAssignedTo] = useState<string>("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+
+  const { data: usersData } = useQuery({ queryKey: ["users-all"], queryFn: () => getUsers() });
+  const users: { _id: string; name: string }[] = usersData?.data?.data ?? usersData?.data ?? [];
 
   const { mutate, isPending } = useMutation({
     mutationFn: createActivity,
@@ -57,7 +63,7 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
       });
       setOpen(false);
       setTitle("");
-      setDescription("");
+      setAssignedTo("");
       setType("call");
       setCustomFields({});
     }
@@ -68,11 +74,11 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
     const data: ActivityFormData = {
       type,
       title,
-      description,
       date,
       status: "pending",
       linkedTo,
       linkedModel,
+      ...(assignedTo ? { assignedTo } : {}),
       customFields,
     };
     mutate(data);
@@ -81,8 +87,8 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8 gap-1">
-          <PlusCircle className="h-3.5 w-3.5" />
+        <Button size="sm" className={`gap-1.5 shadow-sm ${fullWidth ? "w-full" : ""}`}>
+          <PlusCircle className="h-4 w-4" />
           Log Activity
         </Button>
       </DialogTrigger>
@@ -138,6 +144,21 @@ export const ActivityDialog: React.FC<ActivityDialogProps> = ({
                 onChange={(e) => setDate(e.target.value)}
                 className="col-span-3"
               />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Assigned To</Label>
+              <div className="col-span-3">
+                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a user…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u._id} value={u._id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4">
               <DynamicFields module="activities" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />

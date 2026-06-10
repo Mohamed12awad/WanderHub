@@ -1,10 +1,11 @@
-import { IsIn, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
 
 // The frontend submits the relation alias `linkedTo` (+ `linkedModel`); the
 // service resolves it to linkedToId and derives customerId/dealId. createdById
 // is set from the auth context and must not come from the client.
 export class CreateActivityDto {
-  @IsIn(['call', 'meeting', 'task', 'note', 'email'])
+  @IsString()
+  @IsNotEmpty()
   type: string;
 
   @IsString()
@@ -19,7 +20,7 @@ export class CreateActivityDto {
   description?: string;
 
   @IsOptional()
-  @IsIn(['pending', 'completed'])
+  @IsString()
   status?: string;
 
   // Frontend field; the service maps this to linkedToId.

@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray, IsIn, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, ValidateNested,
+  IsArray, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, ValidateNested,
 } from 'class-validator';
 import { LineItemDto } from '../../finance/dto/line-item.dto';
 
@@ -10,7 +10,7 @@ export class CreatePurchaseOrderDto {
   @IsString() @IsNotEmpty() supplier: string;
 
   @IsOptional()
-  @IsIn(['draft', 'sent', 'confirmed', 'received', 'cancelled'])
+  @IsString()
   status?: string;
 
   @IsOptional() @IsString() currency?: string;

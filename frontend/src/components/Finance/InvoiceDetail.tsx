@@ -1,39 +1,28 @@
 import React, { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, MoreHorizontal, Copy } from "lucide-react";
+import { Edit, Trash2, CheckCircle, XCircle, Pencil, Printer, Clock, Copy, Send } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice, sendInvoice, getActivities } from "@/utils/api";
-import { ActivityList } from "@/components/Activities/ActivityList";
+import { getInvoiceById, deleteInvoice, deleteInvoicePayment, approveInvoice, rejectInvoice, sendInvoice } from "@/utils/api";
 import { FinanceStatusBadge, ApprovalBadge } from "./FinanceStatusBadge";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import RecordPaymentDialog from "./RecordPaymentDialog";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LoadingSpinner from "@/components/common/spinner";
 import { Invoice, InvoicePayment } from "@/types/types";
 import { useAuth } from "@/contexts/authContext";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
-
-const InfoRow: React.FC<{ label: string; value?: string | number | React.ReactNode }> = ({ label, value }) => (
-  <div className="grid grid-cols-2 mb-2">
-    <Label className="my-1 font-medium">{label}</Label>
-    <p className="my-1">{value ?? "—"}</p>
-  </div>
-);
+import { InfoRow } from "@/components/common/InfoRow";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const InvoiceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,9 +33,12 @@ const InvoiceDetail: React.FC = () => {
   const { user } = useAuth();
   const f = tr.finance;
 
-  const isAdmin = ["admin", "super admin"].includes(user!.role);
-  const canDelete = isAdmin;
+  const perms = user?.permissions ?? [];
+  const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
+  const canDelete = hasPerm('invoices:delete');
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [editingPayment, setEditingPayment] = useState<InvoicePayment | null>(null);
   const { isApprovalEnabled, canUserApprove } = useApprovalConfig();
@@ -57,12 +49,6 @@ const InvoiceDetail: React.FC = () => {
   });
   const invoice: Invoice | undefined = data?.data?.invoice;
   const payments: InvoicePayment[] = data?.data?.payments ?? [];
-  const { data: activitiesData } = useQuery({
-    queryKey: ["activities", id],
-    queryFn: () => getActivities(id!, "Invoice"),
-    enabled: !!id
-  });
-  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   if (isLoading) return <LoadingSpinner loading />;
   if (!invoice) return <div className="p-4">Invoice not found.</div>;
@@ -72,18 +58,16 @@ const InvoiceDetail: React.FC = () => {
   const approvalStatus = invoice.approvalStatus;
   const isPending = approvalStatus === "pending";
   const isRejected = approvalStatus === "rejected";
-  const canEdit = isAdmin || !approvalEnabled || isRejected;
+  const canEdit = hasPerm('invoices:edit') || !approvalEnabled || isRejected;
   const isPaid = outstanding <= 0;
-  const canRecordPayment = !isPaid && (isAdmin || !approvalEnabled || approvalStatus === "approved");
-  const userCanApprove = canUserApprove("invoices", user!.role);
+  const canRecordPayment = !isPaid && (hasPerm('invoices:create') || !approvalEnabled || approvalStatus === "approved");
+  const userCanApprove = canUserApprove("invoices", user!.role, perms);
 
   const handleSend = async () => {
     setActionLoading(true);
     try {
       await sendInvoice(id!);
-      queryClient.invalidateQueries({
-        queryKey: ["invoices", id]
-      });
+      queryClient.invalidateQueries({ queryKey: ["invoices", id] });
       toast({ title: "Invoice marked as sent." });
     } catch {
       toast({ title: "Failed to mark as sent.", variant: "destructive" });
@@ -94,9 +78,7 @@ const InvoiceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await approveInvoice(id!);
-      queryClient.invalidateQueries({
-        queryKey: ["invoices", id]
-      });
+      queryClient.invalidateQueries({ queryKey: ["invoices", id] });
       toast({ title: "Invoice approved." });
     } catch {
       toast({ title: "Approval failed", variant: "destructive" });
@@ -107,9 +89,7 @@ const InvoiceDetail: React.FC = () => {
     setActionLoading(true);
     try {
       await rejectInvoice(id!, reason);
-      queryClient.invalidateQueries({
-        queryKey: ["invoices", id]
-      });
+      queryClient.invalidateQueries({ queryKey: ["invoices", id] });
       setRejectOpen(false);
       toast({ title: "Invoice rejected." });
     } catch {
@@ -139,7 +119,6 @@ const InvoiceDetail: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this invoice and all its payments?")) return;
     try {
       await deleteInvoice(id!);
       navigate("/finance/invoices");
@@ -149,27 +128,99 @@ const InvoiceDetail: React.FC = () => {
   };
 
   const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm("Delete this payment?")) return;
     try {
       await deleteInvoicePayment(id!, paymentId);
-      queryClient.invalidateQueries({
-        queryKey: ["invoices", id]
-      });
+      queryClient.invalidateQueries({ queryKey: ["invoices", id] });
       toast({ title: "Payment deleted." });
     } catch {
       toast({ title: "Failed to delete payment", variant: "destructive" });
     }
   };
 
+  // Action hierarchy: one primary action by state, the rest in the ⋮ menu.
+  const primaryAction = !isPaid ? (
+    <RecordPaymentDialog
+      invoiceId={id!}
+      currency={invoice.currency}
+      outstanding={Math.max(0, outstanding)}
+      disabled={!canRecordPayment}
+      disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
+      onSuccess={() => queryClient.invalidateQueries({ queryKey: ["invoices", id] })}
+    />
+  ) : canEdit ? (
+    <Button size="sm" className="gap-1" onClick={() => navigate(`/finance/invoices/${id}/edit`)}>
+      <Edit className="h-3.5 w-3.5" />Edit
+    </Button>
+  ) : undefined;
+
+  const menuItems: DetailMenuItem[] = [];
+  if (!isPaid && canEdit) {
+    menuItems.push({ label: "Edit", icon: <Edit className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/finance/invoices/${id}/edit`) });
+  }
+  if (invoice.status === "draft" && approvalStatus === "approved") {
+    menuItems.push({ label: "Mark as Sent", icon: <Send className="h-3.5 w-3.5 me-2" />, onClick: handleSend });
+  }
+  menuItems.push({ label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone });
+  menuItems.push({ label: "Print", icon: <Printer className="h-3.5 w-3.5 me-2" />, onClick: () => window.print() });
+  if (userCanApprove && approvalStatus === "approved") {
+    menuItems.push({ label: "Reject", icon: <XCircle className="h-3.5 w-3.5 me-2" />, onClick: () => setRejectOpen(true), destructive: true, separatorBefore: true });
+  }
+  if (canDelete) {
+    menuItems.push({ label: tr.common.delete, icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setDeleteOpen(true), destructive: true, separatorBefore: true });
+  }
+
+  const header = (
+    <div className="print:hidden">
+      <DetailHeader
+        crumbs={[{ label: "Invoices", href: "/finance/invoices" }, { label: invoice.invoiceNumber }]}
+        title={<>{invoice.invoiceNumber} — {invoice.title}</>}
+        badges={
+          <>
+            <FinanceStatusBadge status={invoice.status} type="invoice" />
+            {approvalEnabled && <ApprovalBadge status={invoice.approvalStatus} rejectionReason={invoice.rejectionReason} />}
+          </>
+        }
+        primaryAction={primaryAction}
+        menuItems={menuItems}
+      />
+    </div>
+  );
+
+  const contextPanel = (
+    <RecordContextPanel
+      linkedTo={id!}
+      linkedModel="Invoice"
+      approvalsContent={approvalEnabled ? <ApprovalStepsTimeline entityType="Invoice" entityId={id!} embedded /> : undefined}
+    />
+  );
+
   return (
-    <main className="p-4 max-w-7xl mx-auto space-y-5">
-      <ApprovalStepsTimeline entityType="Invoice" entityId={id!} />
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       <RejectDialog
         open={rejectOpen}
         onConfirm={handleReject}
         onCancel={() => setRejectOpen(false)}
         loading={actionLoading}
       />
+      <ConfirmDialog
+        open={deleteOpen}
+        onConfirm={() => { setDeleteOpen(false); void handleDelete(); }}
+        onCancel={() => setDeleteOpen(false)}
+        title="Delete Invoice"
+        description="Delete this invoice and all its payments? This action cannot be undone."
+      />
+      <ConfirmDialog
+        open={deletePaymentId !== null}
+        onConfirm={() => {
+          const paymentId = deletePaymentId;
+          setDeletePaymentId(null);
+          if (paymentId) void handleDeletePayment(paymentId);
+        }}
+        onCancel={() => setDeletePaymentId(null)}
+        title="Delete Payment"
+        description="Delete this payment? This action cannot be undone."
+      />
+
       {/* Approval pending banner */}
       {approvalEnabled && isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300 print:hidden">
@@ -203,71 +254,8 @@ const InvoiceDetail: React.FC = () => {
           )}
         </div>
       )}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between print:hidden">
-          <CardTitle className="flex items-center gap-3">
-            <Link to="/finance/invoices"><CircleArrowLeft /></Link>
-            {invoice.invoiceNumber} — {invoice.title}
-          </CardTitle>
-          <div className="flex gap-2 items-center">
-            <Link to={canEdit ? `/finance/invoices/${id}/edit` : "#"}>
-              <Button size="sm" variant="outline" className="h-8 px-4" disabled={!canEdit} title={isPending ? "Pending approval — cannot edit." : undefined}>
-                <Edit className="h-3.5 w-3.5 me-1" />Edit
-              </Button>
-            </Link>
-            {invoice.status === "draft" && approvalStatus === "approved" && (
-              <Button size="sm" variant="outline" className="h-8 px-4 gap-1" onClick={handleSend} disabled={actionLoading}>
-                <CheckCircle className="h-3.5 w-3.5" />Mark as Sent
-              </Button>
-            )}
-            {!isPaid && (
-              <RecordPaymentDialog
-                invoiceId={id!}
-                currency={invoice.currency}
-                outstanding={Math.max(0, outstanding)}
-                disabled={!canRecordPayment}
-                disabledTitle={!canRecordPayment ? "Approve the invoice before recording payment." : undefined}
-                onSuccess={() => queryClient.invalidateQueries({
-                  queryKey: ["invoices", id]
-                })}
-              />
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">More actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="h-3.5 w-3.5 me-2" />Clone
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.print()}>
-                  <Printer className="h-3.5 w-3.5 me-2" />Print
-                </DropdownMenuItem>
-                {userCanApprove && approvalStatus === "approved" && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setRejectOpen(true)} disabled={actionLoading} className="text-destructive focus:text-destructive">
-                      <XCircle className="h-3.5 w-3.5 me-2" />Reject
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {canDelete && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
 
+      <Card>
         {/* Print-only header */}
         <div className="hidden print:block px-6 pt-6 pb-2 border-b">
           <div className="flex justify-between items-start">
@@ -283,35 +271,33 @@ const InvoiceDetail: React.FC = () => {
           </div>
         </div>
 
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Invoice Information</h2>
               <InfoRow label={f.invoiceNumber} value={invoice.invoiceNumber} />
               <InfoRow label={f.customer} value={
-                <Link to={`/customers/${invoice.customer._id}`} className="text-blue-500">
+                <Link to={`/customers/${invoice.customer._id}`} className="text-primary hover:underline">
                   {invoice.customer.name}
                 </Link>
               } />
               <InfoRow label="Deal" value={
                 invoice.deal ? (
-                  <Link to={`/deals/${invoice.deal._id}`} className="text-blue-500 hover:underline">{invoice.deal.title}</Link>
+                  <Link to={`/deals/${invoice.deal._id}`} className="text-primary hover:underline">{invoice.deal.title}</Link>
                 ) : "—"
               } />
               {invoice.project && (
                 <InfoRow label="Project" value={
-                  <Link to={`/projects/${invoice.project._id}`} className="text-blue-500 hover:underline">{invoice.project.name}</Link>
+                  <Link to={`/projects/${invoice.project._id}`} className="text-primary hover:underline">{invoice.project.name}</Link>
                 } />
               )}
               {invoice.quote && (
                 <InfoRow label="From Quote" value={
-                  <Link to={`/finance/quotes/${invoice.quote._id}`} className="text-blue-500">
+                  <Link to={`/finance/quotes/${invoice.quote._id}`} className="text-primary hover:underline">
                     {invoice.quote.quoteNumber}
                   </Link>
                 } />
               )}
-              <InfoRow label={f.status} value={<FinanceStatusBadge status={invoice.status} type="invoice" />} />
-              {approvalEnabled && <InfoRow label="Approval" value={<ApprovalBadge status={invoice.approvalStatus} rejectionReason={invoice.rejectionReason} />} />}
               <InfoRow label={f.currency} value={invoice.currency} />
               {invoice.exchangeRate != null && (
                 <InfoRow label="Exchange Rate" value={`${invoice.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${invoice.currency}`} />
@@ -366,22 +352,22 @@ const InvoiceDetail: React.FC = () => {
           </div>
 
           <div className="flex justify-end mt-4">
-            <div className="w-72 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{f.subtotal}</span>
-                <span className="font-medium tabular-nums">{invoice.subtotal.toLocaleString()} {invoice.currency}</span>
+            <div className="w-full max-w-xs space-y-1.5 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>{f.subtotal}</span>
+                <span className="tabular-nums text-foreground">{invoice.subtotal.toLocaleString()} {invoice.currency}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{f.taxRate}</span>
-                <span className="tabular-nums">{invoice.taxRate}%</span>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{f.taxRate}</span>
+                <span className="tabular-nums text-foreground">{invoice.taxRate}%</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{f.tax}</span>
-                <span className="tabular-nums">{invoice.tax.toLocaleString()} {invoice.currency}</span>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{f.tax}</span>
+                <span className="tabular-nums text-foreground">{invoice.tax.toLocaleString()} {invoice.currency}</span>
               </div>
-              <div className="flex justify-between border-t pt-2 font-semibold">
-                <span>{f.total}</span>
-                <span className="text-base tabular-nums">{invoice.total.toLocaleString()} {invoice.currency}</span>
+              <div className="flex items-baseline justify-between border-t pt-2">
+                <span className="text-sm font-medium">{f.total}</span>
+                <span className="text-xl font-bold tabular-nums">{invoice.total.toLocaleString()} {invoice.currency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{f.totalPaid}</span>
@@ -397,10 +383,11 @@ const InvoiceDetail: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
       {/* Payments */}
       <Card className="print:hidden">
         <CardHeader>
-          <CardTitle>{f.payments}</CardTitle>
+          <CardTitle className="text-base">{f.payments}</CardTitle>
         </CardHeader>
         <CardContent>
           {payments.length === 0 ? (
@@ -433,7 +420,7 @@ const InvoiceDetail: React.FC = () => {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         {canDelete && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePayment(p._id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletePaymentId(p._id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -446,31 +433,7 @@ const InvoiceDetail: React.FC = () => {
           )}
         </CardContent>
       </Card>
-      {/* Notes & Timeline */}
-      <Card className="print:hidden">
-        <CardContent className="py-5">
-          <Tabs defaultValue="timeline">
-            <TabsList className="mb-4">
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="notes">Notes</TabsTrigger>
-              <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
-              <TabsTrigger value="attachments">Attachments</TabsTrigger>
-            </TabsList>
-            <TabsContent value="timeline">
-              <RecordTimeline linkedTo={id!} linkedModel="Invoice" />
-            </TabsContent>
-            <TabsContent value="notes">
-              <NotesPanel linkedTo={id!} linkedModel="Invoice" />
-            </TabsContent>
-            <TabsContent value="activities">
-              <ActivityList linkedTo={id!} linkedModel="Invoice" />
-            </TabsContent>
-            <TabsContent value="attachments">
-              <AttachmentsPanel linkedModel="Invoice" linkedToId={id!} />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+
       {editingPayment && (
         <RecordPaymentDialog
           mode="edit"
@@ -481,13 +444,11 @@ const InvoiceDetail: React.FC = () => {
           onOpenChange={(o) => { if (!o) setEditingPayment(null); }}
           onSuccess={() => {
             setEditingPayment(null);
-            queryClient.invalidateQueries({
-              queryKey: ["invoices", id]
-            });
+            queryClient.invalidateQueries({ queryKey: ["invoices", id] });
           }}
         />
       )}
-    </main>
+    </DetailPageLayout>
   );
 };
 

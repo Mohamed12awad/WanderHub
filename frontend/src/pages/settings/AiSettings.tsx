@@ -22,7 +22,7 @@ export default function AiSettings() {
   const s = tr.tools.aiSettings;
   const qc = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = ["admin", "super admin"].includes(user?.role ?? "");
+  const isAdmin = (user?.permissions ?? []).some((p) => p === '*' || p === 'settings:manage');
   const { data } = useQuery({ queryKey: ["ai-config"], queryFn: getAiConfig });
   const cfg = data?.data;
 

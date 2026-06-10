@@ -37,14 +37,14 @@ export class LeadsController {
   @Put(':id')
   @RequirePermission('leads:edit')
   update(@Param('id') id: string, @Body() body: UpdateLeadDto, @CurrentUser() user: AuthUser) {
-    return this.leads.update(id, body, user.id);
+    return this.leads.update(id, body, user, user.id);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('leads:delete')
-  remove(@Param('id') id: string) {
-    return this.leads.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.leads.remove(id, user);
   }
 
   @Post(':id/convert')

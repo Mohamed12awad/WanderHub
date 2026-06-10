@@ -87,8 +87,8 @@ export class ApprovalService {
     });
   }
 
-  private canActOnStep(approverRoles: string[], userRole: string): boolean {
-    if (['admin', 'super admin'].includes(userRole)) return true;
+  private canActOnStep(approverRoles: string[], userRole: string, permissions: string[]): boolean {
+    if (permissions.includes('*')) return true;
     if (!approverRoles.length) return false; // enabled but no roles ⇒ admins only
     return approverRoles.includes(userRole);
   }
@@ -106,10 +106,11 @@ export class ApprovalService {
     creatorId: string | null | undefined,
     decision: ApprovalDecision,
     comment?: string,
+    userPermissions: string[] = [],
   ): Promise<{ status: OverallStatus; finalApproverId?: string }> {
     // Separation of duties: the creator can't act on their own item — except
-    // Super Admin, the unrestricted override role.
-    if (creatorId && creatorId === userId && userRole !== 'super admin') {
+    // users with wildcard permissions (superpower override).
+    if (creatorId && creatorId === userId && !userPermissions.includes('*')) {
       throw new ForbiddenException(`You cannot ${decision} an item you created`);
     }
     const steps = await this.listSteps(entityType, entityId);
@@ -118,7 +119,7 @@ export class ApprovalService {
       const rejected = steps.some((s) => s.status === 'rejected');
       return { status: rejected ? 'rejected' : 'approved' };
     }
-    if (!this.canActOnStep(current.approverRoles, userRole)) {
+    if (!this.canActOnStep(current.approverRoles, userRole, userPermissions)) {
       throw new ForbiddenException('You are not authorized to act on this approval step');
     }
 

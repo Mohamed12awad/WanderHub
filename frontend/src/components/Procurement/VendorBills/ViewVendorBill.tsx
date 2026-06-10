@@ -1,11 +1,15 @@
 import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getVendorBillById, approveVendorBill, rejectVendorBill, deleteVendorBill,
   recordVendorBillPayment, getAccounts,
 } from "@/utils/api";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { MetaGrid, MetaField } from "@/components/common/MetaGrid";
+import { AuditRows } from "@/components/common/AuditRows";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +21,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Plus, Trash2, Copy } from "lucide-react";
+import { Edit, CheckCircle, XCircle, Clock, Plus, Trash2, Copy } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +29,7 @@ import LoadingSpinner from "@/components/common/spinner";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import { ProcurementStatusBadge } from "../statusBadge";
 import { ApprovalBadge } from "@/components/Finance/FinanceStatusBadge";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 function PaymentDialog({ billId, currency, outstanding, onDone }: { billId: string; currency: string; outstanding: number; onDone: () => void }) {
   const [open, setOpen] = useState(false);
@@ -92,6 +94,7 @@ export default function ViewVendorBill() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -104,7 +107,7 @@ export default function ViewVendorBill() {
     queryKey: ["vendor-bill", id]
   });
 
-  const canApprove = ["admin", "super admin", "manager"].includes(user?.role ?? "");
+  const canApprove = (user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:approve');
   const isPending = bill?.approvalStatus === "pending";
   const isRejected = bill?.approvalStatus === "rejected";
 
@@ -139,7 +142,6 @@ export default function ViewVendorBill() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this bill?")) return;
     try { await deleteVendorBill(id!); navigate("/procurement/bills"); }
     catch { toast({ title: "Delete failed", variant: "destructive" }); }
   };
@@ -156,10 +158,44 @@ export default function ViewVendorBill() {
   const outstanding = (bill.total ?? 0) - (bill.totalPaid ?? 0);
   const canPay = bill.approvalStatus === "approved" && outstanding > 0;
 
+  const primaryAction = canPay ? (
+    <PaymentDialog billId={bill._id} currency={bill.currency} outstanding={outstanding} onDone={refresh} />
+  ) : (
+    <Button size="sm" className="gap-1" onClick={() => navigate(`/procurement/bills/${id}/edit`)}>
+      <Edit className="h-3.5 w-3.5" />{tr.common.edit}
+    </Button>
+  );
+
+  const menuItems: DetailMenuItem[] = [];
+  if (canPay) {
+    menuItems.push({ label: tr.common.edit, icon: <Edit className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/procurement/bills/${id}/edit`) });
+  }
+  menuItems.push({ label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone });
+  menuItems.push({ label: tr.common.delete, icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setDeleteOpen(true), destructive: true, separatorBefore: true });
+
+  const header = (
+    <DetailHeader
+      crumbs={[{ label: "Vendor Bills", href: "/procurement/bills" }, { label: bill.billNumber ?? bill.title }]}
+      title={<>{bill.billNumber} — {bill.title}</>}
+      badges={<><ProcurementStatusBadge status={bill.status} /><ApprovalBadge status={bill.approvalStatus} /></>}
+      primaryAction={primaryAction}
+      menuItems={menuItems}
+    />
+  );
+
   return (
-    <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      <ApprovalStepsTimeline entityType="VendorBill" entityId={id!} />
+    <DetailPageLayout header={header}>
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
+      <ConfirmDialog
+        open={deleteOpen}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteOpen(false)}
+        title="Delete Bill"
+        description="Delete this bill? This action cannot be undone."
+      />
 
       {isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
@@ -181,36 +217,24 @@ export default function ViewVendorBill() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
-          <CardTitle className="flex items-center gap-3 flex-wrap">
-            <Link to="/procurement/bills"><CircleArrowLeft /></Link>
-            {bill.billNumber} — {bill.title}
-            <ProcurementStatusBadge status={bill.status} />
-            <ApprovalBadge status={bill.approvalStatus} />
-          </CardTitle>
-          <div className="flex gap-2 items-center">
-            {canPay && <PaymentDialog billId={bill._id} currency={bill.currency} outstanding={outstanding} onDone={refresh} />}
-            <Link to={`/procurement/bills/${id}/edit`}><Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button></Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}><Copy className="h-3.5 w-3.5 me-2" />Clone</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={handleDelete}>{tr.common.delete}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent className="grid sm:grid-cols-4 gap-3 text-sm">
-          <div><span className="text-muted-foreground">Supplier:</span> {supplierName}</div>
-          {bill.purchaseOrder && <div><span className="text-muted-foreground">PO:</span> {bill.purchaseOrder.poNumber}</div>}
-          <div><span className="text-muted-foreground">Total:</span> {bill.total?.toLocaleString()} {bill.currency}</div>
-          <div><span className="text-muted-foreground">Outstanding:</span> <span className={outstanding > 0 ? "text-destructive font-medium" : "text-emerald-600"}>{outstanding.toLocaleString()} {bill.currency}</span></div>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Details</CardTitle></CardHeader>
+        <CardContent>
+          <MetaGrid>
+            <MetaField label="Supplier" value={supplierName} />
+            {bill.purchaseOrder && <MetaField label="PO" value={bill.purchaseOrder.poNumber} />}
+            <MetaField label="Total" value={`${bill.total?.toLocaleString()} ${bill.currency}`} />
+            <MetaField label="Outstanding">
+              <span className={outstanding > 0 ? "text-destructive font-medium" : "text-emerald-600"}>
+                {outstanding.toLocaleString()} {bill.currency}
+              </span>
+            </MetaField>
+            <AuditRows record={bill} createdByField={bill.createdBy} variant="meta" />
+          </MetaGrid>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
@@ -220,6 +244,22 @@ export default function ViewVendorBill() {
               ))}
             </TableBody>
           </Table>
+          <div className="flex justify-end border-t p-4">
+            <div className="w-full max-w-xs space-y-1.5 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums text-foreground">{bill.subtotal?.toLocaleString()} {bill.currency}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Tax ({bill.taxRate ?? 0}%)</span>
+                <span className="tabular-nums text-foreground">{bill.tax?.toLocaleString()} {bill.currency}</span>
+              </div>
+              <div className="flex items-baseline justify-between border-t pt-2">
+                <span className="text-sm font-medium">Total</span>
+                <span className="text-xl font-bold tabular-nums">{bill.total?.toLocaleString()} {bill.currency}</span>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -236,7 +276,7 @@ export default function ViewVendorBill() {
                   <TableCell className="capitalize">{p.method?.replace("_", " ")}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.amount?.toLocaleString()} {p.currency}</TableCell>
                   <TableCell className="text-right">
-                    {["admin", "super admin"].includes(user?.role ?? "") && (
+                    {((user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete')) && (
                       <button onClick={() => handleDeletePayment(p._id)} className="text-destructive opacity-60 hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
                     )}
                   </TableCell>
@@ -246,6 +286,8 @@ export default function ViewVendorBill() {
           </Table>
         </CardContent>
       </Card>
-    </main>
+
+      <ApprovalStepsTimeline entityType="VendorBill" entityId={id!} />
+    </DetailPageLayout>
   );
 }

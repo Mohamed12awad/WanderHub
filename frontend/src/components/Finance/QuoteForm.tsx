@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams, useLocation, Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
+import { TaxRateSelect } from "@/components/common/TaxRateSelect";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoTextarea } from "@/components/ui/auto-textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
-import { CircleArrowLeft } from "lucide-react";
+import { EntityFormPage } from "@/components/common/EntityFormPage";
+import { StickyFormBar } from "@/components/common/StickyFormBar";
 import { useQuery } from "@tanstack/react-query";
 import { getCustomers, getDeals, getDealById, getQuoteById, createQuote, updateQuote } from "@/utils/api";
 import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
@@ -113,6 +113,8 @@ const QuoteForm: React.FC = () => {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       discount: i.discount,
+      ...(i.taxRate !== undefined && i.taxRate !== null ? { taxRate: i.taxRate } : {}),
+      ...(i.productId ? { productId: i.productId } : {}),
     })));
     setCustomFields(toCustomFieldValues(q.customFields));
   }, [quoteData]);
@@ -139,12 +141,9 @@ const QuoteForm: React.FC = () => {
         items,
         customFields,
       };
-      if (isEdit) {
-        await updateQuote(id!, payload);
-      } else {
-        await createQuote(payload);
-      }
-      navigate("/finance/quotes");
+      const res = isEdit ? await updateQuote(id!, payload) : await createQuote(payload);
+      const newId = (res as any)?.data?._id ?? id;
+      navigate(newId ? `/finance/quotes/${newId}` : "/finance/quotes");
     } catch {
       toast({ title: "Failed to save quote", variant: "destructive" });
     } finally {
@@ -153,19 +152,16 @@ const QuoteForm: React.FC = () => {
   };
 
   return (
-    <main className="p-4">
+    <EntityFormPage
+      title={isEdit ? "Edit Quote" : f.newQuote}
+      backHref="/finance/quotes"
+      breadcrumb={[
+        { label: "Quotes", href: "/finance/quotes" },
+        { label: isEdit ? "Edit" : "New" },
+      ]}
+    >
       <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-3">
-              <Link to="/finance/quotes"><CircleArrowLeft /></Link>
-              {isEdit ? "Edit Quote" : f.newQuote}
-            </CardTitle>
-            <Button type="submit" size="sm" className="h-8 px-5" disabled={saving}>
-              {saving ? tr.common.loading : tr.common.save}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="space-y-6">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Title *</Label>
@@ -195,7 +191,7 @@ const QuoteForm: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>{f.status}</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as QuoteStatus)}>
+                <Select key={status} value={status} onValueChange={(v) => setStatus(v as QuoteStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(f.quoteStatuses).map(([k, v]) => (
@@ -233,14 +229,7 @@ const QuoteForm: React.FC = () => {
               </div>
               <div className="flex gap-8 items-center">
                 <span className="text-muted-foreground">{f.taxRate}</span>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(Number(e.target.value))}
-                  className="h-7 w-20 text-right"
-                />
+                <TaxRateSelect value={taxRate} onChange={setTaxRate} compact />
               </div>
               <div className="flex gap-8">
                 <span className="text-muted-foreground">{f.tax}</span>
@@ -248,9 +237,9 @@ const QuoteForm: React.FC = () => {
                   {tax.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
                 </span>
               </div>
-              <div className="flex gap-8 border-t pt-1 font-semibold">
-                <span>{f.total}</span>
-                <span className="w-32 text-right">
+              <div className="flex items-baseline gap-8 border-t pt-1">
+                <span className="font-medium">{f.total}</span>
+                <span className="w-32 text-right text-xl font-bold tabular-nums">
                   {total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
                 </span>
               </div>
@@ -259,19 +248,19 @@ const QuoteForm: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{f.notes}</Label>
-                <Textarea
+                <AutoTextarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
+                  minRows={3}
                   placeholder="Internal notes…"
                 />
               </div>
               <div className="space-y-2">
                 <Label>{f.terms}</Label>
-                <Textarea
+                <AutoTextarea
                   value={terms}
                   onChange={(e) => setTerms(e.target.value)}
-                  rows={3}
+                  minRows={3}
                   placeholder="Terms & conditions…"
                 />
               </div>
@@ -280,15 +269,11 @@ const QuoteForm: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <DynamicFields module="quotes" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex justify-end mt-4 py-3">
-          <Button type="submit" size="sm" className="h-8 px-5" disabled={saving}>
-            {saving ? tr.common.loading : tr.common.save}
-          </Button>
+
+          <StickyFormBar isSubmitting={saving} onCancel={() => navigate("/finance/quotes")} />
         </div>
       </form>
-    </main>
+    </EntityFormPage>
   );
 };
 

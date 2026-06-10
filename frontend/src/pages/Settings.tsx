@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, NavLink, Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
+import { Protected } from "@/components/common/Protected";
 import { cn } from "@/lib/utils";
 import {
   User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck,
@@ -43,7 +44,7 @@ export default function Settings() {
   const { tr } = useLanguage();
   const { user } = useAuth();
   const s = tr.settings;
-  const isAdmin = ["admin", "super admin"].includes(user?.role ?? "");
+  const isAdmin = (user?.permissions ?? []).some((p) => p === '*' || p === 'users:view' || p === 'settings:manage');
 
   const personalItems: NavItem[] = [
     { to: "/settings/profile",       icon: User,     label: s.profile },
@@ -205,7 +206,6 @@ export default function Settings() {
             <Route path="exchange-rates" element={<ExchangeRatesSettings />} />
             <Route path="modules"        element={<ModulesSettings />} />
             {/* Data */}
-            <Route path="fields"           element={<FieldsSettings />} />
             <Route path="pipeline-stages"  element={<PipelineStagesSettings />} />
             <Route path="categories"       element={<CategoriesSettings />} />
             <Route path="number-sequences" element={<NumberSequencesSettings />} />
@@ -214,17 +214,19 @@ export default function Settings() {
             <Route path="tax-rates"        element={<TaxRatesSettings />} />
             <Route path="invoice-defaults" element={<InvoiceDefaultsSettings />} />
             <Route path="approvals"        element={<ApprovalsSettings />} />
+            {/* Data — workspace-level changes require manage permission */}
+            <Route path="fields" element={<Protected permission="settings:manage"><FieldsSettings /></Protected>} />
             {/* Team & Access */}
-            <Route path="users"  element={<UsersPage />} />
-            <Route path="roles"  element={<Roles />} />
-            <Route path="logs"   element={<Logs />} />
+            <Route path="users"  element={<Protected permission="users:view"><UsersPage /></Protected>} />
+            <Route path="roles"  element={<Protected permission="roles:view"><Roles /></Protected>} />
+            <Route path="logs"   element={<Protected permission="logs:view"><Logs /></Protected>} />
             {/* Advanced */}
-            <Route path="email-config"    element={<EmailConfigSettings />} />
-            <Route path="api-keys"        element={<ApiKeysSettings />} />
-            <Route path="ai"              element={<AiSettings />} />
-            <Route path="password-policy" element={<PasswordPolicySettings />} />
-            <Route path="data-export"     element={<DataExportSettings />} />
-            <Route path="danger-zone"     element={<DangerZoneSettings />} />
+            <Route path="email-config"    element={<Protected permission="settings:manage"><EmailConfigSettings /></Protected>} />
+            <Route path="api-keys"        element={<Protected permission="settings:manage"><ApiKeysSettings /></Protected>} />
+            <Route path="ai"              element={<Protected permission="settings:manage"><AiSettings /></Protected>} />
+            <Route path="password-policy" element={<Protected permission="settings:manage"><PasswordPolicySettings /></Protected>} />
+            <Route path="data-export"     element={<Protected permission="settings:manage"><DataExportSettings /></Protected>} />
+            <Route path="danger-zone"     element={<Protected permission="settings:manage"><DangerZoneSettings /></Protected>} />
           </Routes>
         </main>
       </div>

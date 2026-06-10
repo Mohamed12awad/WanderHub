@@ -34,13 +34,13 @@ export class CustomersController {
   @Put(':id')
   @RequirePermission('contacts:edit')
   update(@Param('id') id: string, @Body() body: UpdateCustomerDto, @CurrentUser() user: AuthUser) {
-    return this.customers.update(id, body, user.id);
+    return this.customers.update(id, body, user, user.id);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('contacts:delete')
-  remove(@Param('id') id: string) {
-    return this.customers.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.customers.remove(id, user);
   }
 }

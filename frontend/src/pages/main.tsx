@@ -89,25 +89,25 @@ const AppRoutes = () => (
       <Route index element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard"                    element={<Dashboard />} />
       <Route path="/customers"                    element={<Protected permission="contacts:view"><Customers /></Protected>} />
-      <Route path="/customers/add"                element={<Protected permission="contacts:view"><AddCustomer /></Protected>} />
+      <Route path="/customers/add"                element={<Protected permission="contacts:create"><AddCustomer /></Protected>} />
       <Route path="/customers/:id"                element={<Protected permission="contacts:view"><ViewCustomer /></Protected>} />
-      <Route path="/customers/:id/edit"           element={<Protected permission="contacts:view"><EditCustomer /></Protected>} />
+      <Route path="/customers/:id/edit"           element={<Protected permission="contacts:edit"><EditCustomer /></Protected>} />
       <Route path="/users"                        element={<Protected permission="users:view"><Users /></Protected>} />
-      <Route path="/users/add"                    element={<Protected permission="users:view"><AddUser /></Protected>} />
-      <Route path="/users/:id/edit"               element={<Protected permission="users:view"><EditUser /></Protected>} />
+      <Route path="/users/add"                    element={<Protected permission="users:create"><AddUser /></Protected>} />
+      <Route path="/users/:id/edit"               element={<Protected permission="users:edit"><EditUser /></Protected>} />
       <Route path="/deals"                        element={<Protected permission="deals:view"><Deals /></Protected>} />
-      <Route path="/deals/add"                    element={<Protected permission="deals:view"><AddDeal /></Protected>} />
+      <Route path="/deals/add"                    element={<Protected permission="deals:create"><AddDeal /></Protected>} />
       <Route path="/deals/:id"                    element={<Protected permission="deals:view"><ViewDeal /></Protected>} />
-      <Route path="/deals/:id/edit"               element={<Protected permission="deals:view"><EditDeal /></Protected>} />
+      <Route path="/deals/:id/edit"               element={<Protected permission="deals:edit"><EditDeal /></Protected>} />
       <Route path="/products"                     element={<Protected permission="products:view"><Products /></Protected>} />
-      <Route path="/products/add"                 element={<Protected permission="products:view"><AddProduct /></Protected>} />
+      <Route path="/products/add"                 element={<Protected permission="products:create"><AddProduct /></Protected>} />
       <Route path="/products/:id"                 element={<Protected permission="products:view"><ViewProduct /></Protected>} />
-      <Route path="/products/:id/edit"            element={<Protected permission="products:view"><EditProduct /></Protected>} />
+      <Route path="/products/:id/edit"            element={<Protected permission="products:edit"><EditProduct /></Protected>} />
       <Route path="/inventory"                    element={<Protected permission="products:view"><Inventory /></Protected>} />
       <Route path="/expenses"                     element={<Protected permission="expenses:view"><Expenses /></Protected>} />
-      <Route path="/expenses/add"                 element={<Protected permission="expenses:view"><AddExpenseReport /></Protected>} />
+      <Route path="/expenses/add"                 element={<Protected permission="expenses:create"><AddExpenseReport /></Protected>} />
       <Route path="/expenses/:id"                 element={<Protected permission="expenses:view"><ViewExpense /></Protected>} />
-      <Route path="/expenses/:id/edit"            element={<Protected permission="expenses:view"><EditExpenseReport /></Protected>} />
+      <Route path="/expenses/:id/edit"            element={<Protected permission="expenses:edit"><EditExpenseReport /></Protected>} />
       <Route path="/reports"                      element={<Protected permission="reports:view"><Reports /></Protected>} />
       <Route path="/pipeline"                     element={<Protected permission="deals:view"><Pipeline /></Protected>} />
       <Route path="/calendar"                     element={<Protected permission="activities:view"><ActivityCalendar /></Protected>} />
@@ -118,31 +118,31 @@ const AppRoutes = () => (
       <Route path="/settings/*"                   element={<Settings />} />
       <Route path="/finance/quotes"               element={<Protected permission="quotes:view"><QuotesPage /></Protected>} />
       <Route path="/finance/invoices"             element={<Protected permission="invoices:view"><InvoicesPage /></Protected>} />
-      <Route path="/finance/quotes/new"           element={<Protected permission="quotes:view"><QuoteForm /></Protected>} />
+      <Route path="/finance/quotes/new"           element={<Protected permission="quotes:create"><QuoteForm /></Protected>} />
       <Route path="/finance/quotes/:id"           element={<Protected permission="quotes:view"><QuoteDetail /></Protected>} />
-      <Route path="/finance/quotes/:id/edit"      element={<Protected permission="quotes:view"><QuoteForm /></Protected>} />
-      <Route path="/finance/invoices/new"         element={<Protected permission="invoices:view"><InvoiceForm /></Protected>} />
+      <Route path="/finance/quotes/:id/edit"      element={<Protected permission="quotes:edit"><QuoteForm /></Protected>} />
+      <Route path="/finance/invoices/new"         element={<Protected permission="invoices:create"><InvoiceForm /></Protected>} />
       <Route path="/finance/invoices/:id"         element={<Protected permission="invoices:view"><InvoiceDetail /></Protected>} />
-      <Route path="/finance/invoices/:id/edit"    element={<Protected permission="invoices:view"><InvoiceForm /></Protected>} />
+      <Route path="/finance/invoices/:id/edit"    element={<Protected permission="invoices:edit"><InvoiceForm /></Protected>} />
       <Route path="/finance/payments"             element={<Protected permission="invoices:view"><Payments /></Protected>} />
       <Route path="/leads"                        element={<Protected permission="leads:view"><LeadsPage /></Protected>} />
-      <Route path="/leads/add"                    element={<Protected permission="leads:view"><AddLead /></Protected>} />
+      <Route path="/leads/add"                    element={<Protected permission="leads:create"><AddLead /></Protected>} />
       <Route path="/leads/:id"                    element={<Protected permission="leads:view"><ViewLead /></Protected>} />
-      <Route path="/leads/:id/edit"               element={<Protected permission="leads:view"><EditLead /></Protected>} />
+      <Route path="/leads/:id/edit"               element={<Protected permission="leads:edit"><EditLead /></Protected>} />
 
       {/* Procurement */}
       <Route path="/procurement/suppliers"               element={<Protected permission="suppliers:view"><SuppliersPage /></Protected>} />
-      <Route path="/procurement/suppliers/add"            element={<Protected permission="suppliers:view"><AddSupplier /></Protected>} />
+      <Route path="/procurement/suppliers/add"            element={<Protected permission="suppliers:create"><AddSupplier /></Protected>} />
       <Route path="/procurement/suppliers/:id"            element={<Protected permission="suppliers:view"><ViewSupplier /></Protected>} />
-      <Route path="/procurement/suppliers/:id/edit"       element={<Protected permission="suppliers:view"><EditSupplier /></Protected>} />
+      <Route path="/procurement/suppliers/:id/edit"       element={<Protected permission="suppliers:edit"><EditSupplier /></Protected>} />
       <Route path="/procurement/purchase-orders"          element={<Protected permission="purchase-orders:view"><PurchaseOrdersPage /></Protected>} />
-      <Route path="/procurement/purchase-orders/new"      element={<Protected permission="purchase-orders:view"><AddPurchaseOrder /></Protected>} />
+      <Route path="/procurement/purchase-orders/new"      element={<Protected permission="purchase-orders:create"><AddPurchaseOrder /></Protected>} />
       <Route path="/procurement/purchase-orders/:id"      element={<Protected permission="purchase-orders:view"><ViewPurchaseOrder /></Protected>} />
-      <Route path="/procurement/purchase-orders/:id/edit" element={<Protected permission="purchase-orders:view"><EditPurchaseOrder /></Protected>} />
+      <Route path="/procurement/purchase-orders/:id/edit" element={<Protected permission="purchase-orders:edit"><EditPurchaseOrder /></Protected>} />
       <Route path="/procurement/bills"                    element={<Protected permission="vendor-bills:view"><VendorBillsPage /></Protected>} />
-      <Route path="/procurement/bills/new"                element={<Protected permission="vendor-bills:view"><AddVendorBill /></Protected>} />
+      <Route path="/procurement/bills/new"                element={<Protected permission="vendor-bills:create"><AddVendorBill /></Protected>} />
       <Route path="/procurement/bills/:id"                element={<Protected permission="vendor-bills:view"><ViewVendorBill /></Protected>} />
-      <Route path="/procurement/bills/:id/edit"           element={<Protected permission="vendor-bills:view"><EditVendorBill /></Protected>} />
+      <Route path="/procurement/bills/:id/edit"           element={<Protected permission="vendor-bills:edit"><EditVendorBill /></Protected>} />
       <Route path="/procurement/vendor-payments"          element={<Protected permission="vendor-bills:view"><VendorPaymentsPage /></Protected>} />
 
       {/* Sales Orders */}
@@ -153,9 +153,9 @@ const AppRoutes = () => (
 
       {/* Projects */}
       <Route path="/projects"          element={<Protected permission="projects:view"><ProjectsPage /></Protected>} />
-      <Route path="/projects/new"      element={<Protected permission="projects:view"><AddProject /></Protected>} />
+      <Route path="/projects/new"      element={<Protected permission="projects:create"><AddProject /></Protected>} />
       <Route path="/projects/:id"      element={<Protected permission="projects:view"><ViewProject /></Protected>} />
-      <Route path="/projects/:id/edit" element={<Protected permission="projects:view"><EditProject /></Protected>} />
+      <Route path="/projects/:id/edit" element={<Protected permission="projects:edit"><EditProject /></Protected>} />
 
       <Route path="*"                             element={<NotFound />} />
     </Routes>

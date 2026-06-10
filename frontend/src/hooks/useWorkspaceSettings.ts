@@ -12,6 +12,12 @@ export type FieldType =
   | "phone"
   | "url";
 
+export interface SectionDef {
+  id: string;
+  label: string;
+  order: number;
+}
+
 export interface FieldDef {
   id: string;
   name: string;      // internal key
@@ -22,6 +28,7 @@ export interface FieldDef {
   isSystem?: boolean;
   filterable?: boolean;
   order?: number;
+  section?: string;  // section id the field belongs to (layout editor)
   // Optional, additive richer-field props (backward compatible).
   multiselect?: boolean;   // select: allow multiple values
   defaultValue?: string;   // prefilled when the value is empty
@@ -34,7 +41,7 @@ export interface FieldDef {
 }
 
 export interface WorkspaceSettings {
-  fieldGroups: { module: string; fields: FieldDef[] }[];
+  fieldGroups: { module: string; fields: FieldDef[]; sections?: SectionDef[] }[];
   moduleSettings: { module: string; enabled: boolean }[];
 }
 
@@ -47,6 +54,12 @@ export function useWorkspaceSettings() {
 
   const getFieldsForModule = (module: string): FieldDef[] => {
     return data?.fieldGroups?.find((g: any) => g.module === module)?.fields ?? [];
+  };
+
+  /** Returns the ordered section layout for a module (empty if none defined) */
+  const getSectionsForModule = (module: string): SectionDef[] => {
+    const sections: SectionDef[] = data?.fieldGroups?.find((g: any) => g.module === module)?.sections ?? [];
+    return [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   };
 
   /** Returns only custom (non-system) filterable fields for use in filter panels */
@@ -76,5 +89,5 @@ export function useWorkspaceSettings() {
     return setting.enabled;
   };
 
-  return { data, isPending, getFieldsForModule, getFilterableCustomFields, getSystemFieldLabel, isModuleEnabled };
+  return { data, isPending, getFieldsForModule, getSectionsForModule, getFilterableCustomFields, getSystemFieldLabel, isModuleEnabled };
 }

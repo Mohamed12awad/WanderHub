@@ -68,7 +68,13 @@ export class ExpensesService {
   async findOne(id: string) {
     const report = await this.prisma.expenseReport.findFirst({
       where: { id, deletedAt: null },
-      include: { user: { select: { id: true, name: true } }, expenses: true },
+      include: {
+        user: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true } },
+        approvedBy: { select: { id: true, name: true } },
+        updatedBy: { select: { id: true, name: true } },
+        expenses: true,
+      },
     });
     return report ? toClient(report) : null;
   }

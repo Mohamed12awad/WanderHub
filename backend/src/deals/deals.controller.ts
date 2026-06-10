@@ -37,14 +37,14 @@ export class DealsController {
   @Put(':id')
   @RequirePermission('deals:edit')
   update(@Param('id') id: string, @Body() body: UpdateDealDto, @CurrentUser() user: AuthUser) {
-    return this.deals.update(id, body, user.id);
+    return this.deals.update(id, body, user, user.id);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('deals:delete')
-  remove(@Param('id') id: string) {
-    return this.deals.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.deals.remove(id, user);
   }
 
   @Post(':id/create-quote')

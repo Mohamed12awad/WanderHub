@@ -2,9 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
+import { VisibilityService } from '../common/visibility.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
 import { toClient } from '../common/serialize';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
@@ -13,18 +15,20 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly visibility: VisibilityService,
     private readonly dispatcher: NotificationDispatcher,
     private readonly customFields: CustomFieldsService,
   ) {}
 
-  async findAll(query: Record<string, string>) {
+  async findAll(query: Record<string, string>, user: AuthUser) {
     const { status, priority, assignedTo, linkedTo, overdue, mine, projectId, page = '1' } = query;
-    const where: Prisma.TaskWhereInput = { deletedAt: null };
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId');
+    const where: Prisma.TaskWhereInput = { deletedAt: null, ...scopeWhere };
     if (status) where.status = status as Prisma.TaskWhereInput['status'];
     if (priority) where.priority = priority as Prisma.TaskWhereInput['priority'];
     if (assignedTo) where.assignedToId = assignedTo;
     if (linkedTo) where.linkedToId = linkedTo;
-    if (mine === 'true') where.assignedToId = query._userId;
+    if (mine === 'true') where.assignedToId = user.id;
     if (projectId) where.projectId = projectId;
     if (overdue === 'true') {
       where.dueDate = { lt: new Date() };
@@ -61,14 +65,16 @@ export class TasksService {
     return summary;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId');
     const task = await this.prisma.task.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...scopeWhere },
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true } },
         project: { select: { id: true, name: true } },
         milestone: { select: { id: true, title: true } },
+        updatedBy: { select: { id: true, name: true } },
       },
     });
     return task ? toClient(task) : null;

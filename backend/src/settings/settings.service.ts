@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
+import { toClient } from '../common/serialize';
 import { CurrencyService } from '../common/currency.service';
 import { encryptSecret as encrypt, decryptSecret as decrypt } from '../common/crypto.util';
 
@@ -28,6 +29,7 @@ const fieldDefSchema = z.object({
   isSystem: z.boolean().optional(),
   options: z.string().optional(),
   order: z.number().optional(),
+  section: z.string().optional(),
   multiselect: z.boolean().optional(),
   defaultValue: z.string().optional(),
   helpText: z.string().optional(),
@@ -38,6 +40,12 @@ const fieldDefSchema = z.object({
   maxLength: z.number().optional(),
 });
 
+const sectionDefSchema = z.object({
+  id: z.string().min(1, 'Section id is required'),
+  label: z.string(),
+  order: z.number().optional(),
+});
+
 const fieldGroupsSchema = z.array(
   z.object({
     module: z.string().min(1),
@@ -46,6 +54,7 @@ const fieldGroupsSchema = z.array(
       const dup = ids.find((id, i) => ids.indexOf(id) !== i);
       if (dup) ctx.addIssue({ code: 'custom', message: `Duplicate field id "${dup}"` });
     }),
+    sections: z.array(sectionDefSchema).optional(),
   }),
 );
 
@@ -236,7 +245,8 @@ export class SettingsService {
   // ── Tax Rates ─────────────────────────────────────────────────────────────────
 
   async getTaxRates() {
-    return this.prisma.taxRate.findMany({ orderBy: { createdAt: 'asc' } });
+    const rates = await this.prisma.taxRate.findMany({ orderBy: { createdAt: 'asc' } });
+    return toClient(rates);
   }
 
   async createTaxRate(body: { name: string; rate: number; isDefault?: boolean }) {

@@ -44,6 +44,7 @@ export class SuppliersService {
       include: {
         purchaseOrders: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 10, select: { id: true, poNumber: true, total: true, status: true, createdAt: true } },
         bills: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 10, select: { id: true, billNumber: true, total: true, totalPaid: true, status: true, createdAt: true } },
+        updatedBy: { select: { id: true, name: true } },
       },
     });
     return supplier ? toClient(supplier) : null;

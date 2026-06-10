@@ -13,12 +13,15 @@ import { UNPAGINATED_MAX } from '../common/paginate';
 import { InventoryService } from '../inventory/inventory.service';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { VisibilityService } from '../common/visibility.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 const INVOICE_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
   deal: { select: { id: true, title: true } },
   fromQuote: { select: { id: true, quoteNumber: true } },
   items: { orderBy: { order: 'asc' as const } },
+  updatedBy: { select: { id: true, name: true } },
 };
 
 @Injectable()
@@ -30,6 +33,7 @@ export class InvoicesService {
     private readonly inventory: InventoryService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -40,8 +44,8 @@ export class InvoicesService {
     return { enabled: cfg?.enabled ?? false, approverRoles: cfg?.approverRoles ?? [] };
   }
 
-  private canUserApprove(approverRoles: string[], userRole: string): boolean {
-    if (['admin', 'super admin'].includes(userRole)) return true;
+  private canUserApprove(approverRoles: string[], userRole: string, permissions: string[]): boolean {
+    if (permissions.includes('*')) return true;
     // Empty approverRoles with approvals enabled means admins-only; don't let anyone through.
     if (!approverRoles.length) return false;
     return approverRoles.includes(userRole);
@@ -60,15 +64,16 @@ export class InvoicesService {
       where: { invoiceId },
       _sum: { amount: true },
     });
-    const totalPaid = agg._sum.amount ?? 0;
-    const status = deriveInvoiceStatus(invoice.total, totalPaid, invoice.dueDate) as Prisma.InvoiceUpdateInput['status'];
+    const totalPaid = Number(agg._sum.amount ?? 0);
+    const total = Number(invoice.total);
+    const status = deriveInvoiceStatus(total, totalPaid, invoice.dueDate) as Prisma.InvoiceUpdateInput['status'];
     const updated = await tx.invoice.update({ where: { id: invoiceId }, data: { totalPaid, status } });
 
     // Sync the linked deal's pipeline stage with payment state.
     if (invoice.dealId) {
       const deal = await tx.deal.findUnique({ where: { id: invoice.dealId } });
       if (deal && deal.status !== 'lost' && deal.status !== 'cancelled') {
-        if (totalPaid >= invoice.total) {
+        if (totalPaid >= total) {
           await tx.deal.update({ where: { id: invoice.dealId }, data: { status: 'won' } });
         } else if (deal.status === 'won') {
           // Payment reversed or reduced — walk the deal back to an active stage.
@@ -101,9 +106,10 @@ export class InvoicesService {
     await tx.account.update({ where: { id: accountId }, data: { balance: { increment: delta } } });
   }
 
-  async getInvoices(query: Record<string, string>) {
+  async getInvoices(query: Record<string, string>, user: AuthUser) {
     const { status, customer, deal, page, limit: limitRaw, q } = query;
-    const where: Prisma.InvoiceWhereInput = { deletedAt: null };
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const where: Prisma.InvoiceWhereInput = { deletedAt: null, ...scopeWhere };
     if (status) where.status = status as Prisma.InvoiceWhereInput['status'];
     if (customer) where.customerId = customer;
     if (deal) where.dealId = deal;
@@ -122,8 +128,9 @@ export class InvoicesService {
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }
 
-  async getInvoiceById(id: string) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null }, include: INVOICE_INCLUDE });
+  async getInvoiceById(id: string, user?: AuthUser) {
+    const scopeWhere = user ? await this.visibility.ownershipWhere(user, 'finance', 'createdById') : {};
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere }, include: INVOICE_INCLUDE });
     if (!invoice) throw new NotFoundException('Invoice not found');
     const payments = await this.prisma.invoicePayment.findMany({
       where: { invoiceId: id },
@@ -161,7 +168,7 @@ export class InvoicesService {
     // Build the approval chain. If no step applies (amount below thresholds),
     // the document is auto-approved.
     if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'Invoice', invoice.id, 'invoices', invoice.total);
+      const overall = await this.approvals.initSteps(this.prisma, 'Invoice', invoice.id, 'invoices', Number(invoice.total));
       if (overall === 'approved') {
         await this.prisma.invoice.update({ where: { id: invoice.id }, data: { approvalStatus: 'approved' } });
         (invoice as { approvalStatus: string }).approvalStatus = 'approved';
@@ -185,11 +192,14 @@ export class InvoicesService {
     return toClient(invoice);
   }
 
-  async updateInvoice(id: string, body: UpdateInvoiceDto) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+  async updateInvoice(id: string, body: UpdateInvoiceDto, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    const { items, taxRate, customer: _customer, deal: _deal, ...rest } = body;
+    const { items, taxRate, customer: _customer, deal: _deal, issueDate, dueDate, ...rest } = body;
     const data: Record<string, unknown> = { ...rest };
+    if (issueDate !== undefined) data.issueDate = issueDate ? new Date(issueDate) : undefined;
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'invoices',
@@ -260,16 +270,24 @@ export class InvoicesService {
     return toClient(updated);
   }
 
-  async deleteInvoice(id: string) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+  async deleteInvoice(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
+    // Deleting an invoice that has recorded payments would hide the document
+    // while its payments — and the account balance they moved — remain. Require
+    // the payments to be voided first so the ledger stays reconciled.
+    const paymentCount = await this.prisma.invoicePayment.count({ where: { invoiceId: id } });
+    if (paymentCount > 0) {
+      throw new BadRequestException('Cannot delete an invoice that has payments. Delete its payments first.');
+    }
     // Soft delete; payment history is preserved for audit but excluded from
     // listings (payments are filtered by invoice.deletedAt).
     await this.prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
-  async approveInvoice(id: string, userId: string, userRole: string) {
+  async approveInvoice(id: string, userId: string, userRole: string, userPermissions: string[] = []) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus === 'approved') return toClient(invoice);
@@ -278,7 +296,7 @@ export class InvoicesService {
     // the document to 'approved'; earlier steps leave it pending.
     const steps = await this.approvals.listSteps('Invoice', id);
     if (steps.length) {
-      const result = await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'approve');
+      const result = await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'approve', undefined, userPermissions);
       const finalApproved = result.status === 'approved';
       const updated = await this.prisma.invoice.update({
         where: { id },
@@ -290,8 +308,8 @@ export class InvoicesService {
 
     // Legacy single-approver path (no chain persisted).
     const { approverRoles } = await this.getApprovalConfig('invoices');
-    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve invoices');
-    if (invoice.createdById === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot approve an invoice you created');
+    if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to approve invoices');
+    if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot approve an invoice you created');
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
@@ -300,14 +318,14 @@ export class InvoicesService {
     return toClient(updated);
   }
 
-  async rejectInvoice(id: string, userId: string, reason: string, userRole: string) {
+  async rejectInvoice(id: string, userId: string, reason: string, userRole: string, userPermissions: string[] = []) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus === 'rejected') return toClient(invoice);
 
     const steps = await this.approvals.listSteps('Invoice', id);
     if (steps.length) {
-      await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason);
+      await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason, userPermissions);
       const updated = await this.prisma.invoice.update({
         where: { id },
         data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -317,8 +335,8 @@ export class InvoicesService {
     }
 
     const { approverRoles } = await this.getApprovalConfig('invoices');
-    if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject invoices');
-    if (invoice.createdById === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot reject an invoice you created');
+    if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to reject invoices');
+    if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject an invoice you created');
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
@@ -327,25 +345,29 @@ export class InvoicesService {
     return toClient(updated);
   }
 
-  async recordPayment(invoiceId: string, body: RecordPaymentDto, userId: string) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
+  async recordPayment(invoiceId: string, body: RecordPaymentDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before recording payment');
+    if (invoice.status === 'cancelled') throw new BadRequestException('Cannot record a payment against a cancelled invoice');
 
     const amount = Number(body.amount);
     const currency = body.currency ?? invoice.currency;
 
-    // Reject payments that would push totalPaid past the invoice total. The
-    // persisted totalPaid is authoritative (kept in sync by recalcInvoiceTotals).
-    // Only enforceable when the payment shares the invoice's currency.
-    const outstanding = invoice.total - (invoice.totalPaid ?? 0);
-    if (currency === invoice.currency && amount > outstanding + 0.005) {
-      throw new BadRequestException(
-        `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${invoice.currency}`,
-      );
-    }
-
     const { payment } = await this.prisma.$transaction(async (tx) => {
+      // Re-fetch inside the serializable transaction so concurrent payments
+      // cannot both pass the outstanding check on a stale snapshot.
+      const fresh = await tx.invoice.findUnique({ where: { id: invoiceId } });
+      if (!fresh) throw new BadRequestException('Invoice not found');
+      const outstanding = Number(fresh.total) - Number(fresh.totalPaid ?? 0);
+      if (amount > outstanding + 0.005) {
+        throw new BadRequestException(
+          `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${fresh.currency}`,
+        );
+      }
+
       const payment = await tx.invoicePayment.create({
         data: { ...body, amount, currency, date: new Date(body.date), invoiceId, createdById: userId } as Prisma.InvoicePaymentUncheckedCreateInput,
         include: { createdBy: { select: { id: true, name: true } } },
@@ -356,7 +378,7 @@ export class InvoicesService {
 
       const updatedInvoice = await this.recalcInvoiceTotals(tx, invoiceId);
       return { payment, updatedInvoice };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     await this.timeline.log('payment.received', `Payment of ${amount} ${currency} recorded`, invoiceId, 'Invoice', { amount, currency, method: payment.method }, userId);
 
@@ -364,62 +386,75 @@ export class InvoicesService {
     return { payment: toClient(payment), invoice: toClient(full) };
   }
 
-  async deleteInvoicePayment(invoiceId: string, paymentId: string) {
-    const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
+  async deleteInvoicePayment(invoiceId: string, paymentId: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId, invoice: { deletedAt: null, ...scopeWhere } } });
     if (!payment) throw new NotFoundException('Payment not found');
 
     await this.prisma.$transaction(async (tx) => {
       await tx.invoicePayment.delete({ where: { id: paymentId } });
       // Money out: reverse the balance move this payment had applied.
-      await this.applyAccountDelta(tx, payment.accountId, payment.currency, -payment.amount);
+      await this.applyAccountDelta(tx, payment.accountId, payment.currency, -Number(payment.amount));
       await this.recalcInvoiceTotals(tx, invoiceId);
     });
     return true;
   }
 
-  async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto) {
-    const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId } });
+  async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId, invoice: { deletedAt: null, ...scopeWhere } } });
     if (!payment) throw new NotFoundException('Payment not found');
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
     const newAmount = Number(body.amount);
     const newCurrency = body.currency ?? payment.currency;
     const newAccountId = body.accountId !== undefined ? body.accountId : payment.accountId;
 
-    // Reject edits that would push totalPaid past the invoice total. Outstanding
-    // is computed excluding this payment's current amount.
-    const outstandingExcl = invoice.total - ((invoice.totalPaid ?? 0) - payment.amount);
-    if (newCurrency === invoice.currency && newAmount > outstandingExcl + 0.005) {
-      throw new BadRequestException(
-        `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstandingExcl.toFixed(2)} ${invoice.currency}`,
-      );
-    }
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Re-fetch invoice and payment inside the serializable transaction so the
+      // outstanding check sees a consistent snapshot. Doing this check outside
+      // the transaction (or without serializable isolation) allowed two
+      // concurrent edits — or an edit racing a new payment — to push totalPaid
+      // past the invoice total.
+      const fresh = await tx.invoice.findUnique({ where: { id: invoiceId } });
+      const freshPayment = await tx.invoicePayment.findUnique({ where: { id: paymentId } });
+      if (!fresh) throw new NotFoundException('Invoice not found');
+      if (!freshPayment) throw new NotFoundException('Payment not found');
+
+      // Reject edits that would push totalPaid past the invoice total. Outstanding
+      // is computed excluding this payment's current amount.
+      const outstandingExcl = Number(fresh.total) - (Number(fresh.totalPaid ?? 0) - Number(freshPayment.amount));
+      if (newCurrency === fresh.currency && newAmount > outstandingExcl + 0.005) {
+        throw new BadRequestException(
+          `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstandingExcl.toFixed(2)} ${fresh.currency}`,
+        );
+      }
+
       // Reverse the old payment's effect on its account, then apply the new one.
       // Handles amount, currency, and account changes (including moving between
       // accounts) without double-counting.
-      await this.applyAccountDelta(tx, payment.accountId, payment.currency, -payment.amount);
+      await this.applyAccountDelta(tx, freshPayment.accountId, freshPayment.currency, -Number(freshPayment.amount));
 
       const updated = await tx.invoicePayment.update({
         where: { id: paymentId },
-        data: { ...body, amount: newAmount, currency: newCurrency, date: body.date ? new Date(body.date) : payment.date } as Prisma.InvoicePaymentUncheckedUpdateInput,
+        data: { ...body, amount: newAmount, currency: newCurrency, date: body.date ? new Date(body.date) : freshPayment.date } as Prisma.InvoicePaymentUncheckedUpdateInput,
       });
 
       await this.applyAccountDelta(tx, newAccountId, newCurrency, newAmount);
       await this.recalcInvoiceTotals(tx, invoiceId);
       return updated;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return toClient(updated);
   }
 
-  async getPayments(query: Record<string, string>) {
+  async getPayments(query: Record<string, string>, user: AuthUser) {
     const p = Math.max(1, parseInt(query.page) || 1);
     const limit = Math.min(100, parseInt(query.limit) || 25);
-    // Exclude payments whose invoice has been (soft) deleted.
-    const where = { invoice: { deletedAt: null } };
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    // Exclude payments whose invoice has been (soft) deleted; scope to user's visible invoices.
+    const where = { invoice: { deletedAt: null, ...scopeWhere } };
     const [data, total] = await Promise.all([
       this.prisma.invoicePayment.findMany({
         where,

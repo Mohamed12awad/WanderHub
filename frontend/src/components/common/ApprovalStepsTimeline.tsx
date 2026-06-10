@@ -24,22 +24,63 @@ const ICON = {
  * is configured (single-approver documents), so it's safe to drop into any
  * detail view.
  */
-export function ApprovalStepsTimeline({ entityType, entityId }: { entityType: string; entityId: string }) {
+/** Final approval outcome for documents that use simple (non-chain) approval. */
+export interface ApprovalOutcome {
+  status: "pending" | "approved" | "rejected";
+  actorName?: string | null;
+  actedAt?: string | null;
+  reason?: string | null;
+}
+
+export function ApprovalStepsTimeline({
+  entityType,
+  entityId,
+  embedded = false,
+  outcome,
+}: {
+  entityType: string;
+  entityId: string;
+  /** When true, render the bare step list (no Card) for use inside a panel/tab. */
+  embedded?: boolean;
+  /**
+   * Fallback shown when no multi-step chain exists. Lets simple approve/reject
+   * documents still surface their outcome here instead of a dead-end message.
+   */
+  outcome?: ApprovalOutcome;
+}) {
   const { data } = useQuery({
     queryKey: ["approval-steps", entityType, entityId],
     queryFn: () => getApprovalSteps(entityType, entityId),
     enabled: !!entityId,
   });
   const steps: Step[] = data?.data ?? [];
-  if (steps.length === 0) return null;
+  if (steps.length === 0) {
+    const fallback = outcome ? (
+      <div className="flex items-start gap-3 px-1 py-2">
+        <span className="mt-0.5">{ICON[outcome.status]}</span>
+        <div className="flex-1">
+          <p className="text-sm font-medium capitalize">{outcome.status}</p>
+          {outcome.status !== "pending" && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {outcome.status === "rejected" ? "Rejected" : "Approved"}
+              {outcome.actorName ? ` by ${outcome.actorName}` : ""}
+              {outcome.actedAt ? ` · ${new Date(outcome.actedAt).toLocaleString()}` : ""}
+            </p>
+          )}
+          {outcome.status === "pending" && (
+            <p className="text-xs text-muted-foreground mt-0.5">Awaiting approval.</p>
+          )}
+          {outcome.reason && <p className="text-xs text-muted-foreground mt-0.5">{outcome.reason}</p>}
+        </div>
+      </div>
+    ) : (
+      <p className="px-1 py-2 text-sm text-muted-foreground">No approval chain configured.</p>
+    );
+    return embedded ? fallback : null;
+  }
 
-  return (
-    <Card className="shadow-sm border-border/60">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Approval chain</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ol className="space-y-3">
+  const list = (
+    <ol className="space-y-3">
           {steps.map((s) => (
             <li key={s._id} className="flex items-start gap-3">
               <span className="mt-0.5">{ICON[s.status]}</span>
@@ -62,8 +103,17 @@ export function ApprovalStepsTimeline({ entityType, entityId }: { entityType: st
               </div>
             </li>
           ))}
-        </ol>
-      </CardContent>
+    </ol>
+  );
+
+  if (embedded) return list;
+
+  return (
+    <Card className="border-border/60">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Approval chain</CardTitle>
+      </CardHeader>
+      <CardContent>{list}</CardContent>
     </Card>
   );
 }

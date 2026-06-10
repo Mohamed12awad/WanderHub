@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateProjectDto {
   @IsString() @IsNotEmpty() name: string;
@@ -6,7 +6,7 @@ export class CreateProjectDto {
   @IsOptional() @IsString() description?: string;
 
   @IsOptional()
-  @IsIn(['planning', 'active', 'on_hold', 'completed', 'cancelled'])
+  @IsString()
   status?: string;
 
   @IsOptional() @IsString() priority?: string;

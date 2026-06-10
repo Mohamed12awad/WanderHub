@@ -1,32 +1,27 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getLeadById, convertLead, deleteLead, getNotes, getActivities } from "@/utils/api";
+import { getLeadById, convertLead, deleteLead } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import LoadingSpinner from "@/components/common/spinner";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { CircleArrowLeft, ArrowRightCircle, Edit, MoreHorizontal, Trash2, Copy, Flame, Thermometer, Snowflake } from "lucide-react";
-import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
+import { ArrowRightCircle, Edit, Trash2, Copy, Flame, Thermometer, Snowflake } from "lucide-react";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
 import { CustomFieldsView } from "@/components/common/CustomFieldsView";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
 import { EmailsPanel } from "@/components/common/EmailsPanel";
 import { AiInsights } from "@/components/common/AiInsights";
-import { ActivityList } from "@/components/Activities/ActivityList";
+import { InfoRow } from "@/components/common/InfoRow";
 
 const STATUS_COLORS: Record<string, string> = {
   new:         "bg-sky-500     text-white border-sky-500     dark:bg-sky-600     dark:border-sky-600",
@@ -43,18 +38,6 @@ const RATING_BADGE: Record<string, { label: string; className: string; icon: Rea
   hot:  { label: "Hot",  className: "bg-red-100 text-red-600 border-red-300 dark:bg-red-950/40 dark:text-red-300",       icon: <Flame className="h-3 w-3" /> },
 };
 
-const InfoRow: React.FC<{ label: string; value?: React.ReactNode; children?: React.ReactNode }> = ({ label, value, children }) => {
-  if (children == null && (value == null || value === "")) return null;
-  return (
-    <div className="mb-2 grid grid-cols-[150px_1fr] items-start gap-2">
-      <Label className="text-sm font-medium text-foreground/60 pt-0.5">{label}</Label>
-      <div className="flex items-start">
-        {children ?? <p className="text-sm text-foreground">{value}</p>}
-      </div>
-    </div>
-  );
-};
-
 export function ViewLead() {
   const { tr } = useLanguage();
   const { id } = useParams<{ id: string }>();
@@ -62,7 +45,7 @@ export function ViewLead() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const canDelete = ["admin", "super admin"].includes(user?.role ?? "");
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'leads:delete');
   const [converting, setConverting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
@@ -73,19 +56,6 @@ export function ViewLead() {
     enabled: !!id
   });
   const lead = data?.data;
-
-  const { data: notesData }      = useQuery({
-    queryKey: ["notes", id, "Lead"],
-    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "Lead" }),
-    enabled: !!id
-  });
-  const { data: activitiesData } = useQuery({
-    queryKey: ["activities", id],
-    queryFn: () => getActivities(id!, "Lead"),
-    enabled: !!id
-  });
-  const notesCount      = ((notesData?.data)      as any[])?.length ?? 0;
-  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
 
   const handleConvert = async (createDeal: boolean) => {
     if (!id) return;
@@ -140,30 +110,7 @@ export function ViewLead() {
     }
   };
 
-  if (isPending) {
-    return (
-      <main className="p-4 space-y-4">
-        <Card>
-          <CardHeader className="flex flex-row justify-between">
-            <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-6 w-48" /></div>
-            <div className="flex gap-2"><Skeleton className="h-8 w-24" /><Skeleton className="h-8 w-20" /><Skeleton className="h-8 w-8" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[0, 1].map((col) => (
-                <div key={col} className="space-y-3">
-                  <Skeleton className="h-4 w-28 mb-4" />
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-2 gap-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-4 w-28" /></div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
+  if (isPending) return <LoadingSpinner loading />;
 
   if (isError || !lead) return <div className="p-4 text-destructive">{tr.common.errorLoading}</div>;
 
@@ -173,63 +120,62 @@ export function ViewLead() {
     ? (lead.website.startsWith("http") ? lead.website : `https://${lead.website}`)
     : null;
 
-  return (
-    <main className="p-4 space-y-5">
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <AppBreadcrumb crumbs={[{ label: tr.leads.title, href: "/leads" }, { label: lead.name }]} />
-            <CardTitle className="flex items-center gap-3 mt-1 flex-wrap">
-              <Link to="/leads"><CircleArrowLeft /></Link>
-              <span className="truncate">{lead.name}</span>
-              <Badge className={`${STATUS_COLORS[lead.status] ?? ""} w-fit capitalize`} variant="outline">
-                {tr.leads.statuses[lead.status] ?? lead.status}
+  const primaryAction = !isConverted ? (
+    <Button size="sm" className="gap-1" onClick={() => setConvertOpen(true)} disabled={converting}>
+      <ArrowRightCircle className="h-3.5 w-3.5" />
+      {converting ? tr.common.loading : tr.leads.convertToCustomer}
+    </Button>
+  ) : (
+    <Button size="sm" className="gap-1" onClick={() => navigate(`/leads/${id}/edit`)}>
+      <Edit className="h-3.5 w-3.5" />{tr.common.edit}
+    </Button>
+  );
+
+  const menuItems: DetailMenuItem[] = [];
+  if (!isConverted) {
+    menuItems.push({ label: tr.common.edit, icon: <Edit className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/leads/${id}/edit`) });
+  }
+  menuItems.push({ label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone });
+  if (canDelete) {
+    menuItems.push({ label: tr.common.delete, icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setConfirmOpen(true), destructive: true, separatorBefore: true });
+  }
+
+  const header = (
+    <div>
+      <DetailHeader
+        crumbs={[{ label: tr.leads.title, href: "/leads" }, { label: lead.name }]}
+        title={lead.name}
+        badges={
+          <>
+            <Badge className={`${STATUS_COLORS[lead.status] ?? ""} w-fit capitalize`} variant="outline">
+              {tr.leads.statuses[lead.status] ?? lead.status}
+            </Badge>
+            {rating && (
+              <Badge variant="outline" className={`flex items-center gap-1 ${rating.className}`}>
+                {rating.icon}{rating.label}
               </Badge>
-              {rating && (
-                <Badge variant="outline" className={`flex items-center gap-1 ${rating.className}`}>
-                  {rating.icon}{rating.label}
-                </Badge>
-              )}
-            </CardTitle>
-            {(lead.jobTitle || lead.company) && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {[lead.jobTitle, lead.company].filter(Boolean).join(" · ")}
-              </p>
             )}
-          </div>
-          <div className="flex gap-2 flex-wrap shrink-0">
-            {!isConverted && (
-              <Button size="sm" variant="outline" className="h-8 px-4" onClick={() => setConvertOpen(true)} disabled={converting}>
-                <ArrowRightCircle className="h-3.5 w-3.5 me-1" />
-                {converting ? tr.common.loading : tr.leads.convertToCustomer}
-              </Button>
-            )}
-            <Link to={`/leads/${id}/edit`}>
-              <Button size="sm" className="h-8 px-4"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button>
-            </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" /><span className="sr-only">More actions</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="h-3.5 w-3.5 me-2" />Clone
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {canDelete ? (
-                  <DropdownMenuItem onClick={() => setConfirmOpen(true)} className="text-destructive focus:text-destructive">
-                    <Trash2 className="h-3.5 w-3.5 me-2" />{tr.common.delete}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem disabled>{tr.common.delete}</DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent>
+          </>
+        }
+        primaryAction={primaryAction}
+        menuItems={menuItems}
+      />
+      {(lead.jobTitle || lead.company) && (
+        <p className="text-sm text-muted-foreground mt-1">
+          {[lead.jobTitle, lead.company].filter(Boolean).join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+
+  const contextPanel = id ? (
+    <RecordContextPanel linkedTo={id} linkedModel="Lead" />
+  ) : undefined;
+
+  return (
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
+      <Card>
+        <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Contact */}
             <div>
@@ -255,6 +201,8 @@ export function ViewLead() {
               <InfoRow label="Expected Close" value={lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : undefined} />
               <InfoRow label="Budget" value={lead.budget != null ? `${lead.budget.toLocaleString()} ${lead.currency ?? ""}`.trim() : undefined} />
               <InfoRow label="Created" value={new Date(lead.createdAt).toLocaleDateString()} />
+              {lead.updatedBy?.name && <InfoRow label="Modified by" value={lead.updatedBy.name} />}
+              {lead.updatedAt && <InfoRow label="Last updated" value={new Date(lead.updatedAt).toLocaleString()} />}
               {isConverted && (
                 <InfoRow label="Converted" value={lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : undefined} />
               )}
@@ -291,27 +239,11 @@ export function ViewLead() {
       {id && (
         <Card>
           <CardContent className="py-5">
-            <Tabs defaultValue="timeline">
-              <TabsList className="mb-4 flex-wrap h-auto">
-                <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
-                <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
-                <TabsTrigger value="attachments">Attachments</TabsTrigger>
+            <Tabs defaultValue="emails">
+              <TabsList className="mb-4 flex h-auto w-full justify-start gap-1 [&>button]:flex-1">
                 <TabsTrigger value="emails">Emails</TabsTrigger>
                 <TabsTrigger value="ai">AI</TabsTrigger>
               </TabsList>
-              <TabsContent value="timeline">
-                <RecordTimeline linkedTo={id} linkedModel="Lead" />
-              </TabsContent>
-              <TabsContent value="notes">
-                <NotesPanel linkedTo={id} linkedModel="Lead" />
-              </TabsContent>
-              <TabsContent value="activities">
-                <ActivityList linkedTo={id} linkedModel="Lead" />
-              </TabsContent>
-              <TabsContent value="attachments">
-                <AttachmentsPanel linkedModel="Lead" linkedToId={id!} />
-              </TabsContent>
               <TabsContent value="emails">
                 <EmailsPanel linkedTo={id} linkedModel="Lead" />
               </TabsContent>
@@ -349,6 +281,6 @@ export function ViewLead() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </DetailPageLayout>
   );
 }

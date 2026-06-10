@@ -32,7 +32,7 @@ const ProjectRow: React.FC<Props> = ({ _id, name, customer, manager, status, bud
   const navigate = useNavigate();
   const { tr } = useLanguage();
   const { user } = useAuth();
-  const canDelete = ["admin", "super admin"].includes(user?.role ?? "");
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'projects:delete');
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/projects/${_id}`)}>

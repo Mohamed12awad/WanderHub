@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
 import { ActivityDetailDialog } from "./ActivityDetailDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const TYPE_DOT: Record<string, string> = {
   call:    "bg-blue-500",
@@ -193,6 +194,7 @@ export function ActivityCalendar() {
   const [detailOpen,  setDetailOpen]  = useState(false);
   const [addOpen,     setAddOpen]     = useState(false);
   const [showAllDay,  setShowAllDay]  = useState<Date | null>(null);
+  const [deleteId,    setDeleteId]    = useState<string | null>(null);
 
   const queryKey = ["activities-calendar", current.getFullYear(), current.getMonth()];
 
@@ -421,7 +423,7 @@ export function ActivityCalendar() {
                             size="icon" variant="ghost"
                             className="h-6 w-6 text-destructive hover:text-destructive"
                             title="Delete"
-                            onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(a._id); }}
+                            onClick={() => setDeleteId(a._id)}
                             disabled={deleteMut.isPending}
                           >
                             <Trash2 className="h-3 w-3" />
@@ -494,6 +496,17 @@ export function ActivityCalendar() {
         open={detailOpen}
         onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetail(null); }}
         invalidateKeys={["activities-calendar"]}
+      />
+      <ConfirmDialog
+        open={deleteId !== null}
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          if (id) deleteMut.mutate(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+        title="Delete Activity"
+        description="Delete this activity? This action cannot be undone."
       />
       {/* Quick-add dialog */}
       <QuickAddDialog

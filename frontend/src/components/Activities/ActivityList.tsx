@@ -10,10 +10,13 @@ import { ActivityDialog } from "./ActivityDialog";
 import { ActivityDetailDialog } from "./ActivityDetailDialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 interface ActivityListProps {
   linkedTo: string;
   linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder";
+  /** Hide the internal "Activities" header + Log button (the panel supplies its own). */
+  hideHeader?: boolean;
 }
 
 const TYPE_ICONS: Record<ActivityType, string> = {
@@ -28,11 +31,12 @@ const TYPE_BORDER: Record<ActivityType, string> = {
   email:   "border-l-emerald-400",
 };
 
-export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedModel }) => {
+export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedModel, hideHeader = false }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [detail, setDetail]     = useState<Activity | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isPending } = useQuery({
     queryKey: ["activities", linkedTo],
@@ -67,11 +71,13 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
   const openDetail = (a: Activity) => { setDetail(a); setDetailOpen(true); };
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">Activities</h2>
-        <ActivityDialog linkedTo={linkedTo} linkedModel={linkedModel} />
-      </div>
+    <div className={hideHeader ? "" : "mt-6"}>
+      {!hideHeader && (
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Activities</h2>
+          <ActivityDialog linkedTo={linkedTo} linkedModel={linkedModel} />
+        </div>
+      )}
       {isPending && <p className="text-sm text-muted-foreground">Loading activities…</p>}
       {!isPending && activities.length === 0 && (
         <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
@@ -111,9 +117,6 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
                   {activity.status}
                 </Badge>
               </div>
-              {activity.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{activity.description}</p>
-              )}
               <p className="text-xs text-muted-foreground mt-0.5">
                 {format(new Date(activity.date), "dd MMM yyyy")}
                 {activity.createdBy && ` · by ${activity.createdBy.name}`}
@@ -142,7 +145,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
                 size="icon" variant="ghost"
                 className="h-7 w-7 text-destructive hover:text-destructive"
                 title="Delete"
-                onClick={() => { if (confirm("Delete this activity?")) deleteMutation.mutate(activity._id); }}
+                onClick={() => setDeleteId(activity._id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -155,6 +158,17 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
         open={detailOpen}
         onOpenChange={(v) => { setDetailOpen(v); if (!v) setDetail(null); }}
         invalidateKeys={[`activities-${linkedTo}`]}
+      />
+      <ConfirmDialog
+        open={deleteId !== null}
+        onConfirm={() => {
+          const id = deleteId;
+          setDeleteId(null);
+          if (id) deleteMutation.mutate(id);
+        }}
+        onCancel={() => setDeleteId(null)}
+        title="Delete Activity"
+        description="Delete this activity? This action cannot be undone."
       />
     </div>
   );

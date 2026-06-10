@@ -5,26 +5,24 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSalesOrderById, approveSalesOrder, rejectSalesOrder,
   updateSalesOrderStatus, deleteSalesOrder, createInvoiceFromSalesOrder,
-  getSalesOrderPurchaseOrderPrefill, getNotes, getActivities,
+  getSalesOrderPurchaseOrderPrefill,
 } from "@/utils/api";
-import { RecordTimeline } from "@/components/common/RecordTimeline";
-import { NotesPanel } from "@/components/common/NotesPanel";
-import { AttachmentsPanel } from "@/components/common/AttachmentsPanel";
-import { ActivityList } from "@/components/Activities/ActivityList";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DetailPageLayout } from "@/components/common/DetailPageLayout";
+import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { MetaGrid, MetaField } from "@/components/common/MetaGrid";
+import { AuditRows } from "@/components/common/AuditRows";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { CircleArrowLeft, Edit, CheckCircle, XCircle, Clock, MoreVertical, Receipt, ShoppingCart, Copy } from "lucide-react";
+import { Edit, CheckCircle, XCircle, Clock, Receipt, ShoppingCart, Copy, Trash2, Ban } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
 import LoadingSpinner from "@/components/common/spinner";
 import { RejectDialog } from "@/components/common/RejectDialog";
 import { ApprovalBadge } from "@/components/Finance/FinanceStatusBadge";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const NEXT_STATUS: Record<string, { next: string; label: string }> = {
   draft: { next: "confirmed", label: "Mark as Confirmed" },
@@ -50,6 +48,7 @@ export default function ViewSalesOrder() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const perms: string[] = user?.permissions ?? [];
@@ -62,22 +61,9 @@ export default function ViewSalesOrder() {
   });
   const so = data?.data;
 
-  const { data: notesData } = useQuery({
-    queryKey: ["notes", id, "SalesOrder"],
-    queryFn: () => getNotes({ linkedTo: id!, linkedModel: "SalesOrder" }),
-    enabled: !!id,
-  });
-  const { data: activitiesData } = useQuery({
-    queryKey: ["activities", id],
-    queryFn: () => getActivities(id!, "SalesOrder"),
-    enabled: !!id,
-  });
-  const notesCount = ((notesData?.data) as any[])?.length ?? 0;
-  const activitiesCount = ((activitiesData?.data) as any[])?.length ?? 0;
-
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["sales-order", id] });
 
-  const canApprove = ["admin", "super admin", "manager"].includes(user?.role ?? "");
+  const canApprove = (user?.permissions ?? []).some((p) => p === '*' || p === 'sales-orders:approve');
   const isPending = so?.approvalStatus === "pending";
   const isRejected = so?.approvalStatus === "rejected";
 
@@ -142,7 +128,6 @@ export default function ViewSalesOrder() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Delete this sales order?")) return;
     try { await deleteSalesOrder(id!); navigate("/sales-orders"); }
     catch { toast({ title: "Delete failed", variant: "destructive" }); }
   };
@@ -155,8 +140,11 @@ export default function ViewSalesOrder() {
         clone: {
           title: `Copy of ${so.title}`,
           customerId: so.customer?._id ?? "",
+          customerLabel: so.customer?.name ?? "",
           dealId: so.deal?._id ?? "",
+          dealLabel: so.deal?.title ?? "",
           projectId: so.project?._id ?? "",
+          projectLabel: so.project?.name ?? "",
           currency: so.currency,
           taxRate: so.taxRate,
           notes: so.notes ?? "",
@@ -176,10 +164,81 @@ export default function ViewSalesOrder() {
   const canInvoice = so.approvalStatus === "approved" && ["confirmed", "fulfilled"].includes(so.status);
   const isEditable = !["invoiced", "cancelled"].includes(so.status);
 
+  // One state-dependent primary action; everything else goes in the ⋮ menu.
+  let primaryAction: React.ReactNode = null;
+  if (transition && isEditable) {
+    primaryAction = (
+      <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isPending}>
+        {transition.label}
+      </Button>
+    );
+  } else if (canInvoice) {
+    primaryAction = (
+      <Button size="sm" className="gap-1" disabled={busy} onClick={handleCreateInvoice}>
+        <Receipt className="h-3.5 w-3.5" />Create Invoice
+      </Button>
+    );
+  } else if (isEditable) {
+    primaryAction = (
+      <Button size="sm" onClick={() => navigate(`/sales-orders/${id}/edit`)} className="gap-1">
+        <Edit className="h-3.5 w-3.5" />{tr.common.edit}
+      </Button>
+    );
+  }
+
+  const menuItems: DetailMenuItem[] = [];
+  if (isEditable && primaryAction !== null && transition) {
+    // primary is the status transition → keep Edit accessible in the menu
+    menuItems.push({ label: tr.common.edit, icon: <Edit className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/sales-orders/${id}/edit`) });
+  }
+  if (canInvoice && transition) {
+    menuItems.push({ label: "Create Invoice", icon: <Receipt className="h-3.5 w-3.5 me-2" />, onClick: handleCreateInvoice });
+  }
+  if (can("purchase-orders:create") && isEditable) {
+    menuItems.push({ label: "Create PO", icon: <ShoppingCart className="h-3.5 w-3.5 me-2" />, onClick: handleCreatePO });
+  }
+  menuItems.push({ label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone });
+  if (isEditable) {
+    menuItems.push({ label: "Cancel order", icon: <Ban className="h-3.5 w-3.5 me-2" />, onClick: () => statusMutation.mutate("cancelled") });
+  }
+  menuItems.push({ label: tr.common.delete, icon: <Trash2 className="h-3.5 w-3.5 me-2" />, onClick: () => setDeleteOpen(true), destructive: true, separatorBefore: true });
+
+  const header = (
+    <DetailHeader
+      crumbs={[{ label: "Sales Orders", href: "/sales-orders" }, { label: so.orderNumber ?? so.title }]}
+      title={<>{so.orderNumber} — {so.title}</>}
+      badges={
+        <>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColor(so.status)}`}>{so.status}</span>
+          <ApprovalBadge status={so.approvalStatus} />
+        </>
+      }
+      primaryAction={primaryAction}
+      menuItems={menuItems}
+    />
+  );
+
+  const contextPanel = (
+    <RecordContextPanel
+      linkedTo={id!}
+      linkedModel="SalesOrder"
+      approvalsContent={<ApprovalStepsTimeline entityType="SalesOrder" entityId={id!} embedded />}
+    />
+  );
+
   return (
-    <main className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-      <ApprovalStepsTimeline entityType="SalesOrder" entityId={id!} />
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
+      <ConfirmDialog
+        open={deleteOpen}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          void handleDelete();
+        }}
+        onCancel={() => setDeleteOpen(false)}
+        title="Delete Sales Order"
+        description="Delete this sales order? This action cannot be undone."
+      />
 
       {isPending && (
         <div className="flex items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 px-4 py-3 text-amber-800 dark:text-amber-300">
@@ -208,72 +267,37 @@ export default function ViewSalesOrder() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
-          <CardTitle className="flex items-center gap-3 flex-wrap">
-            <Link to="/sales-orders"><CircleArrowLeft /></Link>
-            {so.orderNumber} — {so.title}
-            <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${statusColor(so.status)}`}>{so.status}</span>
-            <ApprovalBadge status={so.approvalStatus} />
-          </CardTitle>
-          <div className="flex gap-2 items-center">
-            {transition && isEditable && (
-              <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isPending}>
-                {transition.label}
-              </Button>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Details</CardTitle></CardHeader>
+        <CardContent>
+          <MetaGrid>
+            <MetaField label="Customer" value={so.customer?.name} />
+            <MetaField label="Currency" value={so.currency} />
+            {so.expectedDate && <MetaField label="Expected" value={new Date(so.expectedDate).toLocaleDateString()} />}
+            {so.deal && <MetaField label="Deal" value={so.deal.title} />}
+            {so.project && (
+              <MetaField label="Project">
+                <Link className="text-primary hover:underline" to={`/projects/${so.project._id}`}>{so.project.name}</Link>
+              </MetaField>
             )}
-            {canInvoice && (
-              <Button size="sm" variant="outline" className="gap-1" disabled={busy} onClick={handleCreateInvoice}>
-                <Receipt className="h-3.5 w-3.5" />Create Invoice
-              </Button>
+            {so.fromQuote && (
+              <MetaField label="From quote">
+                <Link className="text-primary hover:underline" to={`/finance/quotes/${so.fromQuote._id}`}>{so.fromQuote.quoteNumber}</Link>
+              </MetaField>
             )}
-            {can("purchase-orders:create") && isEditable && (
-              <Button size="sm" variant="outline" className="gap-1" disabled={busy} onClick={handleCreatePO} title="Create a purchase order from this sales order">
-                <ShoppingCart className="h-3.5 w-3.5" />Create PO
-              </Button>
+            {so.invoices?.length > 0 && (
+              <MetaField label="Invoice">
+                {so.invoices.map((inv: any) => (
+                  <Link key={inv._id} className="text-primary hover:underline me-2" to={`/finance/invoices/${inv._id}`}>{inv.invoiceNumber}</Link>
+                ))}
+              </MetaField>
             )}
-            {isEditable && (
-              <Link to={`/sales-orders/${id}/edit`}>
-                <Button size="sm" variant="outline"><Edit className="h-3.5 w-3.5 me-1" />{tr.common.edit}</Button>
-              </Link>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button size="sm" variant="outline" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleClone}>
-                  <Copy className="h-3.5 w-3.5 me-2" />Clone
-                </DropdownMenuItem>
-                {isEditable && (
-                  <DropdownMenuItem onClick={() => statusMutation.mutate("cancelled")}>Cancel order</DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={handleDelete}>{tr.common.delete}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent className="grid sm:grid-cols-3 gap-3 text-sm">
-          <div><span className="text-muted-foreground">Customer:</span> {so.customer?.name}</div>
-          <div><span className="text-muted-foreground">Currency:</span> {so.currency}</div>
-          {so.expectedDate && <div><span className="text-muted-foreground">Expected:</span> {new Date(so.expectedDate).toLocaleDateString()}</div>}
-          {so.deal && <div><span className="text-muted-foreground">Deal:</span> {so.deal.title}</div>}
-          {so.project && <div><span className="text-muted-foreground">Project:</span> <Link className="text-primary hover:underline" to={`/projects/${so.project._id}`}>{so.project.name}</Link></div>}
-          {so.fromQuote && (
-            <div><span className="text-muted-foreground">From quote:</span>{" "}
-              <Link className="text-primary hover:underline" to={`/finance/quotes/${so.fromQuote._id}`}>{so.fromQuote.quoteNumber}</Link>
-            </div>
-          )}
-          {so.invoices?.length > 0 && (
-            <div><span className="text-muted-foreground">Invoice:</span>{" "}
-              {so.invoices.map((inv: any) => (
-                <Link key={inv._id} className="text-primary hover:underline me-2" to={`/finance/invoices/${inv._id}`}>{inv.invoiceNumber}</Link>
-              ))}
-            </div>
-          )}
+            <AuditRows record={so} variant="meta" />
+          </MetaGrid>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Items</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Disc %</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
@@ -289,42 +313,32 @@ export default function ViewSalesOrder() {
               ))}
             </TableBody>
           </Table>
-          <div className="flex justify-end p-4">
-            <div className="text-sm space-y-1 text-right">
-              <div className="text-muted-foreground">Subtotal: <span className="text-foreground tabular-nums">{so.subtotal?.toLocaleString()} {so.currency}</span></div>
-              <div className="text-muted-foreground">Tax ({so.taxRate}%): <span className="text-foreground tabular-nums">{so.tax?.toLocaleString()} {so.currency}</span></div>
-              <div className="font-semibold text-base">Total: <span className="tabular-nums">{so.total?.toLocaleString()} {so.currency}</span></div>
+          <div className="flex justify-end border-t p-4">
+            <div className="w-full max-w-xs space-y-1.5 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums text-foreground">{so.subtotal?.toLocaleString()} {so.currency}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Tax ({so.taxRate}%)</span>
+                <span className="tabular-nums text-foreground">{so.tax?.toLocaleString()} {so.currency}</span>
+              </div>
+              <div className="flex items-baseline justify-between border-t pt-2">
+                <span className="text-sm font-medium">Total</span>
+                <span className="text-xl font-bold tabular-nums">{so.total?.toLocaleString()} {so.currency}</span>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {so.notes && <Card><CardContent className="pt-4 text-sm"><span className="text-muted-foreground">Notes: </span>{so.notes}</CardContent></Card>}
-
-      <Card>
-        <CardContent className="py-5">
-          <Tabs defaultValue="timeline">
-            <TabsList className="mb-4 flex-wrap h-auto">
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="notes">Notes{notesCount > 0 && ` (${notesCount})`}</TabsTrigger>
-              <TabsTrigger value="activities">Activities{activitiesCount > 0 && ` (${activitiesCount})`}</TabsTrigger>
-              <TabsTrigger value="attachments">Attachments</TabsTrigger>
-            </TabsList>
-            <TabsContent value="timeline">
-              <RecordTimeline linkedTo={id!} linkedModel="SalesOrder" />
-            </TabsContent>
-            <TabsContent value="notes">
-              <NotesPanel linkedTo={id!} linkedModel="SalesOrder" />
-            </TabsContent>
-            <TabsContent value="activities">
-              <ActivityList linkedTo={id!} linkedModel="SalesOrder" />
-            </TabsContent>
-            <TabsContent value="attachments">
-              <AttachmentsPanel linkedModel="SalesOrder" linkedToId={id!} />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </main>
+      {so.notes && (
+        <Card>
+          <CardContent className="pt-4 text-sm">
+            <span className="text-muted-foreground">Notes: </span>{so.notes}
+          </CardContent>
+        </Card>
+      )}
+    </DetailPageLayout>
   );
 }

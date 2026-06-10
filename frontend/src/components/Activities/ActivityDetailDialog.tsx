@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -8,16 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Circle, Pencil, Trash2, ExternalLink, X, Save } from "lucide-react";
 import { format } from "date-fns";
-import { updateActivity, deleteActivity } from "@/utils/api";
+import { updateActivity, deleteActivity, getUsers } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 const TYPE_EMOJIS: Record<ActivityType, string> = {
   call: "📞", meeting: "🤝", task: "✅", note: "📝", email: "📧",
@@ -38,12 +38,21 @@ const ENTITY_ROUTES: Record<string, string> = {
   Invoice: "/finance/invoices", Quote: "/finance/quotes",
 };
 
-function linkedEntityPath(a: Activity): { label: string; href: string } | null {
-  if (a.customer) return { label: a.customer.name, href: `/customers/${a.customer._id}` };
-  if (a.deal)     return { label: a.deal.title,    href: `/deals/${a.deal._id}` };
-  if (a.project)  return { label: a.project.name,  href: `/projects/${a.project._id}` };
+// Human-readable module names for the linked-record chip.
+const MODULE_LABEL: Record<string, string> = {
+  Customer: "Customer", Deal: "Deal", Project: "Project", Lead: "Lead",
+  Supplier: "Supplier", PurchaseOrder: "Purchase Order",
+  Invoice: "Invoice", Quote: "Quote",
+};
+
+function linkedEntityPath(a: Activity): { module: string; label: string; href: string } | null {
+  if (a.customer) return { module: "Customer", label: a.customer.name, href: `/customers/${a.customer._id}` };
+  if (a.deal)     return { module: "Deal",     label: a.deal.title,    href: `/deals/${a.deal._id}` };
+  if (a.project)  return { module: "Project",  label: a.project.name,  href: `/projects/${a.project._id}` };
   const base = ENTITY_ROUTES[a.linkedModel];
-  if (base && a.linkedTo) return { label: a.linkedModel, href: `${base}/${a.linkedTo}` };
+  if (base && a.linkedTo) {
+    return { module: MODULE_LABEL[a.linkedModel] ?? a.linkedModel, label: a.linkedName ?? "", href: `${base}/${a.linkedTo}` };
+  }
   return null;
 }
 
@@ -60,12 +69,16 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
 
+  const { data: usersData } = useQuery({ queryKey: ["users-all"], queryFn: () => getUsers() });
+  const users: { _id: string; name: string }[] = usersData?.data?.data ?? usersData?.data ?? [];
+
   // edit form state
   const [title,       setTitle]       = useState("");
-  const [description, setDescription] = useState("");
   const [date,        setDate]        = useState("");
   const [type,        setType]        = useState<ActivityType>("call");
   const [status,      setStatus]      = useState<"pending" | "completed">("pending");
+  const [assignedTo,  setAssignedTo]  = useState<string>("");
+  const [deleteOpen,  setDeleteOpen]  = useState(false);
 
   const invalidate = () => {
     // Invalidate the passed keys (e.g. "activities-calendar" invalidates the array key starting with that string)
@@ -91,7 +104,9 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
   });
 
   const saveMut = useMutation({
-    mutationFn: () => updateActivity(activity!._id, { title, description, date, type, status } as any),
+    mutationFn: () => updateActivity(activity!._id, {
+      title, date, type, status, ...(assignedTo ? { assignedTo } : {}),
+    } as any),
 
     onSuccess: () => {
       invalidate();
@@ -118,10 +133,10 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
 
   const startEdit = () => {
     setTitle(activity.title);
-    setDescription(activity.description ?? "");
     setDate(activity.date.slice(0, 10));
     setType(activity.type);
     setStatus(activity.status as "pending" | "completed");
+    setAssignedTo(activity.assignedTo?._id ?? "");
     setEditing(true);
   };
 
@@ -129,6 +144,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
   const isDone = activity.status === "completed";
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => { if (!v) setEditing(false); onOpenChange(v); }}>
       <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden">
         {/* Coloured header strip */}
@@ -160,20 +176,29 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
             >
               {activity.status}
             </Badge>
-            {entity && (
-              <Link
-                to={entity.href}
-                onClick={() => onOpenChange(false)}
-                className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium"
-              >
-                {entity.label}
-                <ExternalLink className="h-2.5 w-2.5" />
-              </Link>
-            )}
           </div>
         </div>
 
         <div className="px-5 py-4 space-y-4">
+          {/* Related record — module · name (clickable) */}
+          {entity && (
+            <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Related</Label>
+              <div className="flex items-center gap-1.5 text-sm min-w-0">
+                <span className="text-muted-foreground shrink-0">{entity.module}</span>
+                <span className="text-muted-foreground/50 shrink-0">·</span>
+                <Link
+                  to={entity.href}
+                  onClick={() => onOpenChange(false)}
+                  className="inline-flex items-center gap-1 text-primary hover:underline font-medium truncate"
+                >
+                  <span className="truncate">{entity.label || "Open record"}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Date */}
           <div className="grid grid-cols-[80px_1fr] items-center gap-2">
             <Label className="text-xs text-muted-foreground">Date</Label>
@@ -207,7 +232,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
           {editing && (
             <div className="grid grid-cols-[80px_1fr] items-center gap-2">
               <Label className="text-xs text-muted-foreground">Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as "pending" | "completed")}>
+              <Select key={status} value={status} onValueChange={(v) => setStatus(v as "pending" | "completed")}>
                 <SelectTrigger className="h-7 text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -219,23 +244,22 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
             </div>
           )}
 
-          {/* Description */}
-          <div className="grid grid-cols-[80px_1fr] items-start gap-2">
-            <Label className="text-xs text-muted-foreground mt-1">Notes</Label>
-            {editing ? (
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="text-sm resize-none"
-                placeholder="Add notes…"
-              />
-            ) : (
-              activity.description
-                ? <p className="text-sm text-foreground/80 whitespace-pre-wrap">{activity.description}</p>
-                : <span className="text-sm text-muted-foreground/60 italic">No notes</span>
-            )}
-          </div>
+          {/* Assigned to (edit only) */}
+          {editing && (
+            <div className="grid grid-cols-[80px_1fr] items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Assigned</Label>
+              <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <SelectTrigger className="h-7 text-sm">
+                  <SelectValue placeholder="Select a user…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u._id} value={u._id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Created / assigned */}
           {(activity.createdBy || activity.assignedTo) && (
@@ -285,7 +309,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
               <Button
                 size="sm" variant="ghost"
                 className="h-8 gap-1 text-destructive hover:text-destructive"
-                onClick={() => { if (confirm("Delete this activity?")) deleteMut.mutate(); }}
+                onClick={() => setDeleteOpen(true)}
                 disabled={deleteMut.isPending}
               >
                 <Trash2 className="h-3.5 w-3.5" />Delete
@@ -295,5 +319,16 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
         </div>
       </DialogContent>
     </Dialog>
+    <ConfirmDialog
+      open={deleteOpen}
+      onConfirm={() => {
+        setDeleteOpen(false);
+        deleteMut.mutate();
+      }}
+      onCancel={() => setDeleteOpen(false)}
+      title="Delete Activity"
+      description="Delete this activity? This action cannot be undone."
+    />
+    </>
   );
 }

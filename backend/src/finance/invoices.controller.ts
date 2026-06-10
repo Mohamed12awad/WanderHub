@@ -19,20 +19,20 @@ export class InvoicesController {
 
   @Get('payments')
   @RequirePermission('invoices:view')
-  getPayments(@Query() query: Record<string, string>) {
-    return this.invoices.getPayments(query);
+  getPayments(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser) {
+    return this.invoices.getPayments(query, user);
   }
 
   @Get('invoices')
   @RequirePermission('invoices:view')
-  findAll(@Query() query: Record<string, string>) {
-    return this.invoices.getInvoices(query);
+  findAll(@Query() query: Record<string, string>, @CurrentUser() user: AuthUser) {
+    return this.invoices.getInvoices(query, user);
   }
 
   @Get('invoices/:id')
   @RequirePermission('invoices:view')
-  findOne(@Param('id') id: string) {
-    return this.invoices.getInvoiceById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.invoices.getInvoiceById(id, user);
   }
 
   @Post('invoices')
@@ -44,15 +44,15 @@ export class InvoicesController {
 
   @Put('invoices/:id')
   @RequirePermission('invoices:edit')
-  update(@Param('id') id: string, @Body() body: UpdateInvoiceDto) {
-    return this.invoices.updateInvoice(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateInvoiceDto, @CurrentUser() user: AuthUser) {
+    return this.invoices.updateInvoice(id, body, user);
   }
 
   @Delete('invoices/:id')
   @HttpCode(204)
   @RequirePermission('invoices:delete')
-  remove(@Param('id') id: string) {
-    return this.invoices.deleteInvoice(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.invoices.deleteInvoice(id, user);
   }
 
   @Patch('invoices/:id/send')
@@ -64,33 +64,33 @@ export class InvoicesController {
   @Patch('invoices/:id/approve')
   @RequirePermission('invoices:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.invoices.approveInvoice(id, user.id, user.role);
+    return this.invoices.approveInvoice(id, user.id, user.role, user.permissions);
   }
 
   @Patch('invoices/:id/reject')
   @RequirePermission('invoices:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.invoices.rejectInvoice(id, user.id, body.reason.trim(), user.role);
+    return this.invoices.rejectInvoice(id, user.id, body.reason.trim(), user.role, user.permissions);
   }
 
   @Post('invoices/:id/payments')
   @HttpCode(201)
   @RequirePermission('invoices:create')
   recordPayment(@Param('id') id: string, @Body() body: RecordPaymentDto, @CurrentUser() user: AuthUser) {
-    return this.invoices.recordPayment(id, body, user.id);
+    return this.invoices.recordPayment(id, body, user);
   }
 
   @Patch('invoices/:invoiceId/payments/:paymentId')
   @RequirePermission('invoices:edit')
-  editPayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @Body() body: EditPaymentDto) {
-    return this.invoices.editPayment(invoiceId, paymentId, body);
+  editPayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @Body() body: EditPaymentDto, @CurrentUser() user: AuthUser) {
+    return this.invoices.editPayment(invoiceId, paymentId, body, user);
   }
 
   @Delete('invoices/:invoiceId/payments/:paymentId')
   @HttpCode(204)
   @RequirePermission('invoices:delete')
-  deletePayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string) {
-    return this.invoices.deleteInvoicePayment(invoiceId, paymentId);
+  deletePayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @CurrentUser() user: AuthUser) {
+    return this.invoices.deleteInvoicePayment(invoiceId, paymentId, user);
   }
 }

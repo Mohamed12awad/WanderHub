@@ -15,7 +15,9 @@ function buildPrisma() {
 }
 
 const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
+const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as any;
 const dispatcherMock = { dispatch: jest.fn().mockResolvedValue(undefined) } as any;
+const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
 
 const sampleTask = {
   id: 'task-1',
@@ -43,7 +45,7 @@ describe('TasksService.create', () => {
   it('creates a task and returns the serialized record', async () => {
     const prisma = buildPrisma();
     prisma.task.create.mockResolvedValue({ ...sampleTask, id: 'task-new' });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     const result: any = await svc.create({ title: 'Fix the bug', priority: 'medium', status: 'todo' } as any, 'user-1');
 
@@ -54,7 +56,7 @@ describe('TasksService.create', () => {
   it('dispatches task_assigned notification when assignedTo differs from creator', async () => {
     const prisma = buildPrisma();
     prisma.task.create.mockResolvedValue({ ...sampleTask, assignedToId: 'user-2' });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     await svc.create({ title: 'Fix the bug', priority: 'medium', status: 'todo', assignedTo: 'user-2' } as any, 'user-1');
 
@@ -66,7 +68,7 @@ describe('TasksService.create', () => {
   it('does not dispatch notification when creator is the assignee', async () => {
     const prisma = buildPrisma();
     prisma.task.create.mockResolvedValue({ ...sampleTask, assignedToId: 'user-1' });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     await svc.create({ title: 'Fix', priority: 'medium', status: 'todo', assignedTo: 'user-1' } as any, 'user-1');
 
@@ -76,7 +78,7 @@ describe('TasksService.create', () => {
   it('logs timeline when task has a linked entity', async () => {
     const prisma = buildPrisma();
     prisma.task.create.mockResolvedValue({ ...sampleTask, linkedToId: 'deal-1', linkedModel: 'Deal', assignedToId: null });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     await svc.create({ title: 'Fix', priority: 'medium', status: 'todo' } as any, 'user-1');
 
@@ -97,7 +99,7 @@ describe('TasksService.update', () => {
   it('throws NotFoundException when task does not exist', async () => {
     const prisma = buildPrisma();
     prisma.task.findUnique.mockResolvedValue(null);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
     await expect(svc.update('missing', { title: 'x' } as any, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.task.update).not.toHaveBeenCalled();
   });
@@ -107,7 +109,7 @@ describe('TasksService.update', () => {
     prisma.task.findUnique.mockResolvedValue(sampleTask);
     const updated = { ...sampleTask, title: 'Updated title', assignedTo: null, createdBy: null };
     prisma.task.update.mockResolvedValue(updated);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     const result: any = await svc.update('task-1', { title: 'Updated title' } as any, 'user-1');
 
@@ -118,7 +120,7 @@ describe('TasksService.update', () => {
     const prisma = buildPrisma();
     prisma.task.findUnique.mockResolvedValue({ ...sampleTask, assignedToId: null });
     prisma.task.update.mockResolvedValue({ ...sampleTask, assignedToId: 'user-3', assignedTo: null, createdBy: null });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     await svc.update('task-1', { assignedTo: 'user-3' } as any, 'user-1');
 
@@ -134,7 +136,7 @@ describe('TasksService.complete', () => {
   it('throws NotFoundException when task does not exist', async () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue(null);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
     await expect(svc.complete('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.task.update).not.toHaveBeenCalled();
   });
@@ -143,7 +145,7 @@ describe('TasksService.complete', () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue({ ...sampleTask, status: 'todo' });
     prisma.task.update.mockResolvedValue({ ...sampleTask, status: 'done' });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     const result: any = await svc.complete('task-1', 'user-1');
 
@@ -157,7 +159,7 @@ describe('TasksService.complete', () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue({ ...sampleTask, status: 'done' });
     prisma.task.update.mockResolvedValue({ ...sampleTask, status: 'todo' });
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     await svc.complete('task-1', 'user-1');
 
@@ -173,7 +175,7 @@ describe('TasksService.remove', () => {
   it('throws NotFoundException when task does not exist', async () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue(null);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
     await expect(svc.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.task.update).not.toHaveBeenCalled();
   });
@@ -182,7 +184,7 @@ describe('TasksService.remove', () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue(sampleTask);
     prisma.task.update.mockResolvedValue({});
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
     const result = await svc.remove('task-1');
 
@@ -201,9 +203,9 @@ describe('TasksService.findAll', () => {
     const prisma = buildPrisma();
     prisma.task.findMany.mockResolvedValue([]);
     prisma.task.count.mockResolvedValue(0);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    await svc.findAll({ mine: 'true', _userId: 'user-1' });
+    await svc.findAll({ mine: 'true', _userId: 'user-1' }, { id: 'user-1' } as any);
 
     expect(prisma.task.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -216,9 +218,9 @@ describe('TasksService.findAll', () => {
     const prisma = buildPrisma();
     prisma.task.findMany.mockResolvedValue([]);
     prisma.task.count.mockResolvedValue(0);
-    const svc = new TasksService(prisma, timelineMock, dispatcherMock);
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    await svc.findAll({ overdue: 'true', _userId: 'user-1' });
+    await svc.findAll({ overdue: 'true', _userId: 'user-1' }, { id: 'user-1' } as any);
 
     expect(prisma.task.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

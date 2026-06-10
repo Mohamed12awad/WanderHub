@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { JSX } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import type { JSX, ReactElement, ReactNode } from "react";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useSearchParams } from "react-router-dom";
@@ -89,6 +89,41 @@ type GenericTableProps<T extends DataItem> = {
 };
 
 const SKELETON_WIDTHS = ["w-28", "w-20", "w-24", "w-16", "w-32", "w-12"];
+
+function withMobileLabels(row: JSX.Element, headers: string[], hasSelection: boolean) {
+  if (!isValidElement(row)) return row;
+  const typedRow = row as ReactElement<{ className?: string; children?: ReactNode }>;
+
+  const children = Children.map(typedRow.props.children, (child, index) => {
+    if (!isValidElement(child)) return child;
+    const typedChild = child as ReactElement<{ className?: string; children?: ReactNode; "data-label"?: string }>;
+
+    const labelIndex = index - (hasSelection ? 1 : 0);
+    const isSelection = hasSelection && index === 0;
+    const label =
+      isSelection ? "" :
+      labelIndex >= 0 && labelIndex < headers.length ? headers[labelIndex] :
+      "Actions";
+
+    return cloneElement(typedChild, {
+      "data-label": label || undefined,
+      className: cn(
+        typedChild.props.className,
+        isSelection
+          ? "max-md:py-2 max-md:px-3"
+          : "max-md:grid max-md:grid-cols-[7.5rem_1fr] max-md:items-start max-md:gap-3 max-md:px-3 max-md:py-2 max-md:before:content-[attr(data-label)] max-md:before:text-xs max-md:before:font-medium max-md:before:text-muted-foreground",
+      ),
+    });
+  });
+
+  return cloneElement(typedRow, {
+    className: cn(
+      typedRow.props.className,
+      "max-md:block max-md:border max-md:rounded-md max-md:mb-2 max-md:bg-card max-md:shadow-sm max-md:overflow-hidden",
+    ),
+    children,
+  });
+}
 
 export function GenericTable<T extends DataItem>({
   queryKey,
@@ -624,8 +659,8 @@ export function GenericTable<T extends DataItem>({
       {/* ── Table ── */}
       <Card className={cn("mx-6 mt-3 shadow-sm border-border/60 transition-opacity overflow-hidden", isPlaceholderData && !isPending ? "opacity-60" : "opacity-100")}>
         <CardContent className="p-0 overflow-auto">
-        <Table>
-          <TableHeader>
+        <Table className="max-md:block">
+          <TableHeader className="max-md:hidden">
             <TableRow className="hover:bg-transparent bg-muted/30 border-b-2 border-border/60">
               {bulkConfig && (
                 <TableHead className="w-8">
@@ -680,10 +715,10 @@ export function GenericTable<T extends DataItem>({
             </TableRow>
           </TableHeader>
 
-          <TableBody className="[&>tr:nth-child(even)]:bg-muted/[0.03] dark:[&>tr:nth-child(even)]:bg-muted/[0.08]">
+          <TableBody className="max-md:block max-md:p-2 [&>tr:nth-child(even)]:bg-muted/[0.03] dark:[&>tr:nth-child(even)]:bg-muted/[0.08]">
             {isPending &&
               Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i} className="hover:bg-transparent animate-pulse">
+                <TableRow key={i} className="hover:bg-transparent animate-pulse max-md:block max-md:border max-md:rounded-md max-md:mb-2">
                   {bulkConfig && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                   {headers.map((h, hi) => (
                     <TableCell key={h}>
@@ -731,12 +766,16 @@ export function GenericTable<T extends DataItem>({
               </TableRow>
             )}
 
-            {!isPending && filtered.map((item) => renderRow(item, handleDelete,
-              bulkConfig ? (
-                <TableCell onClick={(e) => e.stopPropagation()} className="w-8">
-                  <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
-                </TableCell>
-              ) : undefined,
+            {!isPending && filtered.map((item) => withMobileLabels(
+              renderRow(item, handleDelete,
+                bulkConfig ? (
+                  <TableCell onClick={(e) => e.stopPropagation()} className="w-8">
+                    <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
+                  </TableCell>
+                ) : undefined,
+              ),
+              headers,
+              Boolean(bulkConfig),
             ))}
           </TableBody>
         </Table>

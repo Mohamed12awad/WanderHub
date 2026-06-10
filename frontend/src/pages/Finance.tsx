@@ -278,7 +278,7 @@ export function QuotesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'quotes:delete');
 
   const handleConvert = useCallback(async (id: string) => {
     try {
@@ -325,7 +325,7 @@ export function QuotesPage() {
 
 export function InvoicesPage() {
   const { user } = useAuth();
-  const canDelete = ["admin", "super admin"].includes(user!.role);
+  const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'invoices:delete');
 
   const { data: allData } = useQuery({
     queryKey: ["invoices-all"],

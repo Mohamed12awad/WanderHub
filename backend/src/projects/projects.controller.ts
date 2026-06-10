@@ -26,8 +26,8 @@ export class ProjectsController {
 
   @Get(':id')
   @RequirePermission('projects:view')
-  findOne(@Param('id') id: string) {
-    return this.projects.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.projects.findOne(id, user);
   }
 
   @Get(':id/invoices')
