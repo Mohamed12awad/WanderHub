@@ -103,7 +103,7 @@ export function ExpenseForm({ mode, id, defaultValues }: ExpenseFormProps) {
 
   const onSubmit = (values: FormValues) => {
     if (!validateLines()) return;
-    const cleanLines = lines.map(({ _id, expenseReportId, ...line }: any) => line);
+    const cleanLines = lines.map(({ _id, expenseReportId: _expenseReportId, ...line }: any) => line);
     mutation.mutate({
       title: values.title.trim(),
       expenses: cleanLines,

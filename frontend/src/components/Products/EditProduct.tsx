@@ -41,7 +41,7 @@ const EditProduct = () => {
   useEffect(() => {
     if (!id) return;
     getProductById(id).then(({ data }) => {
-      const { _id, createdAt, updatedAt, deletedAt, ...fields } = data as any;
+      const { _id, createdAt: _createdAt, updatedAt: _updatedAt, deletedAt: _deletedAt, ...fields } = data as any;
       const loaded = { ...fields, customFields: fields.customFields ?? {} };
       setFormData(loaded);
       originalRef.current = JSON.stringify(loaded);

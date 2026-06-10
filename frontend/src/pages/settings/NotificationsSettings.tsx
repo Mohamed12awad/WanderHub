@@ -61,7 +61,7 @@ export default function NotificationsSettings() {
       })
       .catch(() => toast({ title: "Failed to load preferences.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const toggle = (key: NotifKey, channel: "inApp" | "email") => {
     setPrefs((p) => ({ ...p, [key]: { ...p[key], [channel]: !p[key][channel] } }));

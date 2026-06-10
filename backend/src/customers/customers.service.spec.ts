@@ -28,7 +28,7 @@ const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as an
 const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
 const dealsMock = {} as any;
 
-const mockUser: any = { id: 'user-1', role: 'admin', permissions: ['*'] };
+const mockUser: any = { id: 'user-1', role: 'admin', roleId: 'role-admin', permissions: ['*'] };
 
 const sampleCustomer = {
   id: 'cust-1',
@@ -111,17 +111,17 @@ describe('CustomersService.update', () => {
     const prisma = buildPrisma();
     prisma.customer.findUnique.mockResolvedValue(null);
     const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
-    await expect(svc.update('missing', { name: 'New' } as any, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.update('missing', { name: 'New' } as any, mockUser, mockUser.id)).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.customer.update).not.toHaveBeenCalled();
   });
 
   it('applies changes and returns the serialized record', async () => {
     const prisma = buildPrisma();
-    prisma.customer.findUnique.mockResolvedValue(sampleCustomer);
+    prisma.customer.findFirst.mockResolvedValue(sampleCustomer);
     prisma.customer.update.mockResolvedValue({ ...sampleCustomer, name: 'New Name' });
     const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
-    const result: any = await svc.update('cust-1', { name: 'New Name' } as any, 'user-1');
+    const result: any = await svc.update('cust-1', { name: 'New Name' } as any, mockUser, mockUser.id);
 
     expect(result.name).toBe('New Name');
     expect(prisma.customer.update).toHaveBeenCalledTimes(1);
@@ -135,7 +135,7 @@ describe('CustomersService.remove', () => {
     const prisma = buildPrisma();
     prisma.customer.findFirst.mockResolvedValue(null);
     const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
-    await expect(svc.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.remove('missing', mockUser)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('throws BadRequestException when customer has open invoices', async () => {
@@ -143,7 +143,7 @@ describe('CustomersService.remove', () => {
     prisma.customer.findFirst.mockResolvedValue(sampleCustomer);
     prisma.invoice.count.mockResolvedValue(2);
     const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
-    await expect(svc.remove('cust-1')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.remove('cust-1', mockUser)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('soft-deletes customer and cascades to deals/quotes/invoices in a transaction', async () => {
@@ -152,7 +152,7 @@ describe('CustomersService.remove', () => {
     prisma.invoice.count.mockResolvedValue(0);
     const svc = new CustomersService(prisma, timelineMock, visibilityMock, customFieldsMock, dealsMock);
 
-    const result = await svc.remove('cust-1');
+    const result = await svc.remove('cust-1', mockUser);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(result).toBe(true);

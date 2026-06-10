@@ -41,7 +41,7 @@ export default function EmailConfigSettings() {
       })
       .catch(() => toast({ title: "Failed to load email config.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const patch = (field: keyof SmtpConfig, value: string | number) =>
     setForm((p) => ({ ...p, [field]: value }));

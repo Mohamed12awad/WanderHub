@@ -31,7 +31,7 @@ export default function CategoriesSettings() {
       })
       .catch(() => toast({ title: "Failed to load categories.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const persist = async (cats: string[]) => {
     setSaving(true);

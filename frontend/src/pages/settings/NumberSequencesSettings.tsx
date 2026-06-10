@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,7 +139,7 @@ export default function NumberSequencesSettings() {
   const [sequences, setSequences] = useState<NumberSequence[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     getNumberSequences()
       .then((res) => {
@@ -153,9 +153,9 @@ export default function NumberSequencesSettings() {
       })
       .catch(() => toast({ title: "Failed to load sequences.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  };
+  }, [toast]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
 

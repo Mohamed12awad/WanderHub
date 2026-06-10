@@ -38,7 +38,7 @@ export default function InvoiceDefaultsSettings() {
       })
       .catch(() => toast({ title: "Failed to load defaults.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const patch = (field: keyof InvoiceDefaults, value: string | number) =>
     setForm((p) => ({ ...p, [field]: value }));

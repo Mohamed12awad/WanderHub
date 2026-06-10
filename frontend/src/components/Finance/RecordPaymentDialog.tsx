@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -47,6 +47,8 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isEdit ? (props as EditProps).open : internalOpen;
   const setOpen = isEdit ? (props as EditProps).onOpenChange : setInternalOpen;
+  const editPayment = isEdit ? (props as EditProps).payment : undefined;
+  const outstanding = !isEdit ? (props as CreateProps).outstanding : undefined;
 
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -63,31 +65,29 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
   });
   const accounts: Account[] = accountsData?.data ?? [];
 
-  useEffect(() => {
-    if (open && isEdit) {
-      const p = (props as EditProps).payment;
-      setAmount(String(p.amount));
-      setDate(p.date.split("T")[0]);
-      setMethod(p.method);
-      setReference(p.reference ?? "");
-      setNotes(p.notes ?? "");
-      setAccountId(p.accountId ?? "");
-    }
-    if (open && !isEdit) {
-      const outstanding = (props as CreateProps).outstanding;
-      if (outstanding && outstanding > 0) setAmount(String(outstanding));
-    }
-    if (!open && !isEdit) reset();
-  }, [open]);
-
-  const reset = () => {
+  const reset = useCallback(() => {
     setAmount("");
     setDate(new Date().toISOString().split("T")[0]);
     setMethod("cash");
     setReference("");
     setNotes("");
     setAccountId("");
-  };
+  }, []);
+
+  useEffect(() => {
+    if (open && isEdit && editPayment) {
+      setAmount(String(editPayment.amount));
+      setDate(editPayment.date.split("T")[0]);
+      setMethod(editPayment.method);
+      setReference(editPayment.reference ?? "");
+      setNotes(editPayment.notes ?? "");
+      setAccountId(editPayment.accountId ?? "");
+    }
+    if (open && !isEdit && outstanding && outstanding > 0) {
+      setAmount(String(outstanding));
+    }
+    if (!open && !isEdit) reset();
+  }, [editPayment, isEdit, open, outstanding, reset]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -38,7 +38,7 @@ export default function PasswordPolicySettings() {
       })
       .catch(() => toast({ title: "Failed to load policy.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const patch = (field: keyof PasswordPolicy, value: boolean | number) =>
     setPolicy((p) => ({ ...p, [field]: value }));

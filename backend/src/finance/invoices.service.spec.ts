@@ -32,8 +32,11 @@ function makeService(prisma: any) {
     act: jest.fn(),
   };
   const customFields: any = { validateAndClean: jest.fn() };
-  return new InvoicesService(prisma, numberSequence, timeline, inventory, approvals, customFields);
+  const visibility: any = { ownershipWhere: jest.fn().mockResolvedValue({}) };
+  return new InvoicesService(prisma, numberSequence, timeline, inventory, approvals, customFields, visibility);
 }
+
+const mockUser: any = { id: 'user1', role: 'admin', roleId: 'role-admin', permissions: ['*'] };
 
 describe('InvoicesService — approval separation of duties', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -59,6 +62,7 @@ describe('InvoicesService — approval separation of duties', () => {
   it('approves when a different, authorized user acts', async () => {
     const { prisma } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'other', deletedAt: null });
+    prisma.workspaceConfig.findFirst.mockResolvedValue({ approvals: [{ module: 'invoices', enabled: true, approverRoles: ['admin'] }] });
     prisma.invoice.update.mockResolvedValue({ id: 'inv1', approvalStatus: 'approved' });
     const svc = makeService(prisma);
 
@@ -86,7 +90,7 @@ describe('InvoicesService — recordPayment', () => {
     prisma.invoice.findUnique.mockResolvedValue({ id: 'inv1', total: 100, totalPaid: 90, status: 'partially_paid' });
 
     const svc = makeService(prisma);
-    const res: any = await svc.recordPayment('inv1', { amount: 60, date: '2026-05-29' } as any, 'user1');
+    const res: any = await svc.recordPayment('inv1', { amount: 60, date: '2026-05-29' } as any, mockUser);
 
     // totalPaid is the aggregate sum, not invoice.totalPaid + amount.
     expect(tx.invoice.update).toHaveBeenCalledWith(
@@ -104,7 +108,7 @@ describe('InvoicesService — recordPayment', () => {
     const svc = makeService(prisma);
 
     await expect(
-      svc.recordPayment('inv1', { amount: 50, date: '2026-05-29', accountId: 'acc1' } as any, 'user1'),
+      svc.recordPayment('inv1', { amount: 50, date: '2026-05-29', accountId: 'acc1' } as any, mockUser),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.account.update).not.toHaveBeenCalled();
   });
@@ -120,7 +124,7 @@ describe('InvoicesService — recordPayment', () => {
     prisma.invoice.findUnique.mockResolvedValue({ id: 'inv1', total: 100, totalPaid: 50 });
 
     const svc = makeService(prisma);
-    await svc.recordPayment('inv1', { amount: 50, date: '2026-05-29', accountId: 'acc1' } as any, 'user1');
+    await svc.recordPayment('inv1', { amount: 50, date: '2026-05-29', accountId: 'acc1' } as any, mockUser);
 
     expect(tx.account.update).toHaveBeenCalledWith({
       where: { id: 'acc1' },

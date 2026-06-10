@@ -28,6 +28,7 @@ const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
 const notifMock    = { dispatch: jest.fn().mockResolvedValue(undefined) } as any;
 const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as any;
 const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
+const mockUser: any = { id: 'user-1', role: 'admin', roleId: 'role-admin', permissions: ['*'] };
 
 const sampleLead = {
   id: 'lead-1',
@@ -143,7 +144,7 @@ describe('LeadsService.remove', () => {
     prisma.lead.findFirst.mockResolvedValue(null);
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
-    await expect(svc.remove('lead-missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.remove('lead-missing', mockUser)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('soft-deletes the lead and returns true', async () => {
@@ -152,7 +153,7 @@ describe('LeadsService.remove', () => {
     prisma.lead.update.mockResolvedValue({ ...sampleLead, deletedAt: new Date() });
     const svc = new LeadsService(prisma, timelineMock, notifMock, visibilityMock, customFieldsMock);
 
-    const result = await svc.remove('lead-1');
+    const result = await svc.remove('lead-1', mockUser);
     expect(result).toBe(true);
     expect(prisma.lead.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deletedAt: expect.any(Date) }) }),

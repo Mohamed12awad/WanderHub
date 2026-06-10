@@ -193,25 +193,29 @@ export function GenericTable<T extends DataItem>({
     [filterConfigs, customFieldConfigs],
   );
 
-  const activeFilters: Record<string, string> = {};
-  for (const fc of allFilterConfigs) {
-    if (fc.type === "date-range" || fc.type === "number-range") {
-      const fromKey = fc.type === "number-range" ? `${fc.field}_min` : `${fc.field}_from`;
-      const toKey   = fc.type === "number-range" ? `${fc.field}_max` : `${fc.field}_to`;
-      const from = searchParams.get(fromKey);
-      const to   = searchParams.get(toKey);
-      if (from) activeFilters[fromKey] = from;
-      if (to)   activeFilters[toKey]   = to;
-    } else {
-      const val = searchParams.get(fc.field);
-      if (val) activeFilters[fc.field] = val;
+  const activeFilters = useMemo<Record<string, string>>(() => {
+    const next: Record<string, string> = {};
+    for (const fc of allFilterConfigs) {
+      if (fc.type === "date-range" || fc.type === "number-range") {
+        const fromKey = fc.type === "number-range" ? `${fc.field}_min` : `${fc.field}_from`;
+        const toKey   = fc.type === "number-range" ? `${fc.field}_max` : `${fc.field}_to`;
+        const from = searchParams.get(fromKey);
+        const to   = searchParams.get(toKey);
+        if (from) next[fromKey] = from;
+        if (to)   next[toKey]   = to;
+      } else {
+        const val = searchParams.get(fc.field);
+        if (val) next[fc.field] = val;
+      }
     }
-  }
-  // Quick status tab value also feeds into server-side filters
-  if (quickStatusFilter) {
-    const qsVal = searchParams.get(quickStatusFilter.field);
-    if (qsVal) activeFilters[quickStatusFilter.field] = qsVal;
-  }
+    // Quick status tab value also feeds into server-side filters.
+    if (quickStatusFilter) {
+      const qsVal = searchParams.get(quickStatusFilter.field);
+      if (qsVal) next[quickStatusFilter.field] = qsVal;
+    }
+    return next;
+  }, [allFilterConfigs, quickStatusFilter, searchParams]);
+  const activeFiltersKey = useMemo(() => JSON.stringify(activeFilters), [activeFilters]);
   const activeFilterCount = Object.keys(activeFilters).length;
 
   const [localSearch, setLocalSearch] = useState(committedQ);
@@ -246,7 +250,7 @@ export function GenericTable<T extends DataItem>({
   const clearSelection = () => setSelected(new Set());
 
   // Selection is per-view; drop it whenever the underlying query changes.
-  useEffect(() => { setSelected(new Set()); }, [committedQ, page, sortBy, sortDir, JSON.stringify(activeFilters)]);
+  useEffect(() => { setSelected(new Set()); }, [activeFiltersKey, committedQ, page, sortBy, sortDir]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -327,7 +331,7 @@ export function GenericTable<T extends DataItem>({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const { data, isPending, error, isPlaceholderData } = useQuery({
-    queryKey: [queryKey, page, limit, committedQ, JSON.stringify(activeFilters), sortBy, sortDir],
+    queryKey: [queryKey, page, limit, committedQ, activeFiltersKey, sortBy, sortDir],
     queryFn: () => fetchData({ page, limit, q: committedQ, filters: activeFilters, ...(sortBy ? { sort: sortBy, dir: sortDir } : {}) }),
     placeholderData: keepPreviousData
   });

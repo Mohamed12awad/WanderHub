@@ -117,26 +117,19 @@ export default function ViewPurchaseOrder() {
   const transition = NEXT_STATUS[po.status];
   const canBill = po.status === "received" && po.approvalStatus === "approved";
 
-  let primaryAction: React.ReactNode = null;
-  if (transition) {
-    primaryAction = (
+  const primaryAction: React.ReactNode = transition ? (
       <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isPending}>
         {transition.label}
       </Button>
-    );
-  } else if (canBill) {
-    primaryAction = (
+    ) : canBill ? (
       <Button size="sm" className="gap-1" disabled={busy} onClick={handleCreateBill}>
         <Receipt className="h-3.5 w-3.5" />Create Bill
       </Button>
-    );
-  } else {
-    primaryAction = (
+    ) : (
       <Button size="sm" className="gap-1" onClick={() => navigate(`/procurement/purchase-orders/${id}/edit`)}>
         <Edit className="h-3.5 w-3.5" />{tr.common.edit}
       </Button>
     );
-  }
 
   const menuItems: DetailMenuItem[] = [];
   if (transition || canBill) {

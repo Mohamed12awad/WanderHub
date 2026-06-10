@@ -227,8 +227,8 @@ export default function FieldsSettings() {
   };
 
   // ── Section-level edits ────────────────────────────────────────────────────
-  const sections = sectionGroups[activeModule] ?? [];
-  const fields = fieldGroups[activeModule] ?? [];
+  const sections = useMemo(() => sectionGroups[activeModule] ?? [], [activeModule, sectionGroups]);
+  const fields = useMemo(() => fieldGroups[activeModule] ?? [], [activeModule, fieldGroups]);
 
   const addSection = async () => {
     const next: SectionDef = {

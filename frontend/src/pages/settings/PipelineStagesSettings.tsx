@@ -145,7 +145,7 @@ export default function PipelineStagesSettings() {
       })
       .catch(() => toast({ title: "Failed to load stages.", variant: "destructive" }))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const save = async () => {
     setSaving(true);

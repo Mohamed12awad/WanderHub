@@ -264,7 +264,7 @@ export function Pipeline() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deals"] })
   });
 
-  const deals: Deal[] = Array.isArray(data?.data) ? data.data : [];
+  const deals: Deal[] = useMemo(() => Array.isArray(data?.data) ? data.data : [], [data?.data]);
 
   const grouped = useMemo(
     () =>
