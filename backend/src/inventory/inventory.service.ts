@@ -57,16 +57,41 @@ export class InventoryService {
     });
   }
 
-  /** Current stock levels with product info and a low-stock flag. */
-  async list() {
-    const items = await this.prisma.stockItem.findMany({
-      include: { product: { select: { id: true, name: true, type: true } } },
-      orderBy: { updatedAt: 'desc' },
-      take: 1000,
-    });
-    return toClient(
-      items.map((s) => ({ ...s, lowStock: s.quantityOnHand <= s.reorderLevel })),
-    );
+  /**
+   * Paginated stock levels with product info and a low-stock flag. Supports a
+   * free-text query (`q`) that matches product name or stock location.
+   */
+  async list(query: { page?: string; limit?: string; q?: string } = {}) {
+    const page = Math.max(1, parseInt(query.page ?? '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '25', 10) || 25));
+    const q = query.q?.trim();
+
+    const where: Prisma.StockItemWhereInput = q
+      ? {
+          OR: [
+            { product: { name: { contains: q, mode: 'insensitive' } } },
+            { location: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
+    const [items, total] = await Promise.all([
+      this.prisma.stockItem.findMany({
+        where,
+        include: { product: { select: { id: true, name: true, type: true } } },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.stockItem.count({ where }),
+    ]);
+
+    return {
+      data: toClient(items.map((s) => ({ ...s, lowStock: s.quantityOnHand <= s.reorderLevel }))),
+      total,
+      page,
+      pages: Math.ceil(total / limit) || 1,
+    };
   }
 
   async lowStock() {

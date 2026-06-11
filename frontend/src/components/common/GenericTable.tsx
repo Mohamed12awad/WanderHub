@@ -45,14 +45,16 @@ export type FilterConfig = {
 type GenericTableProps<T extends DataItem> = {
   queryKey: string;
   fetchData: (params: { page: number; limit: number; q: string; filters?: Record<string, string>; sort?: string; dir?: "asc" | "desc" }) => Promise<{ data: T[] | PagedPayload<T> }>;
-  deleteData: (id: string) => Promise<void>;
+  /** Omit for read-only tables (e.g. inventory) that have no per-row delete. */
+  deleteData?: (id: string) => Promise<void>;
   headers: string[];
   sortableHeaders?: string[];
   renderRow: (item: T, handleDelete: (id: string) => void, selectionCell?: React.ReactNode) => JSX.Element;
   title: string;
   description: string;
-  addLink: string;
-  addLabel: string;
+  /** Omit both to hide the "Add" affordance for tables with no create flow. */
+  addLink?: string;
+  addLabel?: string;
   onAdd?: () => void;
   emptyMessage?: string;
   noSearchMessage?: (q: string) => string;
@@ -337,7 +339,7 @@ export function GenericTable<T extends DataItem>({
   });
 
   const mutation = useMutation({
-    mutationFn: deleteData,
+    mutationFn: deleteData ?? (async () => {}),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [queryKey] }); toast({ title: tr.common.deleted }); },
     onError:   () => { toast({ title: tr.common.deleteFailed, variant: "destructive" }); }
   });
@@ -437,14 +439,14 @@ export function GenericTable<T extends DataItem>({
               <PlusCircle className="h-3.5 w-3.5" />
               {addLabel}
             </Button>
-          ) : (
+          ) : addLink ? (
             <Link to={addLink}>
               <Button size="sm" className="h-8 gap-1.5">
                 <PlusCircle className="h-3.5 w-3.5" />
                 {addLabel}
               </Button>
             </Link>
-          )}
+          ) : null}
         </div>
       </div>
       {/* ── Optional top content (e.g. summary bar) ── */}
@@ -756,14 +758,14 @@ export function GenericTable<T extends DataItem>({
                           <PlusCircle className="h-3.5 w-3.5" />
                           {addLabel}
                         </Button>
-                      ) : (
+                      ) : addLink ? (
                         <Link to={addLink}>
                           <Button size="sm" variant="outline" className="gap-1.5 mt-1">
                             <PlusCircle className="h-3.5 w-3.5" />
                             {addLabel}
                           </Button>
                         </Link>
-                      )
+                      ) : null
                     )}
                   </div>
                 </TableCell>

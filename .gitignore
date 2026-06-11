@@ -50,3 +50,5 @@ LEAD_TO_CASH_REVIEW.md
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

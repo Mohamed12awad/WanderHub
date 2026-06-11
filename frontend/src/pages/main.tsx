@@ -73,6 +73,7 @@ const ViewSalesOrder  = lazy(() => import("@/components/SalesOrders/ViewSalesOrd
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 const ProjectsPage  = lazy(() => import("@/components/Projects/Projects").then((m) => ({ default: m.Projects })));
+const ProjectsBoard = lazy(() => import("@/components/Projects/ProjectsBoard").then((m) => ({ default: m.ProjectsBoard })));
 const AddProject    = lazy(() => import("@/components/Projects/ProjectForm").then((m) => ({ default: () => m.default({ mode: "add" }) })));
 const EditProject   = lazy(() => import("@/components/Projects/ProjectForm").then((m) => ({ default: () => m.default({ mode: "edit" }) })));
 const ViewProject   = lazy(() => import("@/components/Projects/ViewProject"));
@@ -153,6 +154,7 @@ const AppRoutes = () => (
 
       {/* Projects */}
       <Route path="/projects"          element={<Protected permission="projects:view"><ProjectsPage /></Protected>} />
+      <Route path="/projects/board"    element={<Protected permission="projects:view"><ProjectsBoard /></Protected>} />
       <Route path="/projects/new"      element={<Protected permission="projects:create"><AddProject /></Protected>} />
       <Route path="/projects/:id"      element={<Protected permission="projects:view"><ViewProject /></Protected>} />
       <Route path="/projects/:id/edit" element={<Protected permission="projects:edit"><EditProject /></Protected>} />

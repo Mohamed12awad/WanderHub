@@ -1,6 +1,7 @@
 import { GenericTable } from "@/components/common/GenericTable";
 import { getProjects, deleteProject } from "@/utils/api";
 import ProjectRow from "./ProjectRow";
+import { ViewToggle } from "./ViewToggle";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function Projects() {
@@ -25,6 +26,7 @@ export function Projects() {
       addLink="/projects/new"
       addLabel={p?.add ?? "Add Project"}
       module="projects"
+      topContent={<div className="flex justify-end"><ViewToggle active="list" /></div>}
       quickStatusFilter={{
         field: "status",
         options: [

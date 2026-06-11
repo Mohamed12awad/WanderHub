@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,13 +12,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Boxes, SlidersHorizontal, History, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, History, ChevronDown } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getInventory, adjustInventory, updateInventoryDetails, getInventoryMovementsPaged,
 } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
-import LoadingSpinner from "@/components/common/spinner";
+import { GenericTable } from "@/components/common/GenericTable";
 
 const ADJUSTMENT_REASONS = [
   { value: "recount",    label: "Recount" },
@@ -43,6 +42,7 @@ const REASON_STYLE: Record<string, string> = {
 
 interface StockItem {
   _id: string;
+  createdAt: string;
   productId: string;
   quantityOnHand: number;
   reorderLevel: number;
@@ -52,6 +52,8 @@ interface StockItem {
 }
 
 const PAGE_SIZE = 50;
+
+const INVENTORY_HEADERS = ["Product", "Location", "On hand", "Reorder level", "Status"];
 
 export function Inventory() {
   const { toast } = useToast();
@@ -66,9 +68,6 @@ export function Inventory() {
   const [saving, setSaving]             = useState(false);
   const [movementsFor, setMovementsFor] = useState<StockItem | null>(null);
   const [movePage, setMovePage]         = useState(0);
-
-  const { data, isLoading } = useQuery({ queryKey: ["inventory"], queryFn: getInventory, staleTime: 15000 });
-  const items: StockItem[] = data?.data ?? [];
 
   const movSkip = movePage * PAGE_SIZE;
   const { data: movesData } = useQuery({
@@ -113,65 +112,39 @@ export function Inventory() {
     }
   };
 
-  if (isLoading) return <LoadingSpinner loading />;
-
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
-      <div className="flex items-center gap-2">
-        <Boxes className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <h1 className="text-xl font-bold">Inventory</h1>
-          <p className="text-sm text-muted-foreground">{items.length} stocked product(s)</p>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {items.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              No stock yet. Receiving a product-linked purchase order will create stock here.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-right">On hand</TableHead>
-                  <TableHead className="text-right">Reorder level</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((it) => (
-                  <TableRow key={it._id}>
-                    <TableCell className="font-medium">{it.product?.name ?? it.productId}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{it.location ?? "—"}</TableCell>
-                    <TableCell className="text-right font-mono">{it.quantityOnHand}</TableCell>
-                    <TableCell className="text-right font-mono">{it.reorderLevel}</TableCell>
-                    <TableCell>
-                      {it.lowStock
-                        ? <Badge variant="destructive">Low stock</Badge>
-                        : <Badge variant="outline">OK</Badge>}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Adjust" onClick={() => openAdjust(it)}>
-                          <SlidersHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Movements" onClick={() => { setMovementsFor(it); setMovePage(0); }}>
-                          <History className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+    <>
+      <GenericTable<StockItem>
+        queryKey="inventory"
+        fetchData={({ page, limit, q }) => getInventory({ page, limit, q })}
+        headers={INVENTORY_HEADERS}
+        title="Inventory"
+        description="Stock levels across products."
+        emptyMessage="No stock yet. Receiving a product-linked purchase order will create stock here."
+        renderRow={(it) => (
+          <TableRow key={it._id}>
+            <TableCell className="font-medium">{it.product?.name ?? it.productId}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{it.location ?? "—"}</TableCell>
+            <TableCell className="text-right font-mono">{it.quantityOnHand}</TableCell>
+            <TableCell className="text-right font-mono">{it.reorderLevel}</TableCell>
+            <TableCell>
+              {it.lowStock
+                ? <Badge variant="destructive">Low stock</Badge>
+                : <Badge variant="outline">OK</Badge>}
+            </TableCell>
+            <TableCell onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Adjust" onClick={() => openAdjust(it)}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Movements" onClick={() => { setMovementsFor(it); setMovePage(0); }}>
+                  <History className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        )}
+      />
 
       {/* Adjust dialog */}
       <Dialog open={!!adjustItem} onOpenChange={(o) => !o && setAdjustItem(null)}>
@@ -274,7 +247,7 @@ export function Inventory() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 

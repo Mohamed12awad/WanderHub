@@ -16,26 +16,48 @@ export class ActivitiesService {
   ) {}
 
   async findAll(query: Record<string, string>) {
-    const { linkedTo, linkedModel, month, year } = query;
+    const { linkedTo, linkedModel, month, year, q, type, status, page, limit } = query;
     const where: Prisma.ActivityWhereInput = {};
     if (linkedTo) where.linkedToId = linkedTo;
     if (linkedModel) where.linkedModel = linkedModel;
+    if (type) where.type = type;
+    if (status) where.status = status;
     if (month && year) {
       const m = parseInt(month, 10);
       const y = parseInt(year, 10);
       where.date = { gte: new Date(y, m - 1, 1), lte: new Date(y, m, 0, 23, 59, 59) };
     }
-    const activities = await this.prisma.activity.findMany({
-      where,
-      include: {
-        assignedTo: { select: { id: true, name: true } },
-        createdBy:  { select: { id: true, name: true } },
-        customer:   { select: { id: true, name: true } },
-        deal:       { select: { id: true, title: true } },
-        project:    { select: { id: true, name: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    if (q?.trim()) {
+      const term = q.trim();
+      where.OR = [
+        { title: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } },
+      ];
+    }
+
+    const include = {
+      assignedTo: { select: { id: true, name: true } },
+      createdBy:  { select: { id: true, name: true } },
+      customer:   { select: { id: true, name: true } },
+      deal:       { select: { id: true, title: true } },
+      project:    { select: { id: true, name: true } },
+    };
+
+    // Paginated mode for the list view (GenericTable). Legacy callers — the
+    // calendar (month/year) and detail panes (linkedTo/linkedModel) — omit
+    // `page` and still receive a plain array.
+    if (page) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const take = Math.min(100, Math.max(1, parseInt(limit ?? '25', 10) || 25));
+      const [activities, total] = await Promise.all([
+        this.prisma.activity.findMany({ where, include, orderBy: { date: 'desc' }, skip: (pageNum - 1) * take, take }),
+        this.prisma.activity.count({ where }),
+      ]);
+      await this.backfillLinkedNames(activities);
+      return { data: toClient(activities), total, page: pageNum, pages: Math.ceil(total / take) || 1 };
+    }
+
+    const activities = await this.prisma.activity.findMany({ where, include, orderBy: { date: 'desc' } });
     await this.backfillLinkedNames(activities);
     return toClient(activities);
   }

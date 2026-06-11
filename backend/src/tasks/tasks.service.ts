@@ -89,6 +89,7 @@ export class TasksService {
     if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
     if (project) data.projectId = project;
     if (milestone) data.milestoneId = milestone;
+    if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     data.customFields = await this.customFields.validateAndClean(
       'tasks',
       data.customFields as Record<string, unknown> | undefined,
@@ -136,6 +137,7 @@ export class TasksService {
     if (linkedTo !== undefined) data.linkedToId = linkedTo;
     if (project !== undefined) data.projectId = project || null;
     if (milestone !== undefined) data.milestoneId = milestone || null;
+    if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'tasks',

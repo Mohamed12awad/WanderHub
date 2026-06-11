@@ -12,8 +12,8 @@ export class InventoryController {
 
   @Get()
   @RequirePermission('products:view')
-  list() {
-    return this.inventory.list();
+  list(@Query() query: Record<string, string>) {
+    return this.inventory.list(query);
   }
 
   @Get('low-stock')

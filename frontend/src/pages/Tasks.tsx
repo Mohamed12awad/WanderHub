@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTasks, deleteTask, completeTask, getProjects } from "@/utils/api";
+import { getTasks, deleteTask, completeTask, updateTask, getProjects } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Task, TaskPriority, TaskStatus } from "@/types/types";
+import { GenericKanban } from "@/components/common/GenericKanban";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,12 +24,13 @@ const PRIORITY_STYLE: Record<TaskPriority, string> = {
   urgent: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
 };
 
-const STATUS_COLS: { key: TaskStatus; color: string }[] = [
-  { key: "todo",        color: "border-t-slate-400" },
-  { key: "in_progress", color: "border-t-blue-400" },
-  { key: "review",      color: "border-t-amber-400" },
-  { key: "done",        color: "border-t-emerald-500" },
-  { key: "cancelled",   color: "border-t-rose-400" },
+// Board columns: status key + header color (hex, consumed by GenericKanban).
+const STATUS_META: { key: TaskStatus; color: string }[] = [
+  { key: "todo",        color: "#94a3b8" },
+  { key: "in_progress", color: "#3b82f6" },
+  { key: "review",      color: "#f59e0b" },
+  { key: "done",        color: "#10b981" },
+  { key: "cancelled",   color: "#f43f5e" },
 ];
 
 function TaskCard({
@@ -171,6 +173,13 @@ export function Tasks() {
     onError: () => toast({ title: "Failed to update task.", variant: "destructive" }),
   });
 
+  const moveMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      updateTask(id, { status: status as TaskStatus }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onError: () => toast({ title: "Failed to move task.", variant: "destructive" }),
+  });
+
   const openEdit = (task: Task) => { setCloneTask(null); setEditTask(task); setPanelOpen(true); };
   const openClone = (task: Task) => { setEditTask(null); setCloneTask(task); setPanelOpen(true); };
   const closePanel = () => { setPanelOpen(false); setEditTask(null); setCloneTask(null); };
@@ -256,7 +265,25 @@ export function Tasks() {
       ) : view === "list" ? (
         <ListView tasks={filtered} onEdit={openEdit} onClone={openClone} onDelete={(id) => deleteMut.mutate(id)} onComplete={(id) => completeMut.mutate(id)} statuses={t.statuses} priorities={t.priorities} />
       ) : (
-        <BoardView tasks={filtered} onEdit={openEdit} onClone={openClone} onDelete={(id) => deleteMut.mutate(id)} onComplete={(id) => completeMut.mutate(id)} statuses={t.statuses} priorities={t.priorities} />
+        <GenericKanban<Task>
+          items={filtered}
+          columns={STATUS_META.map((s) => ({ key: s.key, label: t.statuses[s.key] ?? s.key, color: s.color }))}
+          groupBy={(task) => task.status}
+          getId={(task) => task._id}
+          isLoading={isPending}
+          onMove={(id, status) => moveMut.mutate({ id, status })}
+          renderCard={(task) => (
+            <TaskCard
+              task={task}
+              onEdit={() => openEdit(task)}
+              onClone={() => openClone(task)}
+              onDelete={() => deleteMut.mutate(task._id)}
+              onComplete={() => completeMut.mutate(task._id)}
+              statuses={t.statuses}
+              priorities={t.priorities}
+            />
+          )}
+        />
       )}
 
       <AddTaskPanel
@@ -291,30 +318,3 @@ function ListView({ tasks, onEdit, onClone, onDelete, onComplete, statuses, prio
   );
 }
 
-function BoardView({ tasks, onEdit, onClone, onDelete, onComplete, statuses, priorities }: {
-  tasks: Task[]; onEdit: (t: Task) => void; onClone: (t: Task) => void;
-  onDelete: (id: string) => void; onComplete: (id: string) => void;
-  statuses: Record<string, string>; priorities: Record<string, string>;
-}) {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
-      {STATUS_COLS.map(({ key, color }) => {
-        const col = tasks.filter((t) => t.status === key);
-        return (
-          <div key={key} className={cn("flex-shrink-0 w-64 rounded-xl border border-t-4 bg-muted/30", color)}>
-            <div className="flex items-center justify-between px-3 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wide">{statuses[key]}</span>
-              <span className="text-xs text-muted-foreground font-medium">{col.length}</span>
-            </div>
-            <div className="px-2 pb-2 space-y-2 min-h-[80px]">
-              {col.map((task) => (
-                <TaskCard key={task._id} task={task} onEdit={() => onEdit(task)} onClone={() => onClone(task)}
-                  onDelete={() => onDelete(task._id)} onComplete={() => onComplete(task._id)} statuses={statuses} priorities={priorities} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}

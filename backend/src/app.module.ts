@@ -48,6 +48,7 @@ import { PublicApiModule } from './public-api/public-api.module';
 import { EmailsModule } from './emails/emails.module';
 import { AiModule } from './ai/ai.module';
 import { SalesOrdersModule } from './sales-orders/sales-orders.module';
+import { SampleDataModule } from './sample-data/sample-data.module';
 
 @Module({
   providers: [
@@ -117,6 +118,7 @@ import { SalesOrdersModule } from './sales-orders/sales-orders.module';
     EmailsModule,
     AiModule,
     SalesOrdersModule,
+    SampleDataModule,
   ],
 })
 export class AppModule {}

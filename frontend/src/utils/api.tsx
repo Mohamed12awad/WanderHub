@@ -283,7 +283,7 @@ export const deleteExpenseReportItem = (
 // Activities API Requests
 export const getActivities = (linkedTo: string, linkedModel: "Customer" | "Deal" | "Lead" | "Project" | "Supplier" | "PurchaseOrder" | "Invoice" | "Quote" | "SalesOrder") =>
   api.get("/activities", { params: { linkedTo, linkedModel } });
-export const getAllActivities = (params?: { month?: number; year?: number }) =>
+export const getAllActivities = (params?: Record<string, string | number | undefined>) =>
   api.get("/activities", { params });
 export const createActivity = (data: ActivityFormData) =>
   api.post("/activities", data);
@@ -551,7 +551,8 @@ export const deleteMilestone = (projectId: string, milestoneId: string): Promise
   api.delete(`/projects/${projectId}/milestones/${milestoneId}`);
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
-export const getInventory = () => api.get("/inventory");
+export const getInventory = (params?: { page?: number; limit?: number; q?: string }) =>
+  api.get("/inventory", { params });
 export const getLowStock = () => api.get("/inventory/low-stock");
 export const getInventoryMovements = (productId?: string) =>
   api.get("/inventory/movements", { params: productId ? { productId } : {} });
@@ -640,6 +641,11 @@ export const updateEmailConfig = (data: {
   fromEmail?: string;
 }) => api.put("/settings/email-config", data);
 export const testEmailConfig = () => api.post("/settings/email-config/test");
+
+// ── Sample Data (Settings → Danger Zone) ──────────────────────────────────────
+export const loadSampleData = () => api.post("/settings/sample-data/load");
+export const clearSampleData = (): Promise<{ data: { ok: boolean; total: number } }> =>
+  api.post("/settings/sample-data/clear");
 
 // ── Security — sessions, login history, change password ───────────────────────
 export const getSessions = () => api.get("/users/me/sessions");
