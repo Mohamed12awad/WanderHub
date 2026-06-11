@@ -29,9 +29,15 @@ export class ActivitiesService {
     }
     if (q?.trim()) {
       const term = q.trim();
+      // Match title/description and the linked entity's display name, so a
+      // search like "Nile Corp" still finds activities linked to that customer
+      // (parity with the old client-side filter that matched the entity label).
       where.OR = [
         { title: { contains: term, mode: 'insensitive' } },
         { description: { contains: term, mode: 'insensitive' } },
+        { customer: { name: { contains: term, mode: 'insensitive' } } },
+        { deal: { title: { contains: term, mode: 'insensitive' } } },
+        { project: { name: { contains: term, mode: 'insensitive' } } },
       ];
     }
 

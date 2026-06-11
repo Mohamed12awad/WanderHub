@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   useDroppable,
@@ -45,9 +46,15 @@ export interface GenericKanbanProps<T> {
 
 const DEFAULT_COLOR = "#64748b";
 
+/** Synthetic column that surfaces items whose status matches no configured
+ *  column, so they stay visible (and draggable out) instead of disappearing. */
+const UNMATCHED_COLUMN_KEY = "__kanban_unmatched__";
+
 // ── Draggable card wrapper ──────────────────────────────────────────────────
-// The whole card is the drag source; a 6px activation distance keeps clicks on
-// links/buttons inside the card working normally.
+// The whole card is the drag source. Mouse drags start after a 6px move (so
+// clicks on inner links/buttons still work); touch drags require a short
+// press-hold (see sensors below), which leaves normal swipe-to-scroll intact —
+// hence no `touch-none` here, which would otherwise swallow board scrolling.
 function DraggableCard({ id, children }: { id: string; children: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id });
   const style = transform
@@ -59,7 +66,7 @@ function DraggableCard({ id, children }: { id: string; children: ReactNode }) {
       style={style}
       {...attributes}
       {...listeners}
-      className={cn("cursor-grab active:cursor-grabbing touch-none outline-none", isDragging && "opacity-40")}
+      className={cn("cursor-grab active:cursor-grabbing outline-none", isDragging && "opacity-40")}
     >
       {children}
     </div>
@@ -148,17 +155,34 @@ export function GenericKanban<T>({
 }: GenericKanbanProps<T>) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const grouped = useMemo(() => {
+  const { grouped, unmatched } = useMemo(() => {
     const map: Record<string, T[]> = {};
     for (const col of columns) map[col.key] = [];
+    const extra: T[] = [];
     for (const item of items) {
       const k = groupBy(item);
-      if (map[k]) map[k].push(item); // items in unconfigured columns are hidden
+      if (map[k]) map[k].push(item);
+      else extra.push(item); // status matches no configured column
     }
-    return map;
+    return { grouped: map, unmatched: extra };
   }, [items, columns, groupBy]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // Surface unmatched items in a trailing read-only column so a renamed/legacy
+  // status never silently hides records from the board.
+  const displayColumns = useMemo<KanbanColumn[]>(
+    () =>
+      unmatched.length
+        ? [...columns, { key: UNMATCHED_COLUMN_KEY, label: "Other", color: "#94a3b8" }]
+        : columns,
+    [columns, unmatched.length],
+  );
+
+  // Mouse: drag after a small move (clicks still work). Touch: drag only after a
+  // brief press-hold, so a swipe scrolls the board instead of dragging a card.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+  );
 
   const activeItem = activeId ? items.find((i) => getId(i) === activeId) ?? null : null;
 
@@ -184,8 +208,8 @@ export function GenericKanban<T>({
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-3 min-w-max">
-          {columns.map((col) => {
-            const colItems = grouped[col.key] ?? [];
+          {displayColumns.map((col) => {
+            const colItems = col.key === UNMATCHED_COLUMN_KEY ? unmatched : grouped[col.key] ?? [];
             return (
               <KanbanColumnView
                 key={col.key}
@@ -193,7 +217,7 @@ export function GenericKanban<T>({
                 cards={colItems.map((item) => ({ id: getId(item), node: renderCard(item) }))}
                 isLoading={isLoading}
                 headerExtra={columnHeaderExtra?.(colItems, col)}
-                onAdd={onAddTo ? () => onAddTo(col.key) : undefined}
+                onAdd={onAddTo && col.key !== UNMATCHED_COLUMN_KEY ? () => onAddTo(col.key) : undefined}
                 addLabel={addLabel}
                 emptyLabel={emptyColumnLabel}
               />

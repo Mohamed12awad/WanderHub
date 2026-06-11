@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { seedAll, clearSampleData } from './sample-data.builder';
@@ -17,6 +17,15 @@ export class SampleDataService {
   }
 
   async load() {
+    // The seed provisions demo login accounts with a well-known password from
+    // the public source. That is fine for dev/CLI use, but loading it from the
+    // in-app endpoint on a production deployment would silently create those
+    // accounts on a live system. Block it there unless explicitly opted in.
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SAMPLE_DATA !== 'true') {
+      throw new ForbiddenException(
+        'Loading sample data is disabled in production. Set ALLOW_SAMPLE_DATA=true to enable it.',
+      );
+    }
     await seedAll(this.client);
     return { ok: true };
   }

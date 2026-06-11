@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toClient } from '../common/serialize';
+import { paginate } from '../common/paginate';
 
 interface MovementInput {
   productId: string;
@@ -62,10 +63,7 @@ export class InventoryService {
    * free-text query (`q`) that matches product name or stock location.
    */
   async list(query: { page?: string; limit?: string; q?: string } = {}) {
-    const page = Math.max(1, parseInt(query.page ?? '1', 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '25', 10) || 25));
     const q = query.q?.trim();
-
     const where: Prisma.StockItemWhereInput = q
       ? {
           OR: [
@@ -75,22 +73,20 @@ export class InventoryService {
         }
       : {};
 
-    const [items, total] = await Promise.all([
-      this.prisma.stockItem.findMany({
+    const result = await paginate<{ quantityOnHand: number; reorderLevel: number }>(
+      this.prisma.stockItem,
+      {
         where,
         include: { product: { select: { id: true, name: true, type: true } } },
         orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.stockItem.count({ where }),
-    ]);
-
+        page: query.page,
+        limit: query.limit,
+      },
+    );
+    // paginate() already serialized the rows; just decorate with the low-stock flag.
     return {
-      data: toClient(items.map((s) => ({ ...s, lowStock: s.quantityOnHand <= s.reorderLevel }))),
-      total,
-      page,
-      pages: Math.ceil(total / limit) || 1,
+      ...result,
+      data: result.data.map((s) => ({ ...s, lowStock: s.quantityOnHand <= s.reorderLevel })),
     };
   }
 

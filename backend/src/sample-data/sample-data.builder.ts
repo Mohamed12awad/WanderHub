@@ -20,6 +20,7 @@
  * (src/config/fieldDefaults.ts); the schema stores them as plain strings.
  */
 import {
+  Prisma,
   PrismaClient,
   ApprovalStatus,
   NotificationType,
@@ -122,15 +123,18 @@ const USERS = [
 ];
 
 /**
- * Upsert roles + the five demo login accounts. Existing users keep their
- * password (it is only set on create), so this is safe to re-run on a live DB.
+ * Upsert roles + the five demo login accounts. Everything is create-only on
+ * re-run: an existing role keeps its (possibly admin-customized) permissions and
+ * an existing user keeps its name/phone/role/password. This makes the seed safe
+ * to re-run on a live workspace without clobbering real RBAC config or rebinding
+ * a real account that happens to share a demo email.
  */
 export async function seedRolesAndUsers(prisma: PrismaClient, log: Log = noop) {
   log('  roles…');
   for (const r of ROLES) {
     await prisma.role.upsert({
       where: { name: r.name },
-      update: { permissions: r.permissions },
+      update: {},
       create: { name: r.name, permissions: r.permissions },
     });
   }
@@ -142,7 +146,7 @@ export async function seedRolesAndUsers(prisma: PrismaClient, log: Log = noop) {
     if (!role) continue;
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, phone: u.phone, roleId: role.id },
+      update: {},
       create: { name: u.name, email: u.email, phone: u.phone, password: hashed, roleId: role.id },
     });
   }
@@ -168,8 +172,10 @@ const PO_STATUS = ['draft', 'sent', 'confirmed', 'received', 'cancelled'];
 const BILL_STATUS = ['draft', 'received', 'partially_paid', 'paid', 'overdue'];
 const PROJECT_STATUS = ['planning', 'active', 'on_hold', 'completed', 'cancelled'];
 const TASK_STATUS = ['todo', 'in_progress', 'done', 'cancelled'];
-const ACTIVITY_TYPE = ['call', 'meeting', 'email', 'task', 'note', 'other'];
-const ACTIVITY_STATUS = ['pending', 'completed', 'cancelled'];
+// Values must stay within what the Activities UI renders/filters
+// (src/types/types.ts ActivityType / ActivityStatus); no 'other'/'cancelled'.
+const ACTIVITY_TYPE = ['call', 'meeting', 'email', 'task', 'note'];
+const ACTIVITY_STATUS = ['pending', 'completed'];
 const NOTIF_TYPES = [
   NotificationType.task_assigned, NotificationType.deal_assigned, NotificationType.lead_assigned,
   NotificationType.approval_requested, NotificationType.approval_approved, NotificationType.approval_rejected,
@@ -668,13 +674,15 @@ export async function seedSampleData(prisma: PrismaClient, log: Log = noop) {
             { id: 'company_size', name: 'company_size', label: 'Company Size', type: 'select', options: '1-10,11-50,51-200,200+', required: false, filterable: true, isSystem: false, order: 1 },
           ] },
         ],
+        // Shape mirrors the frontend PipelineStage ({ key, label, color }); the
+        // board and deal form key columns/options off `key`, not `id`.
         pipelineStages: [
-          { id: 'lead', label: 'Lead', order: 0 },
-          { id: 'qualified', label: 'Qualified', order: 1 },
-          { id: 'proposal', label: 'Proposal', order: 2 },
-          { id: 'negotiation', label: 'Negotiation', order: 3 },
-          { id: 'won', label: 'Won', order: 4 },
-          { id: 'lost', label: 'Lost', order: 5 },
+          { key: 'lead', label: 'Lead', color: '#3b82f6', order: 0 },
+          { key: 'qualified', label: 'Qualified', color: '#8b5cf6', order: 1 },
+          { key: 'proposal', label: 'Proposal', color: '#f59e0b', order: 2 },
+          { key: 'negotiation', label: 'Negotiation', color: '#f97316', order: 3 },
+          { key: 'won', label: 'Won', color: '#10b981', order: 4, isWin: true },
+          { key: 'lost', label: 'Lost', color: '#ef4444', order: 5, isLoss: true },
         ],
         moduleSettings: [
           { module: 'crm', enabled: true },
@@ -710,36 +718,82 @@ export async function seedAll(prisma: PrismaClient, log: Log = noop) {
 export async function clearSampleData(prisma: PrismaClient, log: Log = noop) {
   const where = { id: { startsWith: SAMPLE_PREFIX } };
   const counts: Record<string, number> = {};
-  const del = async (label: string, fn: () => Promise<{ count: number }>) => {
-    const { count } = await fn();
-    if (count) counts[label] = count;
-    log(`  ✓ ${label}: ${count}`);
-  };
 
-  // Dependents first, then roots.
-  await del('timelineEvents', () => prisma.timelineEvent.deleteMany({ where }));
-  await del('notes', () => prisma.note.deleteMany({ where }));
-  await del('activities', () => prisma.activity.deleteMany({ where }));
-  await del('tasks', () => prisma.task.deleteMany({ where }));
-  await del('notifications', () => prisma.notification.deleteMany({ where }));
-  await del('savedViews', () => prisma.savedView.deleteMany({ where }));
-  await del('invoices', () => prisma.invoice.deleteMany({ where }));        // payments + items cascade
-  await del('salesOrders', () => prisma.salesOrder.deleteMany({ where }));  // items cascade
-  await del('quotes', () => prisma.quote.deleteMany({ where }));            // items cascade
-  await del('vendorBills', () => prisma.vendorBill.deleteMany({ where }));  // payments + items cascade
-  await del('purchaseOrders', () => prisma.purchaseOrder.deleteMany({ where }));
-  await del('expenseReports', () => prisma.expenseReport.deleteMany({ where })); // items cascade
-  await del('projects', () => prisma.project.deleteMany({ where }));        // milestones + members cascade
-  await del('deals', () => prisma.deal.deleteMany({ where }));
-  await del('suppliers', () => prisma.supplier.deleteMany({ where }));
-  await del('stockMovements', () => prisma.stockMovement.deleteMany({ where }));
-  await del('products', () => prisma.product.deleteMany({ where }));        // stock items + remaining movements cascade
-  await del('leads', () => prisma.lead.deleteMany({ where }));
-  await del('customers', () => prisma.customer.deleteMany({ where }));
-  await del('accounts', () => prisma.account.deleteMany({ where }));
-  await del('taxRates', () => prisma.taxRate.deleteMany({ where }));
-  await del('exchangeRates', () => prisma.exchangeRate.deleteMany({ where }));
+  // Run the whole teardown atomically: if a later delete fails (e.g. a real,
+  // user-created record references a sample customer and the FK blocks the
+  // delete), the transaction rolls back instead of leaving a half-cleared
+  // workspace that can never be re-cleared.
+  await prisma.$transaction(
+    async (tx) => {
+      const del = async (label: string, fn: () => Promise<{ count: number }>) => {
+        const { count } = await fn();
+        if (count) counts[label] = count;
+        log(`  ✓ ${label}: ${count}`);
+      };
+
+      // Seeded payments are written as raw nested creates and never moved an
+      // account balance. But a user can post a *real* payment (non-`smpl-` id)
+      // against a sample invoice/bill, which DID increment an account balance.
+      // Those cascade away with the parent below, so reverse their balance
+      // effect first or the real account stays permanently inflated. Currency
+      // matched the account at payment time, so the stored amount is exact.
+      await reverseRealPaymentBalances(
+        tx,
+        () => tx.invoicePayment.findMany({
+          where: { invoice: { id: { startsWith: SAMPLE_PREFIX } }, id: { not: { startsWith: SAMPLE_PREFIX } }, accountId: { not: null } },
+          select: { accountId: true, amount: true },
+        }),
+      );
+      await reverseRealPaymentBalances(
+        tx,
+        () => tx.vendorBillPayment.findMany({
+          where: { bill: { id: { startsWith: SAMPLE_PREFIX } }, id: { not: { startsWith: SAMPLE_PREFIX } }, accountId: { not: null } },
+          select: { accountId: true, amount: true },
+        }),
+      );
+
+      // Dependents first, then roots.
+      await del('timelineEvents', () => tx.timelineEvent.deleteMany({ where }));
+      await del('notes', () => tx.note.deleteMany({ where }));
+      await del('activities', () => tx.activity.deleteMany({ where }));
+      await del('tasks', () => tx.task.deleteMany({ where }));
+      await del('notifications', () => tx.notification.deleteMany({ where }));
+      await del('savedViews', () => tx.savedView.deleteMany({ where }));
+      await del('invoices', () => tx.invoice.deleteMany({ where }));        // payments + items cascade
+      await del('salesOrders', () => tx.salesOrder.deleteMany({ where }));  // items cascade
+      await del('quotes', () => tx.quote.deleteMany({ where }));            // items cascade
+      await del('vendorBills', () => tx.vendorBill.deleteMany({ where }));  // payments + items cascade
+      await del('purchaseOrders', () => tx.purchaseOrder.deleteMany({ where }));
+      await del('expenseReports', () => tx.expenseReport.deleteMany({ where })); // items cascade
+      await del('projects', () => tx.project.deleteMany({ where }));        // milestones + members cascade
+      await del('deals', () => tx.deal.deleteMany({ where }));
+      await del('suppliers', () => tx.supplier.deleteMany({ where }));
+      await del('stockMovements', () => tx.stockMovement.deleteMany({ where }));
+      await del('products', () => tx.product.deleteMany({ where }));        // stock items + remaining movements cascade
+      await del('leads', () => tx.lead.deleteMany({ where }));
+      await del('customers', () => tx.customer.deleteMany({ where }));
+      await del('accounts', () => tx.account.deleteMany({ where }));
+      await del('taxRates', () => tx.taxRate.deleteMany({ where }));
+      await del('exchangeRates', () => tx.exchangeRate.deleteMany({ where }));
+    },
+    { timeout: 30000 },
+  );
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   return { total, counts };
+}
+
+/** Decrement each account by the (real) payments that are about to be deleted. */
+async function reverseRealPaymentBalances(
+  tx: Prisma.TransactionClient,
+  fetch: () => Promise<Array<{ accountId: string | null; amount: Prisma.Decimal }>>,
+) {
+  const payments = await fetch();
+  for (const p of payments) {
+    if (!p.accountId) continue;
+    await tx.account.update({
+      where: { id: p.accountId },
+      data: { balance: { decrement: p.amount } },
+    });
+  }
 }

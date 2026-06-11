@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimelineService } from '../timeline/timeline.service';
@@ -19,6 +19,15 @@ export class TasksService {
     private readonly dispatcher: NotificationDispatcher,
     private readonly customFields: CustomFieldsService,
   ) {}
+
+  /** Coerce an optional date string to a Date, mapping ''→null and rejecting
+   *  unparseable input with a 400 rather than letting Prisma throw a 500. */
+  private parseOptionalDate(value: string, field: string): Date | null {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException(`Invalid ${field}`);
+    return d;
+  }
 
   async findAll(query: Record<string, string>, user: AuthUser) {
     const { status, priority, assignedTo, linkedTo, overdue, mine, projectId, page = '1' } = query;
@@ -89,7 +98,7 @@ export class TasksService {
     if (data.linkedModel === 'Deal' && data.linkedToId) data.dealId = data.linkedToId;
     if (project) data.projectId = project;
     if (milestone) data.milestoneId = milestone;
-    if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (typeof data.dueDate === 'string') data.dueDate = this.parseOptionalDate(data.dueDate, 'dueDate');
     data.customFields = await this.customFields.validateAndClean(
       'tasks',
       data.customFields as Record<string, unknown> | undefined,
@@ -137,7 +146,7 @@ export class TasksService {
     if (linkedTo !== undefined) data.linkedToId = linkedTo;
     if (project !== undefined) data.projectId = project || null;
     if (milestone !== undefined) data.milestoneId = milestone || null;
-    if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (typeof data.dueDate === 'string') data.dueDate = this.parseOptionalDate(data.dueDate, 'dueDate');
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
         'tasks',
