@@ -63,9 +63,22 @@ export class SummeryService {
     return { total: Number(totalAgg._sum.amount ?? 0), categories };
   }
 
-  async getSummery(timePeriod?: string) {
+  async getSummery(timePeriod?: string, startDate?: string, endDate?: string) {
     const now = new Date();
     let currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date;
+
+    // Explicit custom range wins over the presets: the current period is the
+    // given range and the previous period is the equally-long window directly
+    // before it, so MoM-style deltas stay meaningful.
+    if (startDate && endDate) {
+      currentStart = new Date(startDate);
+      currentEnd = new Date(endDate);
+      currentEnd.setHours(23, 59, 59, 999);
+      const span = currentEnd.getTime() - currentStart.getTime();
+      previousEnd = new Date(currentStart.getTime() - 1);
+      previousStart = new Date(currentStart.getTime() - span - 1);
+      return this.buildSummery(currentStart, currentEnd, previousStart, previousEnd);
+    }
 
     switch (timePeriod) {
       case 'week': {
@@ -91,6 +104,16 @@ export class SummeryService {
       }
     }
 
+    return this.buildSummery(currentStart, currentEnd, previousStart, previousEnd);
+  }
+
+  /** Compute the full current-vs-previous metric payload for two periods. */
+  private async buildSummery(
+    currentStart: Date,
+    currentEnd: Date,
+    previousStart: Date,
+    previousEnd: Date,
+  ) {
     const [
       currentRevenue, previousRevenue,
       currentNewCustomers, previousNewCustomers,

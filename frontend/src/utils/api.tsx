@@ -247,11 +247,11 @@ export const deleteProduct = (id: string): Promise<void> =>
   api.delete(`/products/${id}`);
 
 // Summery API Requests
-export const getSummery = (period?: string) =>
-  api.get("/summery", { params: { timePeriod: period } });
+export const getSummery = (period?: string, range?: { startDate?: string; endDate?: string }) =>
+  api.get("/summery", { params: { timePeriod: period, ...range } });
 
 export const getPendingApprovals = () => api.get("/summery/pending-approvals");
-export const getLeadsReport = () => api.get("/reports/leads");
+export const getLeadsReport = (params?: ReportFilters) => api.get("/reports/leads", { params });
 
 // Reports API Requests
 export const getReport = (params: ReportParams) =>
@@ -411,14 +411,52 @@ export const getAccountStatement = (id: string, params?: { page?: number; limit?
   api.get(`/accounts/${id}/statement`, { params });
 
 // Reports — Analytics
-export const getRevenueReport = (params?: { startDate?: string; endDate?: string }) =>
+// Unified filter set shared by every analytics endpoint (see backend
+// report-utils.parseReportParams). All fields optional.
+export type ReportFilters = {
+  startDate?: string;
+  endDate?: string;
+  groupBy?: "month" | "quarter" | "year";
+  ownerId?: string;
+  status?: string;
+  currency?: string;
+};
+
+export const getRevenueReport = (params?: ReportFilters) =>
   api.get("/reports/revenue", { params });
-export const getPipelineReport = () => api.get("/reports/pipeline");
-export const getExpensesCategoryReport = (params?: { startDate?: string; endDate?: string }) =>
+export const getPipelineReport = (params?: ReportFilters) =>
+  api.get("/reports/pipeline", { params });
+export const getExpensesCategoryReport = (params?: ReportFilters) =>
   api.get("/reports/expenses-category", { params });
-export const getOutstandingReport = () => api.get("/reports/outstanding");
-export const getCustomerAcquisitionReport = (params?: { startDate?: string; endDate?: string }) =>
+export const getOutstandingReport = (params?: ReportFilters) =>
+  api.get("/reports/outstanding", { params });
+export const getCustomerAcquisitionReport = (params?: ReportFilters) =>
   api.get("/reports/customer-acquisition", { params });
+
+// New analytics — Sales
+export const getSalesLeaderboard = (params?: ReportFilters) =>
+  api.get("/reports/sales-leaderboard", { params });
+export const getConversionFunnel = (params?: ReportFilters) =>
+  api.get("/reports/conversion-funnel", { params });
+export const getDealMetrics = (params?: ReportFilters) =>
+  api.get("/reports/deal-metrics", { params });
+
+// New analytics — Finance
+export const getProfitLoss = (params?: ReportFilters) =>
+  api.get("/reports/profit-loss", { params });
+export const getArAging = (params?: ReportFilters) =>
+  api.get("/reports/ar-aging", { params });
+export const getTopCustomers = (params?: ReportFilters) =>
+  api.get("/reports/top-customers", { params });
+export const getExpenseTrend = (params?: ReportFilters) =>
+  api.get("/reports/expense-trend", { params });
+
+// New analytics — Operations
+export const getTopProducts = (params?: ReportFilters) =>
+  api.get("/reports/top-products", { params });
+export const getInventoryValuation = () => api.get("/reports/inventory-valuation");
+export const getTaskStats = (params?: ReportFilters) =>
+  api.get("/reports/task-stats", { params });
 
 // Finance — Payments
 export const getPayments = (params?: { page?: number; limit?: number }) =>

@@ -17,11 +17,13 @@ import {
 } from "@/utils/api";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { Account } from "@/types/types";
+import { PeriodSelector, defaultPeriod, type PeriodValue } from "@/components/common/PeriodSelector";
 
 const LEAD_COLORS: Record<string, string> = {
   new: "#3b82f6", contacted: "#8b5cf6", qualified: "#22c55e",
@@ -106,9 +108,13 @@ export function Dashboard() {
   const { tr } = useLanguage();
   const d = tr.dashboard;
 
+  const [period, setPeriod] = useState<PeriodValue>(() => defaultPeriod("month"));
   const { data: summeryData, isPending: summeryLoading } = useQuery({
-    queryKey: ["summery"],
-    queryFn: () => getSummery("month")
+    queryKey: ["summery", period.preset, period.startDate, period.endDate],
+    queryFn: () =>
+      period.preset === "custom"
+        ? getSummery(undefined, { startDate: period.startDate, endDate: period.endDate })
+        : getSummery(period.preset),
   });
   const { data: dealsData, isPending: dealsLoading } = useQuery({
     queryKey: ["deals"],
@@ -139,19 +145,19 @@ export function Dashboard() {
   });
   const { data: outstandingData } = useQuery({
     queryKey: ["outstanding"],
-    queryFn: getOutstandingReport,
+    queryFn: () => getOutstandingReport(),
     staleTime: 60000,
     enabled: canViewInvoices,
   });
   const { data: leadsData } = useQuery({
     queryKey: ["leads-report"],
-    queryFn: getLeadsReport,
+    queryFn: () => getLeadsReport(),
     staleTime: 60000,
     enabled: canViewLeads,
   });
   const { data: pipelineData } = useQuery({
     queryKey: ["pipeline-report"],
-    queryFn: getPipelineReport,
+    queryFn: () => getPipelineReport(),
     staleTime: 60000,
     enabled: canViewDeals,
   });
@@ -204,7 +210,8 @@ export function Dashboard() {
             {format(new Date(), "EEEE, d MMMM yyyy")}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodSelector value={period} onChange={setPeriod} />
           <Link to="/customers/add">
             <Button variant="outline" size="sm" className="gap-1.5 h-9">
               <PlusCircle className="h-3.5 w-3.5" />
@@ -283,14 +290,14 @@ export function Dashboard() {
                   {accounts.map((acc) => {
                     const Icon = acc.type === "bank" ? Landmark : acc.type === "safe" ? Lock : Wallet;
                     return (
-                      <div key={acc._id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                      <Link key={acc._id} to={`/settings/accounts/${acc._id}`} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 hover:bg-muted/60 transition-colors">
                         <div className="rounded-lg bg-primary/10 p-2 shrink-0"><Icon className="h-3.5 w-3.5 text-primary" /></div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{acc.name}</p>
                           <p className="text-xs text-muted-foreground capitalize">{acc.type}</p>
                         </div>
                         <p className="text-sm font-bold tabular-nums">{acc.balance.toLocaleString()} {acc.currency}</p>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -608,7 +615,7 @@ export function Dashboard() {
               {accounts.map((acc) => {
                 const Icon = acc.type === "bank" ? Landmark : acc.type === "safe" ? Lock : Wallet;
                 return (
-                  <div key={acc._id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+                  <Link key={acc._id} to={`/settings/accounts/${acc._id}`} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 hover:bg-muted/60 transition-colors">
                     <div className="rounded-lg bg-primary/10 p-2 shrink-0">
                       <Icon className="h-3.5 w-3.5 text-primary" />
                     </div>
@@ -619,7 +626,7 @@ export function Dashboard() {
                     <p className="ms-auto text-sm font-semibold whitespace-nowrap tabular-nums">
                       {acc.balance.toLocaleString()} {acc.currency}
                     </p>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

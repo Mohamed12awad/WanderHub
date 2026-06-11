@@ -41,20 +41,59 @@ export class AccountsService {
     return true;
   }
 
+  /**
+   * Full account statement: every transaction touching the account, both
+   * money-in (invoice payments) and money-out (vendor-bill payments), merged
+   * into one date-sorted ledger. Each side is queried ordered by date desc and
+   * capped at `page * limit`, so the merged top page is always complete without
+   * loading the entire history.
+   */
   async getStatement(id: string, query: Record<string, string>) {
-    const { page, limit: limitRaw } = query;
-    const p = Math.max(1, parseInt(page || '1'));
-    const limit = Math.min(100, parseInt(limitRaw || '25'));
-    const [data, total] = await Promise.all([
+    const account = await this.prisma.account.findFirst({ where: { id, deletedAt: null } });
+    if (!account) throw new NotFoundException('account not found');
+
+    const p = Math.max(1, parseInt(query.page || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit || '25')));
+    const take = p * limit;
+
+    const [inflows, outflows, inCount, outCount] = await Promise.all([
       this.prisma.invoicePayment.findMany({
         where: { accountId: id },
         include: { invoice: { select: { id: true, invoiceNumber: true, title: true } } },
         orderBy: { date: 'desc' },
-        skip: (p - 1) * limit,
-        take: limit,
+        take,
+      }),
+      this.prisma.vendorBillPayment.findMany({
+        where: { accountId: id },
+        include: { bill: { select: { id: true, billNumber: true, title: true } } },
+        orderBy: { date: 'desc' },
+        take,
       }),
       this.prisma.invoicePayment.count({ where: { accountId: id } }),
+      this.prisma.vendorBillPayment.count({ where: { accountId: id } }),
     ]);
-    return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+
+    const txns = [
+      ...inflows.map((t) => ({
+        id: t.id, date: t.date, direction: 'in' as const, amount: Number(t.amount), currency: t.currency,
+        method: t.method, reference: t.invoice?.invoiceNumber ?? null, title: t.invoice?.title ?? null,
+        refType: 'invoice' as const, refId: t.invoiceId,
+      })),
+      ...outflows.map((t) => ({
+        id: t.id, date: t.date, direction: 'out' as const, amount: Number(t.amount), currency: t.currency,
+        method: t.method, reference: t.bill?.billNumber ?? null, title: t.bill?.title ?? null,
+        refType: 'bill' as const, refId: t.billId,
+      })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    const pageItems = txns.slice((p - 1) * limit, p * limit);
+    const total = inCount + outCount;
+    return {
+      account: toClient(account),
+      data: toClient(pageItems),
+      total,
+      page: p,
+      pages: Math.ceil(total / limit) || 1,
+    };
   }
 }

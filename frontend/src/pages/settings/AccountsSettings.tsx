@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Landmark, Wallet, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAccounts, createAccount, updateAccount, deleteAccount } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
@@ -52,6 +53,7 @@ const emptyForm = (): FormState => ({
 export default function AccountsSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
@@ -155,7 +157,12 @@ export default function AccountsSettings() {
                 {accounts.map((acc) => {
                   const Icon = TYPE_ICONS[acc.type];
                   return (
-                    <TableRow key={acc._id} className="cursor-pointer hover:bg-muted/40">
+                    <TableRow
+                      key={acc._id}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => navigate(`/settings/accounts/${acc._id}`)}
+                      title="View transactions"
+                    >
                       <TableCell className="font-medium flex items-center gap-2">
                         <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                         {acc.name}
@@ -167,10 +174,10 @@ export default function AccountsSettings() {
                       <TableCell className="text-right font-mono">{acc.balance.toLocaleString()}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(acc)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEdit(acc); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setPendingDelete(acc)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); setPendingDelete(acc); }}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>

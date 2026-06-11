@@ -11,8 +11,12 @@ export class SummeryController {
   constructor(private readonly summery: SummeryService) {}
 
   @Get()
-  getSummery(@Query('timePeriod') timePeriod: string) {
-    return this.summery.getSummery(timePeriod);
+  getSummery(
+    @Query('timePeriod') timePeriod: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.summery.getSummery(timePeriod, startDate, endDate);
   }
 
   @Get('pending-approvals')

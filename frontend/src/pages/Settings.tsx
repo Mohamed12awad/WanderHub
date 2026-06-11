@@ -15,6 +15,7 @@ import ModulesSettings from "./settings/ModulesSettings";
 import FieldsSettings from "./settings/FieldsSettings";
 import ApprovalsSettings from "./settings/ApprovalsSettings";
 import AccountsSettings from "./settings/AccountsSettings";
+import AccountStatement from "./settings/AccountStatement";
 import OrganizationSettings from "./settings/OrganizationSettings";
 import ExchangeRatesSettings from "./settings/ExchangeRatesSettings";
 import SecuritySettings from "./settings/SecuritySettings";
@@ -211,6 +212,7 @@ export default function Settings() {
             <Route path="number-sequences" element={<NumberSequencesSettings />} />
             {/* Finance */}
             <Route path="accounts"         element={<AccountsSettings />} />
+            <Route path="accounts/:id"     element={<AccountStatement />} />
             <Route path="tax-rates"        element={<TaxRatesSettings />} />
             <Route path="invoice-defaults" element={<InvoiceDefaultsSettings />} />
             <Route path="approvals"        element={<ApprovalsSettings />} />
