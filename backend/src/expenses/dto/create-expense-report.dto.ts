@@ -21,6 +21,11 @@ export class CreateExpenseReportDto {
   @IsString()
   project?: string;
 
+  // Optional analytic cost center.
+  @IsOptional()
+  @IsString()
+  costCenterId?: string;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

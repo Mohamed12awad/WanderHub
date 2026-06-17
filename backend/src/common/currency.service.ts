@@ -42,6 +42,28 @@ export class CurrencyService {
     return rate ? amount * rate : amount;
   }
 
+  /**
+   * Convert `amount` from one currency to another, routed through the base
+   * currency. `fromRateOverride`/`toRateOverride` pin a historical rate (e.g. an
+   * invoice's recorded `exchangeRate`) instead of the latest market rate. When a
+   * needed rate is unknown the amount passes through unconverted rather than
+   * collapsing to zero.
+   */
+  async convert(
+    amount: number,
+    from: string,
+    to: string,
+    fromRateOverride?: number | null,
+    toRateOverride?: number | null,
+  ): Promise<number> {
+    if (from === to) return amount;
+    const base = await this.getBaseCurrency();
+    const inBase = await this.toBase(amount, from, fromRateOverride);
+    if (to === base) return inBase;
+    const toRate = toRateOverride ?? (await this.getRates())[to];
+    return toRate ? inBase / toRate : inBase;
+  }
+
   /** Collapse a per-currency map (e.g. { USD: 100, EGP: 50 }) into one base total. */
   async sumToBase(byCurrency: Record<string, number>): Promise<number> {
     const base = await this.getBaseCurrency();

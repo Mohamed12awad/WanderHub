@@ -1,9 +1,11 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 
 // On edit, date is optional (the service falls back to the existing date), but
 // amount is still required since the totals are recomputed from it.
 export class EditPaymentDto {
+  // Must be > 0: a negative or zero payment would corrupt totalPaid / paid status.
   @IsNumber()
+  @IsPositive()
   amount: number;
 
   @IsOptional()

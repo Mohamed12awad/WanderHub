@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, ValidateNested,
+  IsArray, IsBoolean, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, ValidateNested,
 } from 'class-validator';
 import { LineItemDto } from '../../finance/dto/line-item.dto';
 
@@ -20,7 +20,9 @@ export class CreateVendorBillDto {
   @IsOptional() @IsString() dueDate?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsString() terms?: string;
+  @IsOptional() @IsString() costCenterId?: string; // optional analytic cost center
   @IsOptional() @IsNumber() taxRate?: number;
+  @IsOptional() @IsBoolean() taxInclusive?: boolean;
   @IsOptional() @IsObject() customFields?: Record<string, unknown>;
 
   @IsOptional()

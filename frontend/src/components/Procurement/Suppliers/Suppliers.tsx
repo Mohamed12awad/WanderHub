@@ -4,14 +4,22 @@ import { deleteSupplier, getSuppliers } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Supplier } from "@/types/types";
 import type { FilterConfig } from "@/components/common/GenericTable";
-
-const SUPPLIER_FILTERS: FilterConfig[] = [
-  { label: "Created Date", field: "createdAt", type: "date-range" },
-];
+import { useMemo } from "react";
 
 export default function Suppliers() {
   const { tr } = useLanguage();
   const s = tr.suppliers;
+  const filters = useMemo<FilterConfig[]>(
+    () => [{ label: tr.common.createdDate, field: "createdAt", type: "date-range" }],
+    [tr],
+  );
+  const statusOptions = useMemo(
+    () => [
+      { value: "active", label: s.active },
+      { value: "inactive", label: s.inactive },
+    ],
+    [s],
+  );
 
   return (
     <GenericTable<Supplier>
@@ -21,13 +29,10 @@ export default function Suppliers() {
       }
       deleteData={deleteSupplier}
       headers={s.headers}
-      sortableHeaders={["Name", "Created"]}
+      sortableHeaders={[tr.common.name, tr.common.created]}
       quickStatusFilter={{
         field: "status",
-        options: [
-          { value: "active", label: s.active || "Active" },
-          { value: "inactive", label: s.inactive || "Inactive" },
-        ],
+        options: statusOptions,
       }}
       renderRow={(item, handleDelete) => (
         <SupplierRow
@@ -40,7 +45,17 @@ export default function Suppliers() {
       description={s.description}
       addLink="/procurement/suppliers/add"
       addLabel={s.add}
-      filterConfigs={SUPPLIER_FILTERS}
+      filterConfigs={filters}
+      module="suppliers"
+      importConfig={{ entity: "suppliers", title: "Suppliers", permission: "suppliers:create" }}
+      exportConfig={{ entity: "suppliers", filename: "suppliers" }}
+      bulkConfig={{
+        entity: "suppliers",
+        statusOptions: [
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ],
+      }}
     />
   );
 }

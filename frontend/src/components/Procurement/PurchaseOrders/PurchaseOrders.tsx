@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { GenericTable } from "@/components/common/GenericTable";
+import { ViewSwitch } from "@/components/common/ViewSwitch";
+import PurchaseOrdersBoard from "./PurchaseOrdersBoard";
 import PurchaseOrderRow from "./PurchaseOrderRow";
 import { deletePurchaseOrder, getPurchaseOrders } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -13,10 +16,15 @@ const PO_FILTERS: FilterConfig[] = [
 export default function PurchaseOrders() {
   const { tr } = useLanguage();
   const s = tr.purchaseOrders;
+  const [view, setView] = useState<"list" | "board">("list");
+  const switcher = <ViewSwitch active={view} onChange={setView} />;
+
+  if (view === "board") return <PurchaseOrdersBoard headerExtra={switcher} />;
 
   return (
     <GenericTable<PurchaseOrder>
       queryKey="purchaseOrders"
+      headerExtra={switcher}
       fetchData={({ page, limit, q, filters, sort, dir }) =>
         getPurchaseOrders({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })
       }

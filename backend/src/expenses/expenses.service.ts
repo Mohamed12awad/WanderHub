@@ -7,8 +7,18 @@ import { buildCfConditions } from '../common/customFields';
 import { CustomFieldsService } from '../common/custom-fields.service';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { ApprovalService } from '../common/approval.service';
+import { PostingService } from '../accounting/posting.service';
 import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
 import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
+
+const EXPENSE_REPORT_INCLUDE = {
+  user: { select: { id: true, name: true } },
+  project: { select: { id: true, name: true } },
+  costCenter: { select: { id: true, code: true, name: true } },
+  approvedBy: { select: { id: true, name: true } },
+  updatedBy: { select: { id: true, name: true } },
+  expenses: true,
+};
 
 @Injectable()
 export class ExpensesService {
@@ -17,7 +27,22 @@ export class ExpensesService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly posting: PostingService,
   ) {}
+
+  /**
+   * Posts the expense-report GL entry (Dr Expense / Cr AP) once finally approved.
+   * No-op when GL posting is disabled, before the cutover date, or already
+   * posted (idempotent on the report id).
+   */
+  private async postExpenseIssued(id: string, userId: string) {
+    const report = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null },
+      include: { expenses: true },
+    });
+    if (!report) return;
+    await this.posting.postExpenseReport(report, undefined, userId);
+  }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
@@ -35,9 +60,8 @@ export class ExpensesService {
 
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, approvalStatus, createdAt_from, createdAt_to } = query;
-    const baseInclude = { user: { select: { id: true, name: true } }, expenses: true };
     if (!page) {
-      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: baseInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
+      const reports = await this.prisma.expenseReport.findMany({ where: { deletedAt: null }, include: EXPENSE_REPORT_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(reports);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -59,7 +83,7 @@ export class ExpensesService {
       ];
     }
     const [data, total] = await Promise.all([
-      this.prisma.expenseReport.findMany({ where, include: baseInclude, orderBy: { createdAt: 'desc' }, skip: (p - 1) * limit, take: limit }),
+      this.prisma.expenseReport.findMany({ where, include: EXPENSE_REPORT_INCLUDE, orderBy: { createdAt: 'desc' }, skip: (p - 1) * limit, take: limit }),
       this.prisma.expenseReport.count({ where }),
     ]);
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
@@ -68,19 +92,13 @@ export class ExpensesService {
   async findOne(id: string) {
     const report = await this.prisma.expenseReport.findFirst({
       where: { id, deletedAt: null },
-      include: {
-        user: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        approvedBy: { select: { id: true, name: true } },
-        updatedBy: { select: { id: true, name: true } },
-        expenses: true,
-      },
+      include: EXPENSE_REPORT_INCLUDE,
     });
     return report ? toClient(report) : null;
   }
 
   async create(body: CreateExpenseReportDto, userId: string) {
-    const { title, expenses, project } = body;
+    const { title, expenses, project, costCenterId } = body;
     const total = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
     const enabled = await this.approvals.isEnabled('expenses');
     const customFields = await this.customFields.validateAndClean('expenses', body.customFields);
@@ -89,6 +107,7 @@ export class ExpensesService {
         title,
         userId,
         ...(project ? { projectId: project } : {}),
+        ...(costCenterId ? { costCenterId } : {}),
         approvalStatus: enabled ? 'pending' : 'approved',
         ...(customFields !== undefined ? { customFields: customFields as Prisma.InputJsonValue } : {}),
         expenses: {
@@ -98,10 +117,12 @@ export class ExpensesService {
             date: new Date(e.date),
             category: e.category,
             beneficiary: e.beneficiary,
+            ...(e.taskId ? { taskId: e.taskId } : {}),
+            ...(e.milestoneId ? { milestoneId: e.milestoneId } : {}),
           })),
         },
       },
-      include: { user: { select: { id: true, name: true } }, expenses: true },
+      include: EXPENSE_REPORT_INCLUDE,
     });
     if (enabled) {
       const overall = await this.approvals.initSteps(this.prisma, 'ExpenseReport', report.id, 'expenses', total);
@@ -109,6 +130,11 @@ export class ExpensesService {
         await this.prisma.expenseReport.update({ where: { id: report.id }, data: { approvalStatus: 'approved' } });
         (report as { approvalStatus: string }).approvalStatus = 'approved';
       }
+    }
+    // Auto-approved (approvals disabled, or no step applied) → post now, since
+    // approve() won't be called for this report.
+    if (report.approvalStatus === 'approved') {
+      await this.posting.postExpenseReport(report, undefined, userId);
     }
     await this.timeline.log('expense.created', `Expense report "${report.title}" created`, report.id, 'Expense', { total }, userId);
     return toClient(report);
@@ -147,7 +173,7 @@ export class ExpensesService {
     const report = await this.prisma.expenseReport.update({
       where: { id },
       data: data as Prisma.ExpenseReportUncheckedUpdateInput,
-      include: { user: { select: { id: true, name: true } }, expenses: true },
+      include: EXPENSE_REPORT_INCLUDE,
     });
     return toClient(report);
   }
@@ -164,8 +190,9 @@ export class ExpensesService {
       const updated = await this.prisma.expenseReport.update({
         where: { id },
         data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
-        include: { user: { select: { id: true, name: true } }, expenses: true },
+        include: EXPENSE_REPORT_INCLUDE,
       });
+      if (finalApproved) await this.postExpenseIssued(id, userId);
       await this.timeline.log('expense.approved', `Expense report "${report.title}" approval advanced (${result.status})`, id, 'Expense', {}, userId);
       return toClient(updated);
     }
@@ -177,8 +204,9 @@ export class ExpensesService {
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
-      include: { user: { select: { id: true, name: true } }, expenses: true },
+      include: EXPENSE_REPORT_INCLUDE,
     });
+    await this.postExpenseIssued(id, userId);
     await this.timeline.log('expense.approved', `Expense report "${report.title}" approved`, id, 'Expense', {}, userId);
     return toClient(updated);
   }
@@ -194,7 +222,7 @@ export class ExpensesService {
       const updated = await this.prisma.expenseReport.update({
         where: { id },
         data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
-        include: { user: { select: { id: true, name: true } }, expenses: true },
+        include: EXPENSE_REPORT_INCLUDE,
       });
       await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
       return toClient(updated);
@@ -206,7 +234,7 @@ export class ExpensesService {
     const updated = await this.prisma.expenseReport.update({
       where: { id },
       data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
-      include: { user: { select: { id: true, name: true } }, expenses: true },
+      include: EXPENSE_REPORT_INCLUDE,
     });
     await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
     return toClient(updated);

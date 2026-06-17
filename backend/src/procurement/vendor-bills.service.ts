@@ -1,20 +1,24 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { toClient } from '../common/serialize';
 import { paginate, dateRange, UNPAGINATED_MAX } from '../common/paginate';
-import { calcTotals } from '../finance/finance.math';
+import { calcTotals, paymentTolerance } from '../finance/finance.math';
+import { CurrencyService } from '../common/currency.service';
+import { withSerializableRetry } from '../common/prisma-retry';
 import { CreateVendorBillDto } from './dto/create-vendor-bill.dto';
 import { UpdateVendorBillDto } from './dto/update-vendor-bill.dto';
 import { RecordBillPaymentDto } from './dto/record-bill-payment.dto';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { PostingService } from '../accounting/posting.service';
 
 const BILL_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
   purchaseOrder: { select: { id: true, poNumber: true } },
+  costCenter: { select: { id: true, code: true, name: true } },
   items: { orderBy: { order: 'asc' as const } },
   payments: { orderBy: { date: 'asc' as const } },
   createdBy: { select: { id: true, name: true } },
@@ -37,7 +41,27 @@ export class VendorBillsService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly posting: PostingService,
+    private readonly currency: CurrencyService,
   ) {}
+
+  /**
+   * Posts the vendor-bill GL entry once approved. When the bill's PO was already
+   * received into stock, the goods value clears GRNI (Dr GRNI / Cr AP); otherwise
+   * it is expensed (Dr Expense / Cr AP).
+   */
+  private async postBillIssued(billId: string, userId: string) {
+    const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
+    if (!bill) return;
+    await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
+  }
+
+  /** True if the linked PO has been received into stock (GRNI was accrued). */
+  private async wasReceived(purchaseOrderId: string | null): Promise<boolean> {
+    if (!purchaseOrderId) return false;
+    const mv = await this.prisma.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: purchaseOrderId } });
+    return !!mv;
+  }
 
   private async getApprovalConfig() {
     const config = await this.prisma.workspaceConfig.findFirst();
@@ -110,13 +134,13 @@ export class VendorBillsService {
   }
 
   async create(body: CreateVendorBillDto, userId: string) {
-    const { items = [], taxRate = 0, ...rest } = body;
+    const { items = [], taxRate = 0, taxInclusive = false, ...rest } = body;
     const data = this.cleanData(rest);
     data.customFields = await this.customFields.validateAndClean(
       'vendorBills',
       data.customFields as Record<string, unknown> | undefined,
     );
-    const totals = calcTotals(items, taxRate);
+    const totals = calcTotals(items, taxRate, taxInclusive);
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const enabled = await this.approvals.isEnabled('vendor_bills');
 
@@ -125,6 +149,7 @@ export class VendorBillsService {
         ...data,
         billNumber,
         taxRate,
+        taxInclusive,
         subtotal: totals.subtotal,
         tax: totals.tax,
         total: totals.total,
@@ -144,6 +169,10 @@ export class VendorBillsService {
       }
     }
 
+    if (bill.approvalStatus === 'approved') {
+      await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
+    }
+
     await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created`, bill.id, 'VendorBill', { billNumber }, userId);
     return toClient(bill);
   }
@@ -152,7 +181,7 @@ export class VendorBillsService {
     const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
 
-    const { items, taxRate, ...rest } = body;
+    const { items, taxRate, taxInclusive, ...rest } = body;
     const data = this.cleanData(rest);
     if (typeof data.issueDate === 'string') data.issueDate = data.issueDate ? new Date(data.issueDate) : undefined;
     if (typeof data.dueDate === 'string') data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
@@ -167,11 +196,13 @@ export class VendorBillsService {
       if (items !== undefined) {
         await tx.vendorBillItem.deleteMany({ where: { billId: id } });
         const tr = taxRate ?? existing.taxRate;
-        const totals = calcTotals(items, tr);
+        const inclusive = taxInclusive ?? existing.taxInclusive;
+        const totals = calcTotals(items, tr, inclusive);
         data.subtotal = totals.subtotal;
         data.tax = totals.tax;
         data.total = totals.total;
         data.taxRate = tr;
+        data.taxInclusive = inclusive;
         await tx.vendorBillItem.createMany({
           data: totals.items.map((item, idx) => ({ ...item, billId: id, order: idx })),
         });
@@ -208,6 +239,7 @@ export class VendorBillsService {
         },
         include: BILL_INCLUDE,
       });
+      if (finalApproved) await this.postBillIssued(id, userId);
       await this.timeline.log('bill.approved', `Vendor Bill approval advanced (${result.status})`, id, 'VendorBill', {}, userId);
       return toClient(updated);
     }
@@ -228,6 +260,7 @@ export class VendorBillsService {
       },
       include: BILL_INCLUDE,
     });
+    await this.postBillIssued(id, userId);
     await this.timeline.log('bill.approved', 'Vendor Bill approved', id, 'VendorBill', {}, userId);
     return toClient(updated);
   }
@@ -242,7 +275,8 @@ export class VendorBillsService {
       await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'reject', reason);
       const updated = await this.prisma.vendorBill.update({
         where: { id },
-        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        // Clear any prior approval so a rejected bill never keeps stale approvedBy/approvedAt.
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
         include: BILL_INCLUDE,
       });
       await this.timeline.log('bill.rejected', 'Vendor Bill rejected', id, 'VendorBill', { reason }, userId);
@@ -254,7 +288,8 @@ export class VendorBillsService {
 
     const updated = await this.prisma.vendorBill.update({
       where: { id },
-      data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+      // Clear any prior approval (see chain path above).
+      data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
       include: BILL_INCLUDE,
     });
     await this.timeline.log('bill.rejected', 'Vendor Bill rejected', id, 'VendorBill', { reason }, userId);
@@ -263,25 +298,28 @@ export class VendorBillsService {
 
   async recordPayment(billId: string, body: RecordBillPaymentDto, userId: string) {
     const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
-    if (!bill) return null;
+    if (!bill) throw new NotFoundException('Vendor bill not found');
     if (bill.approvalStatus !== 'approved') throw new BadRequestException('Vendor bill must be approved before recording payment');
     if (bill.status === 'cancelled') throw new BadRequestException('Cannot record a payment against a cancelled vendor bill');
 
     const payCurrency = body.currency ?? bill.currency;
 
-    const updated = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const updated = await withSerializableRetry(() => this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Re-fetch inside the serializable transaction so concurrent payments
       // cannot both pass the outstanding check on a stale snapshot.
       const fresh = await tx.vendorBill.findUnique({ where: { id: billId } });
-      if (!fresh) throw new BadRequestException('Vendor bill not found');
+      if (!fresh) throw new NotFoundException('Vendor bill not found');
       const outstanding = Number(fresh.total) - Number(fresh.totalPaid ?? 0);
-      if (body.amount > outstanding + 0.005) {
+      // Compare in the bill currency: convert foreign-currency payments so an
+      // overpayment is caught regardless of the payment currency.
+      const amountInBillCcy = await this.currency.convert(body.amount, payCurrency, fresh.currency);
+      if (amountInBillCcy > outstanding + paymentTolerance(fresh.currency)) {
         throw new BadRequestException(
           `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${fresh.currency}`,
         );
       }
 
-      await tx.vendorBillPayment.create({
+      const payment = await tx.vendorBillPayment.create({
         data: {
           billId,
           amount: body.amount,
@@ -306,8 +344,11 @@ export class VendorBillsService {
         await tx.account.update({ where: { id: body.accountId }, data: { balance: { decrement: body.amount } } });
       }
 
+      // GL: Dr AP / Cr Cash / realized FX — same transaction as the cache move.
+      await this.posting.postVendorBillPayment(payment, bill, tx, userId);
+
       return this.recalcBillTotals(tx, billId);
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
     return updated ? toClient(updated) : null;
   }
@@ -317,6 +358,8 @@ export class VendorBillsService {
     if (!payment) return null;
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // GL: reverse the payment entry before deleting the row.
+      await this.posting.reverseLive('VendorBillPayment', paymentId, {}, tx);
       // Restore account balance
       if (payment.accountId) {
         await tx.account.update({ where: { id: payment.accountId }, data: { balance: { increment: payment.amount } } });
@@ -382,6 +425,11 @@ export class VendorBillsService {
       } as Prisma.VendorBillUncheckedCreateInput,
       include: BILL_INCLUDE,
     });
+
+    // Auto-approved (approvals disabled) → post now; clears GRNI if the PO was received.
+    if (bill.approvalStatus === 'approved') {
+      await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
+    }
 
     await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created from PO`, bill.id, 'VendorBill', { poId }, userId);
     return toClient(bill);

@@ -6,7 +6,14 @@ const AddExpenseReport = () => {
   const location = useLocation();
   const clone = (location.state as any)?.clone;
   const defaultValues = clone
-    ? { title: clone.title ?? "", project: clone.project ?? "", expenses: clone.expenses, customFields: clone.customFields ? toCustomFieldValues(clone.customFields) : {} }
+    ? {
+        title: clone.title ?? "",
+        project: clone.project ?? "",
+        costCenterId: clone.costCenterId ?? "",
+        costCenterLabel: clone.costCenterLabel ?? "",
+        expenses: clone.expenses,
+        customFields: clone.customFields ? toCustomFieldValues(clone.customFields) : {},
+      }
     : undefined;
   return <ExpenseForm mode="create" defaultValues={defaultValues} />;
 };

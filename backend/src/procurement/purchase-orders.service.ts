@@ -11,6 +11,7 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { PostingService } from '../accounting/posting.service';
 
 const PO_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -29,7 +30,42 @@ export class PurchaseOrdersService {
     private readonly inventory: InventoryService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly posting: PostingService,
   ) {}
+
+  /**
+   * Receives an approved PO into stock: per line, an inbound stock movement at
+   * the PO unit cost (establishing inventory valuation) plus a GRNI posting
+   * (Dr Inventory / Cr GRNI). Idempotent — a PO can only be received once.
+   */
+  async receive(id: string, userId: string, warehouseId?: string) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null }, include: { items: { orderBy: { order: 'asc' } } },
+    });
+    if (!po) throw new BadRequestException('Purchase order not found');
+    if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before receiving');
+    const already = await this.prisma.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: id } });
+    if (already) throw new BadRequestException('Purchase order has already been received');
+
+    for (const it of po.items) {
+      if (!it.productId || it.quantity <= 0) continue;
+      const product = await this.prisma.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+      if (!product?.tracksInventory) continue;
+      const move = await this.inventory.applyMovement({
+        productId: it.productId, warehouseId, qty: it.quantity, unitCost: Number(it.unitPrice),
+        type: 'in', refType: 'po-receipt', refId: id, note: `PO ${po.poNumber}`, userId,
+      });
+      if (move) {
+        await this.posting.postGrni(
+          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? it.unitPrice), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId, supplierId: po.supplierId },
+          undefined, userId,
+        );
+      }
+    }
+    await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'received' } });
+    await this.timeline.log('po.received', `Purchase Order ${po.poNumber} received into stock`, id, 'PurchaseOrder', {}, userId);
+    return toClient(await this.prisma.purchaseOrder.findUnique({ where: { id }, include: PO_INCLUDE }));
+  }
 
   private async getApprovalConfig() {
     const config = await this.prisma.workspaceConfig.findFirst();

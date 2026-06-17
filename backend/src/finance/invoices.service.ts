@@ -8,18 +8,23 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
-import { calcTotals, deriveInvoiceStatus } from './finance.math';
+import { calcTotals, deriveInvoiceStatus, paymentTolerance } from './finance.math';
 import { UNPAGINATED_MAX } from '../common/paginate';
+import { CurrencyService } from '../common/currency.service';
+import { withSerializableRetry } from '../common/prisma-retry';
 import { InventoryService } from '../inventory/inventory.service';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
+import { PostingService } from '../accounting/posting.service';
+import { WorkspaceConfigService } from '../common/workspace-config.service';
 
 const INVOICE_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true } },
   deal: { select: { id: true, title: true } },
   fromQuote: { select: { id: true, quoteNumber: true } },
+  costCenter: { select: { id: true, code: true, name: true } },
   items: { orderBy: { order: 'asc' as const } },
   updatedBy: { select: { id: true, name: true } },
 };
@@ -34,7 +39,28 @@ export class InvoicesService {
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
     private readonly visibility: VisibilityService,
+    private readonly posting: PostingService,
+    private readonly currency: CurrencyService,
+    private readonly workspaceConfig: WorkspaceConfigService,
   ) {}
+
+  /** Resolve the default tax-inclusive mode from the org's invoice defaults. */
+  private async defaultTaxInclusive(): Promise<boolean> {
+    const config = await this.workspaceConfig.get();
+    const defaults = (config.invoiceDefaults as { taxInclusive?: boolean } | null) ?? {};
+    return defaults.taxInclusive ?? false;
+  }
+
+  /**
+   * Posts the invoice-issued GL entry (Dr AR / Cr Income / Cr Tax) once an
+   * invoice becomes approved. No-op when GL posting is disabled, before the
+   * cutover date, or already posted (idempotent on the invoice id).
+   */
+  private async postInvoiceIssued(invoiceId: string, userId: string) {
+    const inv = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
+    if (!inv) return;
+    await this.posting.postInvoiceIssued(inv, undefined, userId);
+  }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
     const config = await this.prisma.workspaceConfig.findFirst();
@@ -141,8 +167,9 @@ export class InvoicesService {
   }
 
   async createInvoice(body: CreateInvoiceDto, userId: string) {
-    const { items = [], taxRate = 0, customer, deal, customFields: rawCf, ...rest } = body;
-    const totals = calcTotals(items, taxRate);
+    const { items = [], taxRate = 0, customer, deal, customFields: rawCf, taxInclusive: bodyTaxInclusive, ...rest } = body;
+    const taxInclusive = bodyTaxInclusive ?? (await this.defaultTaxInclusive());
+    const totals = calcTotals(items, taxRate, taxInclusive);
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
     const enabled = await this.approvals.isEnabled('invoices');
     const customFields = await this.customFields.validateAndClean('invoices', rawCf);
@@ -152,6 +179,7 @@ export class InvoicesService {
         ...(customFields !== undefined ? { customFields } : {}),
         invoiceNumber,
         taxRate,
+        taxInclusive,
         subtotal: totals.subtotal,
         tax: totals.tax,
         total: totals.total,
@@ -174,18 +202,26 @@ export class InvoicesService {
         (invoice as { approvalStatus: string }).approvalStatus = 'approved';
       }
     }
-    // A sale draws product-linked items out of stock.
+    // A sale draws stock-tracked items out of stock and books COGS.
     for (const it of totals.items) {
-      if (it.productId) {
-        await this.inventory.applyMovement({
-          productId: it.productId,
-          qty: -it.quantity,
-          type: 'out',
-          refType: 'Invoice',
-          refId: invoice.id,
-          userId,
-        });
+      if (!it.productId) continue;
+      const product = await this.prisma.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+      if (!product?.tracksInventory) continue;
+      const move = await this.inventory.applyMovement({
+        productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: invoice.id, userId,
+      });
+      if (move) {
+        await this.posting.postCogs(
+          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
+          undefined, userId,
+        );
       }
+    }
+
+    // Auto-approved (approvals disabled) → post the issued GL entry now, since
+    // approveInvoice won't be called for this invoice.
+    if (invoice.approvalStatus === 'approved') {
+      await this.posting.postInvoiceIssued(invoice, undefined, userId);
     }
 
     await this.timeline.log('invoice.created', `Invoice ${invoice.invoiceNumber} created`, invoice.id, 'Invoice', { total: invoice.total, currency: invoice.currency }, userId);
@@ -196,8 +232,9 @@ export class InvoicesService {
     const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    const { items, taxRate, customer: _customer, deal: _deal, issueDate, dueDate, ...rest } = body;
+    const { items, taxRate, customer: _customer, deal: _deal, issueDate, dueDate, taxInclusive, ...rest } = body;
     const data: Record<string, unknown> = { ...rest };
+    if (taxInclusive !== undefined) data.taxInclusive = taxInclusive;
     if (issueDate !== undefined) data.issueDate = issueDate ? new Date(issueDate) : undefined;
     if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
     if ('customFields' in data) {
@@ -213,10 +250,12 @@ export class InvoicesService {
     const updated = await this.prisma.$transaction(async (tx) => {
       if (items) {
         const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
-        const totals = calcTotals(items, tr);
+        const inclusive = taxInclusive !== undefined ? taxInclusive : invoice.taxInclusive;
+        const totals = calcTotals(items, tr, inclusive);
         // Replace line items atomically with the recomputed totals.
         await tx.invoiceLineItem.deleteMany({ where: { invoiceId: id } });
         data.taxRate = tr;
+        data.taxInclusive = inclusive;
         data.subtotal = totals.subtotal;
         data.tax = totals.tax;
         data.total = totals.total;
@@ -237,7 +276,7 @@ export class InvoicesService {
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before sending');
-    if (invoice.status !== 'draft') return this.getInvoiceById(id);
+    if (invoice.status !== 'draft') throw new BadRequestException('Invoice has already been sent');
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { status: 'sent' },
@@ -251,7 +290,9 @@ export class InvoicesService {
       for (const item of invoice.items) {
         if (item.productId && item.quantity > 0) {
           try {
-            await this.inventory.applyMovement({
+            const product = await this.prisma.product.findUnique({ where: { id: item.productId }, select: { tracksInventory: true } });
+            if (!product?.tracksInventory) continue;
+            const move = await this.inventory.applyMovement({
               productId: item.productId,
               qty: -item.quantity,
               type: 'out',
@@ -260,6 +301,12 @@ export class InvoicesService {
               note: `Invoice ${invoice.invoiceNumber}`,
               userId,
             });
+            if (move) {
+              await this.posting.postCogs(
+                { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: item.productId, warehouseId: move.warehouseId },
+                undefined, userId,
+              );
+            }
           } catch {
             // Log but don't fail the send if stock is untracked for this product.
           }
@@ -303,6 +350,7 @@ export class InvoicesService {
         data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
         include: INVOICE_INCLUDE,
       });
+      if (finalApproved) await this.postInvoiceIssued(id, userId);
       return toClient(updated);
     }
 
@@ -315,6 +363,7 @@ export class InvoicesService {
       data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
       include: INVOICE_INCLUDE,
     });
+    await this.postInvoiceIssued(id, userId);
     return toClient(updated);
   }
 
@@ -328,7 +377,9 @@ export class InvoicesService {
       await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason, userPermissions);
       const updated = await this.prisma.invoice.update({
         where: { id },
-        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        // Clear any prior approval: rejecting a previously-approved invoice must
+        // not leave stale approvedBy/approvedAt behind.
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
         include: INVOICE_INCLUDE,
       });
       return toClient(updated);
@@ -339,7 +390,8 @@ export class InvoicesService {
     if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject an invoice you created');
     const updated = await this.prisma.invoice.update({
       where: { id },
-      data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+      // Clear any prior approval (see chain path above).
+      data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
       include: INVOICE_INCLUDE,
     });
     return toClient(updated);
@@ -356,13 +408,17 @@ export class InvoicesService {
     const amount = Number(body.amount);
     const currency = body.currency ?? invoice.currency;
 
-    const { payment } = await this.prisma.$transaction(async (tx) => {
+    const { payment } = await withSerializableRetry(() => this.prisma.$transaction(async (tx) => {
       // Re-fetch inside the serializable transaction so concurrent payments
       // cannot both pass the outstanding check on a stale snapshot.
       const fresh = await tx.invoice.findUnique({ where: { id: invoiceId } });
       if (!fresh) throw new BadRequestException('Invoice not found');
       const outstanding = Number(fresh.total) - Number(fresh.totalPaid ?? 0);
-      if (amount > outstanding + 0.005) {
+      // Compare in the invoice currency: convert a foreign-currency payment at
+      // the invoice's recorded exchange rate so overpayment is caught regardless
+      // of the payment currency. Tolerance is sized to the invoice currency.
+      const amountInInvoiceCcy = await this.currency.convert(amount, currency, fresh.currency, undefined, fresh.exchangeRate);
+      if (amountInInvoiceCcy > outstanding + paymentTolerance(fresh.currency)) {
         throw new BadRequestException(
           `Payment of ${amount} ${currency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${fresh.currency}`,
         );
@@ -376,9 +432,12 @@ export class InvoicesService {
       // Money in: increment the linked account's balance (currency-checked).
       await this.applyAccountDelta(tx, body.accountId, currency, amount);
 
+      // GL: Dr Cash / Cr AR / realized FX — in the same transaction as the cache.
+      await this.posting.postInvoicePayment(payment, invoice, tx, userId);
+
       const updatedInvoice = await this.recalcInvoiceTotals(tx, invoiceId);
       return { payment, updatedInvoice };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
     await this.timeline.log('payment.received', `Payment of ${amount} ${currency} recorded`, invoiceId, 'Invoice', { amount, currency, method: payment.method }, userId);
 
@@ -392,6 +451,8 @@ export class InvoicesService {
     if (!payment) throw new NotFoundException('Payment not found');
 
     await this.prisma.$transaction(async (tx) => {
+      // GL: reverse the payment's journal entry before deleting the row.
+      await this.posting.reverseLive('InvoicePayment', paymentId, { createdById: user.id }, tx);
       await tx.invoicePayment.delete({ where: { id: paymentId } });
       // Money out: reverse the balance move this payment had applied.
       await this.applyAccountDelta(tx, payment.accountId, payment.currency, -Number(payment.amount));
@@ -411,7 +472,7 @@ export class InvoicesService {
     const newCurrency = body.currency ?? payment.currency;
     const newAccountId = body.accountId !== undefined ? body.accountId : payment.accountId;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await withSerializableRetry(() => this.prisma.$transaction(async (tx) => {
       // Re-fetch invoice and payment inside the serializable transaction so the
       // outstanding check sees a consistent snapshot. Doing this check outside
       // the transaction (or without serializable isolation) allowed two
@@ -423,9 +484,12 @@ export class InvoicesService {
       if (!freshPayment) throw new NotFoundException('Payment not found');
 
       // Reject edits that would push totalPaid past the invoice total. Outstanding
-      // is computed excluding this payment's current amount.
+      // is computed excluding this payment's current amount. Foreign-currency
+      // edits are converted at the invoice's recorded rate (previously skipped,
+      // which let a cross-currency edit overpay unchecked).
       const outstandingExcl = Number(fresh.total) - (Number(fresh.totalPaid ?? 0) - Number(freshPayment.amount));
-      if (newCurrency === fresh.currency && newAmount > outstandingExcl + 0.005) {
+      const newAmountInInvoiceCcy = await this.currency.convert(newAmount, newCurrency, fresh.currency, undefined, fresh.exchangeRate);
+      if (newAmountInInvoiceCcy > outstandingExcl + paymentTolerance(fresh.currency)) {
         throw new BadRequestException(
           `Payment of ${newAmount} ${newCurrency} exceeds the outstanding balance of ${outstandingExcl.toFixed(2)} ${fresh.currency}`,
         );
@@ -435,6 +499,9 @@ export class InvoicesService {
       // Handles amount, currency, and account changes (including moving between
       // accounts) without double-counting.
       await this.applyAccountDelta(tx, freshPayment.accountId, freshPayment.currency, -Number(freshPayment.amount));
+      // GL: reverse the old payment entry; the corrected one is re-posted below
+      // under a versioned sourceId so idempotency on the original id is preserved.
+      await this.posting.reverseLive('InvoicePayment', paymentId, { createdById: user.id }, tx);
 
       const updated = await tx.invoicePayment.update({
         where: { id: paymentId },
@@ -442,9 +509,10 @@ export class InvoicesService {
       });
 
       await this.applyAccountDelta(tx, newAccountId, newCurrency, newAmount);
+      await this.posting.postInvoicePayment(updated, invoice, tx, user.id, `${paymentId}#r${Date.now()}`);
       await this.recalcInvoiceTotals(tx, invoiceId);
       return updated;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
     return toClient(updated);
   }

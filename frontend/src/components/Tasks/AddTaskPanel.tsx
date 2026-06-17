@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createTask, updateTask, getUsers, getProjects, getProjectMilestones } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { X, FolderKanban } from "lucide-react";
 import DynamicFields from "@/components/common/DynamicFields";
 import { toCustomFieldValues } from "@/utils/customFields";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 
 interface Props {
   open: boolean;
@@ -50,14 +51,29 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
     assignedTo: "",
     project: projectId ?? "",
     milestone: "",
+    estimatedCost: undefined,
     tags: [],
   });
   const [tagInput, setTagInput] = useState("");
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
+  const initialSourceRef = useRef<string | null>(null);
+  const { allowNavigation, resetSnapshot, confirmDiscard } = useUnsavedChangesSnapshot(
+    { form, customFields },
+    { enabled: open },
+  );
 
   useEffect(() => {
+    if (!open) {
+      initialSourceRef.current = null;
+      return;
+    }
+    const sourceKey = JSON.stringify({ taskId: task?._id ?? null, cloneData, projectId, presetMilestoneId });
+    if (initialSourceRef.current === sourceKey) return;
+    initialSourceRef.current = sourceKey;
+
+    let nextForm: TaskFormData;
     if (task) {
-      setForm({
+      nextForm = {
         title: task.title,
         description: task.description ?? "",
         priority: task.priority,
@@ -66,10 +82,11 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
         assignedTo: task.assignedTo?._id ?? "",
         project: task.project?._id ?? projectId ?? "",
         milestone: task.milestone?._id ?? "",
+        estimatedCost: task.estimatedCost ?? undefined,
         tags: task.tags ?? [],
-      });
+      };
     } else if (cloneData) {
-      setForm({
+      nextForm = {
         title: cloneData.title ?? "",
         description: cloneData.description ?? "",
         priority: cloneData.priority ?? "medium",
@@ -78,21 +95,27 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
         assignedTo: cloneData.assignedTo ?? "",
         project: cloneData.project ?? projectId ?? "",
         milestone: cloneData.milestone ?? "",
+        estimatedCost: cloneData.estimatedCost ?? undefined,
         tags: cloneData.tags ?? [],
-      });
+      };
     } else {
-      setForm({
+      nextForm = {
         title: "", description: "", priority: "medium", status: "todo",
-        dueDate: "", assignedTo: "", project: projectId ?? "", milestone: presetMilestoneId ?? "", tags: [],
-      });
+        dueDate: "", assignedTo: "", project: projectId ?? "", milestone: presetMilestoneId ?? "",
+        estimatedCost: undefined, tags: [],
+      };
     }
-    setCustomFields(
+
+    const nextCustomFields =
       task ? toCustomFieldValues((task as any).customFields)
       : cloneData?.customFields ? toCustomFieldValues(cloneData.customFields)
-      : {},
-    );
+      : {};
+
+    setForm(nextForm);
+    setCustomFields(nextCustomFields);
     setTagInput("");
-  }, [task, cloneData, open, projectId, presetMilestoneId]);
+    resetSnapshot({ form: nextForm, customFields: nextCustomFields });
+  }, [task, cloneData, open, projectId, presetMilestoneId, resetSnapshot]);
 
   const { data: usersData } = useQuery({ queryKey: ["users"], queryFn: () => getUsers() });
   const users: { _id: string; name: string }[] = Array.isArray(usersData?.data) ? usersData.data : [];
@@ -120,6 +143,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
     if (activeProjectId) queryClient.invalidateQueries({ queryKey: ["project-tasks", activeProjectId] });
     toast({ title: isEdit ? "Task updated." : "Task created." });
+    allowNavigation();
+    resetSnapshot();
     onClose();
   };
 
@@ -153,9 +178,15 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
     else createMut.mutate(payload);
   };
 
+  const handleClose = () => {
+    if (!confirmDiscard()) return;
+    resetSnapshot();
+    onClose();
+  };
+
   return (
     <>
-      {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]" onClick={handleClose} />}
       <aside
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-full max-w-md bg-background border-l shadow-2xl flex flex-col transition-transform duration-300",
@@ -164,7 +195,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="font-semibold text-base">{isEdit ? "Edit Task" : t.add}</h2>
-          <button onClick={onClose} className="rounded-md p-1 hover:bg-muted transition-colors">
+          <button onClick={handleClose} className="rounded-md p-1 hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -303,6 +334,20 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
             </div>
           </div>
 
+          {/* Estimated cost */}
+          <div className="space-y-1.5">
+            <Label htmlFor="task-est-cost">Estimated Cost</Label>
+            <Input
+              id="task-est-cost"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.estimatedCost ?? ""}
+              onChange={(e) => set("estimatedCost", e.target.value === "" ? undefined : Number(e.target.value))}
+              placeholder="Planned budget for this task"
+            />
+          </div>
+
           {/* Tags */}
           <div className="space-y-1.5">
             <Label>{t.tags}</Label>
@@ -339,7 +384,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
         </div>
 
         <div className="px-5 py-4 border-t flex gap-2 justify-end">
-          <Button variant="outline" onClick={onClose}>{tr.common.cancel}</Button>
+          <Button variant="outline" onClick={handleClose}>{tr.common.cancel}</Button>
           <Button disabled={!form.title.trim() || saving} onClick={handleSubmit}>
             {saving ? tr.common.loading : isEdit ? tr.common.save : "Create"}
           </Button>

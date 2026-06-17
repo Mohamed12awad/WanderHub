@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Quote as QuoteIcon } from "lucide-react";
 import { getInvoiceDefaults, updateInvoiceDefaults } from "@/utils/api";
@@ -14,6 +15,7 @@ interface InvoiceDefaults {
   notes: string;
   terms: string;
   quotesValidDays: number;
+  taxInclusive: boolean;
 }
 
 const INITIAL: InvoiceDefaults = {
@@ -21,6 +23,7 @@ const INITIAL: InvoiceDefaults = {
   notes: "",
   terms: "",
   quotesValidDays: 30,
+  taxInclusive: false,
 };
 
 export default function InvoiceDefaultsSettings() {
@@ -40,7 +43,7 @@ export default function InvoiceDefaultsSettings() {
       .finally(() => setLoading(false));
   }, [toast]);
 
-  const patch = (field: keyof InvoiceDefaults, value: string | number) =>
+  const patch = (field: keyof InvoiceDefaults, value: string | number | boolean) =>
     setForm((p) => ({ ...p, [field]: value }));
 
   const save = async () => {
@@ -57,14 +60,14 @@ export default function InvoiceDefaultsSettings() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-5">
+      <div className="page-w-narrow page-pad page-gap">
         {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h2 className="text-lg font-semibold">Invoice Defaults</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -116,6 +119,21 @@ export default function InvoiceDefaultsSettings() {
               value={form.terms}
               onChange={(e) => patch("terms", e.target.value)}
               placeholder="e.g. Payment due within the agreed period. Late fees may apply."
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="tax-inclusive">Tax-inclusive prices by default</Label>
+              <p className="text-xs text-muted-foreground">
+                When on, new invoices treat line prices as tax-inclusive (tax is
+                back-calculated out of the total). Can be overridden per invoice.
+              </p>
+            </div>
+            <Switch
+              id="tax-inclusive"
+              checked={form.taxInclusive}
+              onCheckedChange={(v) => patch("taxInclusive", v)}
             />
           </div>
         </CardContent>

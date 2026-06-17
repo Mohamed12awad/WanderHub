@@ -18,6 +18,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { CircleArrowLeft } from "lucide-react";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { useState } from "react";
 
@@ -45,6 +46,8 @@ const AddUser: React.FC = () => {
     resolver: zodResolver(schema),
     defaultValues: { name: "", phone: "", email: "", password: "", role: "" },
   });
+  const values = form.watch();
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot({ values, reportsTo });
 
   const { data: rolesData, isPending: rolesLoading } = useQuery({
     queryKey: queryKeys.roles.all,
@@ -64,7 +67,11 @@ const AddUser: React.FC = () => {
     invalidate: [queryKeys.users.all],
     successMessage: "User created",
     errorMessage:   "Failed to create user",
-    onSuccess: () => navigate("/settings/users"),
+    onSuccess: () => {
+      allowNavigation();
+      resetSnapshot();
+      navigate("/settings/users");
+    },
   });
 
   const onSubmit = (values: FormValues) => {

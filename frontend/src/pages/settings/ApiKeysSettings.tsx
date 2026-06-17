@@ -44,7 +44,7 @@ export default function ApiKeysSettings() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h1 className="text-lg font-semibold tracking-tight flex items-center gap-2">
           <KeyRound className="h-5 w-5" /> {tk.title}

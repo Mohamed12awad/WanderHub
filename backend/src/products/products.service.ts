@@ -7,12 +7,14 @@ import { CustomFieldsService } from '../common/custom-fields.service';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { TimelineService } from '../timeline/timeline.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customFields: CustomFieldsService,
+    private readonly timeline: TimelineService,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -68,7 +70,7 @@ export class ProductsService {
     return toClient(product);
   }
 
-  async update(id: string, body: UpdateProductDto) {
+  async update(id: string, body: UpdateProductDto, userId?: string) {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('product not found');
     const data = { ...body } as Record<string, unknown>;
@@ -79,6 +81,12 @@ export class ProductsService {
       );
     }
     const product = await this.prisma.product.update({ where: { id }, data: data as Prisma.ProductUncheckedUpdateInput });
+
+    await this.timeline.logUpdate({
+      eventType: 'product.updated', title: 'Product updated', linkedModel: 'Product',
+      id, before: existing as Record<string, unknown>, changed: data, userId,
+    });
+
     return toClient(product);
   }
 

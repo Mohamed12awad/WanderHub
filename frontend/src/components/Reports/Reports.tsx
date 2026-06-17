@@ -26,6 +26,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { downloadCSV } from "@/utils/csv";
 import { defaultPeriod, type PeriodPreset } from "@/components/common/PeriodSelector";
 import { ReportsFilterBar, toReportFilters, type ReportsState } from "./ReportsFilterBar";
+import { PageShell } from "@/components/common/PageShell";
+import { PageHeader } from "@/components/common/PageHeader";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -164,13 +166,16 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex justify-between items-center print:hidden">
-        <h1 className="text-lg font-bold">Reports &amp; Analytics</h1>
-        <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => print()}>
-          <Printer className="h-3.5 w-3.5" />Print
-        </Button>
-      </div>
+    <PageShell width="default">
+      <PageHeader
+        className="print:hidden"
+        title="Reports & Analytics"
+        primaryAction={
+          <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => print()}>
+            <Printer className="h-3.5 w-3.5" />Print
+          </Button>
+        }
+      />
 
       <ReportsFilterBar
         value={state}
@@ -602,7 +607,7 @@ const Reports: React.FC = () => {
           </TabsContent>
         )}
       </Tabs>
-    </div>
+    </PageShell>
   );
 };
 

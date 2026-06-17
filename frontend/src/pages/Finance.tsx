@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
 import { ReceiptText, CircleDollarSign, AlertCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +8,8 @@ import {
   getQuotes, getInvoices, deleteQuote, deleteInvoice, convertQuoteToInvoice,
 } from "@/utils/api";
 import { GenericTable, FilterConfig } from "@/components/common/GenericTable";
+import { ViewSwitch } from "@/components/common/ViewSwitch";
+import QuotesBoard from "@/components/Finance/QuotesBoard";
 import { useAuth } from "@/contexts/authContext";
 import { Quote, Invoice, QuoteStatus, InvoiceStatus } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,77 +21,7 @@ import InvoiceRow from "@/components/Finance/InvoiceRow";
 const QUOTE_STATUSES: QuoteStatus[] = ["draft", "sent", "accepted", "rejected", "expired"];
 const INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent", "partially_paid", "paid", "overdue", "cancelled"];
 const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
-
-function statusLabel(s: string): string {
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-// ── Filter configs ─────────────────────────────────────────────────────────────
-
-const QUOTE_FILTER_CONFIGS: FilterConfig[] = [
-  {
-    label: "Currency",
-    field: "currency",
-    type: "select",
-    options: CURRENCIES.map((c) => ({ label: c, value: c })),
-  },
-  {
-    label: "Approval Status",
-    field: "approvalStatus",
-    type: "select",
-    options: ["pending", "approved", "rejected"].map((s) => ({ label: statusLabel(s), value: s })),
-  },
-  {
-    label: "Amount",
-    field: "total",
-    type: "number-range",
-  },
-  {
-    label: "Valid Until",
-    field: "validUntil",
-    type: "date-range",
-  },
-  {
-    label: "Created",
-    field: "createdAt",
-    type: "date-range",
-  },
-];
-
-const INVOICE_FILTER_CONFIGS: FilterConfig[] = [
-  {
-    label: "Currency",
-    field: "currency",
-    type: "select",
-    options: CURRENCIES.map((c) => ({ label: c, value: c })),
-  },
-  {
-    label: "Approval Status",
-    field: "approvalStatus",
-    type: "select",
-    options: ["pending", "approved", "rejected"].map((s) => ({ label: statusLabel(s), value: s })),
-  },
-  {
-    label: "Amount",
-    field: "total",
-    type: "number-range",
-  },
-  {
-    label: "Issue Date",
-    field: "issueDate",
-    type: "date-range",
-  },
-  {
-    label: "Due Date",
-    field: "dueDate",
-    type: "date-range",
-  },
-  {
-    label: "Created",
-    field: "createdAt",
-    type: "date-range",
-  },
-];
+const APPROVAL_STATUSES = ["pending", "approved", "rejected"];
 
 // ── Client-side fetch wrappers ────────────────────────────────────────────────
 
@@ -128,7 +61,7 @@ function paginate<T>(list: T[], page: number, limit: number) {
   return { data, total, page, pages };
 }
 
-async function fetchQuotesForTable(params: TableParams): Promise<{ data: ReturnType<typeof paginate<Quote>> }> {
+async function fetchQuotesForTable(params: TableParams, sortMap: Record<string, string>): Promise<{ data: ReturnType<typeof paginate<Quote>> }> {
   const resp = await getQuotes();
   let list: Quote[] = Array.isArray(resp.data) ? resp.data : [];
 
@@ -156,7 +89,7 @@ async function fetchQuotesForTable(params: TableParams): Promise<{ data: ReturnT
 
   list = applySort(
     list as unknown as Record<string, unknown>[],
-    { "Quote #": "quoteNumber", "Amount": "total", "Valid Until": "validUntil", "Created": "createdAt" },
+    sortMap,
     params.sort,
     params.dir ?? "desc",
   ) as unknown as Quote[];
@@ -164,7 +97,7 @@ async function fetchQuotesForTable(params: TableParams): Promise<{ data: ReturnT
   return { data: paginate(list, params.page, params.limit) };
 }
 
-async function fetchInvoicesForTable(params: TableParams): Promise<{ data: ReturnType<typeof paginate<Invoice>> }> {
+async function fetchInvoicesForTable(params: TableParams, sortMap: Record<string, string>): Promise<{ data: ReturnType<typeof paginate<Invoice>> }> {
   const resp = await getInvoices();
   let list: Invoice[] = Array.isArray(resp.data) ? resp.data : [];
 
@@ -194,7 +127,7 @@ async function fetchInvoicesForTable(params: TableParams): Promise<{ data: Retur
 
   list = applySort(
     list as unknown as Record<string, unknown>[],
-    { "Invoice #": "invoiceNumber", "Total": "total", "Due Date": "dueDate" },
+    sortMap,
     params.sort,
     params.dir ?? "desc",
     { "Outstanding": (i) => (i as unknown as Invoice).total - (i as unknown as Invoice).totalPaid },
@@ -230,6 +163,8 @@ function CurrencyAmounts({ entries, className }: { entries: [string, number][]; 
 }
 
 function InvoiceSummaryBar({ invoices }: { invoices: Invoice[] }) {
+  const { tr } = useLanguage();
+  const f = tr.finance;
   const invoicedByCur = groupByCurrency(invoices, (i) => i.total);
   const collectedByCur = groupByCurrency(invoices, (i) => i.totalPaid);
   const outstandingByCur = groupByCurrency(
@@ -243,19 +178,19 @@ function InvoiceSummaryBar({ invoices }: { invoices: Invoice[] }) {
     <div className="flex flex-wrap items-center gap-4 text-sm">
       <div className="flex items-center gap-2">
         <ReceiptText className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-        <span className="text-muted-foreground text-xs">Invoiced</span>
+        <span className="text-muted-foreground text-xs">{f.invoiced}</span>
         <CurrencyAmounts entries={invoicedByCur} />
       </div>
       <div className="h-4 w-px bg-border hidden sm:block" />
       <div className="flex items-center gap-2">
         <CircleDollarSign className="h-3.5 w-3.5 text-green-500 shrink-0" />
-        <span className="text-muted-foreground text-xs">Collected</span>
+        <span className="text-muted-foreground text-xs">{f.collected}</span>
         <CurrencyAmounts entries={collectedByCur} className="text-green-600 dark:text-green-400" />
       </div>
       <div className="h-4 w-px bg-border hidden sm:block" />
       <div className="flex items-center gap-2">
         <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-        <span className="text-muted-foreground text-xs">Outstanding</span>
+        <span className="text-muted-foreground text-xs">{f.outstanding}</span>
         <CurrencyAmounts
           entries={outstandingByCur}
           className={hasOutstanding ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}
@@ -263,7 +198,7 @@ function InvoiceSummaryBar({ invoices }: { invoices: Invoice[] }) {
         {!hasOutstanding && <span className="font-semibold text-green-600 dark:text-green-400 tabular-nums">0</span>}
         {overdue > 0 && (
           <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
-            {overdue} overdue
+            {f.overdueCount(overdue)}
           </Badge>
         )}
       </div>
@@ -278,31 +213,58 @@ export function QuotesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { tr } = useLanguage();
+  const f = tr.finance;
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'quotes:delete');
+  const [quotesView, setQuotesView] = useState<"list" | "board">("list");
+  const quotesSwitch = <ViewSwitch active={quotesView} onChange={setQuotesView} />;
+
+  // Headers, sortable columns and the sort map are built from the same `tr` keys
+  // so the (translated) header labels stay in sync with the client-side sort —
+  // sorting keeps working after a language switch.
+  const headers = useMemo(
+    () => [f.quoteNumber, f.titleHeader, f.customer, f.status, f.approval, f.amount, f.validUntil, tr.common.created],
+    [tr],
+  );
+  const sortableHeaders = useMemo(() => [f.quoteNumber, f.amount, f.validUntil, tr.common.created], [tr]);
+  const sortMap = useMemo<Record<string, string>>(
+    () => ({ [f.quoteNumber]: "quoteNumber", [f.amount]: "total", [f.validUntil]: "validUntil", [tr.common.created]: "createdAt" }),
+    [tr],
+  );
+  const filterConfigs = useMemo<FilterConfig[]>(() => [
+    { label: f.currency, field: "currency", type: "select", options: CURRENCIES.map((c) => ({ label: c, value: c })) },
+    { label: f.approvalStatus, field: "approvalStatus", type: "select", options: APPROVAL_STATUSES.map((s) => ({ label: f.approvalStatuses[s], value: s })) },
+    { label: f.amount, field: "total", type: "number-range" },
+    { label: f.validUntil, field: "validUntil", type: "date-range" },
+    { label: tr.common.created, field: "createdAt", type: "date-range" },
+  ], [tr]);
 
   const handleConvert = useCallback(async (id: string) => {
     try {
       const res = await convertQuoteToInvoice(id);
       queryClient.invalidateQueries({ queryKey: ["quotes-gt"] });
-      toast({ title: "Converted to invoice." });
+      toast({ title: f.convertedToInvoice });
       navigate(`/finance/invoices/${res.data._id}`);
     } catch {
-      toast({ title: "Conversion failed", variant: "destructive" });
+      toast({ title: f.conversionFailed, variant: "destructive" });
     }
-  }, [navigate, queryClient, toast]);
+  }, [navigate, queryClient, toast, f]);
+
+  if (quotesView === "board") return <QuotesBoard headerExtra={quotesSwitch} />;
 
   return (
     <GenericTable<Quote>
       queryKey="quotes-gt"
-      fetchData={fetchQuotesForTable}
+      headerExtra={quotesSwitch}
+      fetchData={(p) => fetchQuotesForTable(p, sortMap)}
       deleteData={deleteQuote}
-      headers={["Quote #", "Title", "Customer", "Status", "Approval", "Amount", "Valid Until", "Created"]}
-      sortableHeaders={["Quote #", "Amount", "Valid Until", "Created"]}
+      headers={headers}
+      sortableHeaders={sortableHeaders}
       quickStatusFilter={{
         field: "status",
-        options: QUOTE_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+        options: QUOTE_STATUSES.map((s) => ({ value: s, label: f.quoteStatuses[s] })),
       }}
-      filterConfigs={QUOTE_FILTER_CONFIGS}
+      filterConfigs={filterConfigs}
       renderRow={(item, handleDelete) => (
         <QuoteRow
           key={item._id}
@@ -312,11 +274,11 @@ export function QuotesPage() {
           canDelete={canDelete}
         />
       )}
-      title="Quotes"
-      description="Manage your quotes and proposals"
+      title={f.quotes}
+      description={f.quotesDescription}
       addLink="/finance/quotes/new"
-      addLabel="New Quote"
-      emptyMessage="No quotes yet"
+      addLabel={f.newQuote}
+      emptyMessage={f.noQuotesShort}
     />
   );
 }
@@ -325,6 +287,8 @@ export function QuotesPage() {
 
 export function InvoicesPage() {
   const { user } = useAuth();
+  const { tr } = useLanguage();
+  const f = tr.finance;
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'invoices:delete');
 
   const { data: allData } = useQuery({
@@ -334,18 +298,36 @@ export function InvoicesPage() {
   });
   const allInvoices: Invoice[] = allData?.data ?? [];
 
+  const headers = useMemo(
+    () => [f.invoiceNumber, f.titleHeader, f.customer, f.status, f.total, f.outstanding, f.dueDate],
+    [tr],
+  );
+  const sortableHeaders = useMemo(() => [f.invoiceNumber, f.total, f.outstanding, f.dueDate], [tr]);
+  const sortMap = useMemo<Record<string, string>>(
+    () => ({ [f.invoiceNumber]: "invoiceNumber", [f.total]: "total", [f.outstanding]: "Outstanding", [f.dueDate]: "dueDate" }),
+    [tr],
+  );
+  const filterConfigs = useMemo<FilterConfig[]>(() => [
+    { label: f.currency, field: "currency", type: "select", options: CURRENCIES.map((c) => ({ label: c, value: c })) },
+    { label: f.approvalStatus, field: "approvalStatus", type: "select", options: APPROVAL_STATUSES.map((s) => ({ label: f.approvalStatuses[s], value: s })) },
+    { label: f.amount, field: "total", type: "number-range" },
+    { label: f.issueDate, field: "issueDate", type: "date-range" },
+    { label: f.dueDate, field: "dueDate", type: "date-range" },
+    { label: tr.common.created, field: "createdAt", type: "date-range" },
+  ], [tr]);
+
   return (
     <GenericTable<Invoice>
       queryKey="invoices-gt"
-      fetchData={fetchInvoicesForTable}
+      fetchData={(p) => fetchInvoicesForTable(p, sortMap)}
       deleteData={deleteInvoice}
-      headers={["Invoice #", "Title", "Customer", "Status", "Total", "Outstanding", "Due Date"]}
-      sortableHeaders={["Invoice #", "Total", "Outstanding", "Due Date"]}
+      headers={headers}
+      sortableHeaders={sortableHeaders}
       quickStatusFilter={{
         field: "status",
-        options: INVOICE_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+        options: INVOICE_STATUSES.map((s) => ({ value: s, label: f.invoiceStatuses[s] })),
       }}
-      filterConfigs={INVOICE_FILTER_CONFIGS}
+      filterConfigs={filterConfigs}
       topContent={allInvoices.length > 0 ? <InvoiceSummaryBar invoices={allInvoices} /> : undefined}
       renderRow={(item, handleDelete) => (
         <InvoiceRow
@@ -355,11 +337,11 @@ export function InvoicesPage() {
           canDelete={canDelete}
         />
       )}
-      title="Invoices"
-      description="Manage your invoices and payments"
+      title={f.invoices}
+      description={f.invoicesDescription}
       addLink="/finance/invoices/new"
-      addLabel="New Invoice"
-      emptyMessage="No invoices yet"
+      addLabel={f.newInvoice}
+      emptyMessage={f.noInvoicesShort}
     />
   );
 }

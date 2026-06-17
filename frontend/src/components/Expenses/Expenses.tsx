@@ -66,6 +66,7 @@ export function Expenses() {
       filterConfigs={EXPENSE_FILTERS}
       module="expenses"
       exportConfig={{
+        entity: "expenses",
         filename: "expenses",
         getRow: (ex) => ({
           Title: ex.title,

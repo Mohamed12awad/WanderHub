@@ -11,6 +11,7 @@ import { EntityFormPage } from "@/components/common/EntityFormPage";
 import { TextField, TextareaField, SelectField, FormActions } from "@/components/common/form";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { createProject, updateProject, getProjectById, getCustomers, getDeals, getUsers } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
@@ -82,6 +83,7 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
       manager: cloneData?.manager ?? "",
     },
   });
+  const values = form.watch();
 
   // Reference data — server-side searched lookups
   const fetchCustomers = useCallback((q: string) => getCustomers({ page: 1, limit: 20, q }).then((r) => asOptions(r, "name")), []);
@@ -110,6 +112,10 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
   }, [projectData, form]);
 
   const backHref = mode === "edit" ? `/projects/${id}` : "/projects";
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { values, customFields },
+    { enabled: mode === "add" || !!projectData?.data },
+  );
 
   const mutation = useSaveMutation<Record<string, unknown>>({
     save: (payload) => mode === "edit" ? updateProject(id!, payload) : createProject(payload),
@@ -117,6 +123,8 @@ export default function ProjectForm({ mode }: { mode: "add" | "edit" }) {
     successMessage: mode === "edit" ? "Project updated" : "Project created",
     errorMessage:   mode === "edit" ? "Failed to update project" : "Failed to create project",
     onSuccess: (res: any) => {
+      allowNavigation();
+      resetSnapshot();
       const newId = res?.data?._id ?? id;
       navigate(newId ? `/projects/${newId}` : "/projects");
     },

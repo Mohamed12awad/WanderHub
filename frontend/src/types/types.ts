@@ -27,9 +27,18 @@ export interface Owner {
   name: string;
 }
 
+export type ContactType = "individual" | "company";
+
 export interface Customer {
   _id?: string;
   name: string;
+  // Contact type + type-specific identity fields. `name` is the canonical display
+  // name, derived from these on save.
+  type?: ContactType;
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
+  taxId?: string;
   phone: string;
   mobile: string;
   email: string;
@@ -169,6 +178,8 @@ export interface ExpenseReportData {
   title: string;
   userId: string;
   expenses: ExpenseItem[];
+  costCenterId?: string | null;
+  costCenter?: CostCenter | null;
   approvalStatus?: ApprovalStatus;
   createdAt?: string;
   customFields?: Record<string, string>;
@@ -277,6 +288,9 @@ export interface Task {
   linkedModel?: "Customer" | "Deal";
   project?: { _id: string; name: string } | null;
   milestone?: { _id: string; title: string } | null;
+  estimatedCost?: number | null;
+  /** Computed server-side: sum of expenses attributed to this task. */
+  actualCost?: number;
   completedAt?: string;
   tags?: string[];
   createdBy?: { _id: string; name: string };
@@ -293,6 +307,8 @@ export interface TaskFormData {
   assignedTo?: string;
   project?: string;
   milestone?: string;
+  // Planning figure; actual cost is rolled up server-side from attributed expenses.
+  estimatedCost?: number;
   linkedTo?: string;
   linkedModel?: "Customer" | "Deal";
   tags?: string[];
@@ -368,11 +384,13 @@ export interface Invoice {
   items: LineItem[];
   subtotal: number;
   taxRate: number;
+  taxInclusive?: boolean;
   tax: number;
   total: number;
   totalPaid: number;
   currency: string;
   exchangeRate?: number;
+  costCenter?: CostCenter | null;
   issueDate: string;
   dueDate?: string;
   notes?: string;
@@ -433,6 +451,7 @@ export interface InvoiceFormData {
   items: Omit<LineItem, "total">[];
   taxRate?: number;
   currency: string;
+  costCenterId?: string | null;
   issueDate?: string;
   dueDate?: string;
   notes?: string;
@@ -536,6 +555,7 @@ export interface VendorBill {
   total: number;
   totalPaid: number;
   currency: string;
+  costCenter?: CostCenter | null;
   issueDate: string;
   dueDate?: string;
   notes?: string;
@@ -559,6 +579,16 @@ export interface VendorBillPayment {
   account?: { _id: string; name: string };
   createdBy: { _id: string; name: string };
   createdAt: string;
+}
+
+export interface CostCenter {
+  _id: string;
+  code: string;
+  name: string;
+  createdAt: string;
+  isActive?: boolean;
+  parentId?: string | null;
+  parent?: { _id: string; code: string; name: string } | null;
 }
 
 // ── Projects ──────────────────────────────────────────────────────────────────

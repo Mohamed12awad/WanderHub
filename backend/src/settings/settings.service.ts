@@ -20,11 +20,13 @@ const FIELD_TYPES = [
 ] as const;
 
 const fieldDefSchema = z.object({
-  id: z.string().min(1, 'Field id is required'),
+  id: z.string().min(1).optional(),
+  _id: z.string().min(1).optional(),
   name: z.string().optional(),
   label: z.string().optional(),
   type: z.enum(FIELD_TYPES).optional(),
   required: z.boolean().optional(),
+  hidden: z.boolean().optional(),
   filterable: z.boolean().optional(),
   isSystem: z.boolean().optional(),
   options: z.string().optional(),
@@ -38,13 +40,22 @@ const fieldDefSchema = z.object({
   max: z.number().optional(),
   pattern: z.string().optional(),
   maxLength: z.number().optional(),
-});
+}).superRefine((field, ctx) => {
+  if (!field.id && !field._id) {
+    ctx.addIssue({ code: 'custom', message: 'Field id is required' });
+  }
+}).transform(({ _id, ...field }) => ({ ...field, id: field.id ?? _id! }));
 
 const sectionDefSchema = z.object({
-  id: z.string().min(1, 'Section id is required'),
+  id: z.string().min(1).optional(),
+  _id: z.string().min(1).optional(),
   label: z.string(),
   order: z.number().optional(),
-});
+}).superRefine((section, ctx) => {
+  if (!section.id && !section._id) {
+    ctx.addIssue({ code: 'custom', message: 'Section id is required' });
+  }
+}).transform(({ _id, ...section }) => ({ ...section, id: section.id ?? _id! }));
 
 const fieldGroupsSchema = z.array(
   z.object({
@@ -71,6 +82,10 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, label: string): T
     throw new BadRequestException(`Invalid ${label}: ${msg}`);
   }
   return result.data;
+}
+
+function normalizeWorkspaceFieldGroups(value: unknown) {
+  return parseOrThrow(fieldGroupsSchema, Array.isArray(value) ? value : [], 'fieldGroups');
 }
 
 @Injectable()
@@ -109,7 +124,7 @@ export class SettingsService {
   async getWorkspace() {
     const config = await this.getOrCreate();
     return {
-      fieldGroups: config.fieldGroups,
+      fieldGroups: normalizeWorkspaceFieldGroups(config.fieldGroups),
       moduleSettings: config.moduleSettings,
       pipelineStages: config.pipelineStages,
     };
@@ -123,7 +138,7 @@ export class SettingsService {
     const config = await this.getOrCreate();
     const data: Record<string, unknown> = {};
     if (body.fieldGroups !== undefined) {
-      data.fieldGroups = parseOrThrow(fieldGroupsSchema, body.fieldGroups, 'fieldGroups');
+      data.fieldGroups = normalizeWorkspaceFieldGroups(body.fieldGroups);
     }
     if (body.moduleSettings !== undefined) {
       data.moduleSettings = parseOrThrow(moduleSettingsSchema, body.moduleSettings, 'moduleSettings');
@@ -137,7 +152,7 @@ export class SettingsService {
     });
     this.workspaceConfig.invalidate();
     return {
-      fieldGroups: updated.fieldGroups,
+      fieldGroups: normalizeWorkspaceFieldGroups(updated.fieldGroups),
       moduleSettings: updated.moduleSettings,
       pipelineStages: updated.pipelineStages,
     };
@@ -231,6 +246,9 @@ export class SettingsService {
     notes?: string;
     terms?: string;
     quotesValidDays?: number;
+    // Global default for the per-invoice tax mode. When an invoice is created
+    // without an explicit `taxInclusive`, the invoices service falls back to this.
+    taxInclusive?: boolean;
   }) {
     const config = await this.getOrCreate();
     const existing = (config.invoiceDefaults as Record<string, unknown>) ?? {};
@@ -249,18 +267,68 @@ export class SettingsService {
     return toClient(rates);
   }
 
-  async createTaxRate(body: { name: string; rate: number; isDefault?: boolean }) {
+  async createTaxRate(body: {
+    name: string;
+    rate: number;
+    isDefault?: boolean;
+    liabilityAccountCode?: string | null;
+    inputAccountCode?: string | null;
+  }) {
     if (body.isDefault) {
       await this.prisma.taxRate.updateMany({ data: { isDefault: false } });
     }
     return this.prisma.taxRate.create({ data: body as Prisma.TaxRateUncheckedCreateInput });
   }
 
-  async updateTaxRate(id: string, body: { name?: string; rate?: number; isDefault?: boolean }) {
+  async updateTaxRate(
+    id: string,
+    body: {
+      name?: string;
+      rate?: number;
+      isDefault?: boolean;
+      liabilityAccountCode?: string | null;
+      inputAccountCode?: string | null;
+    },
+  ) {
     if (body.isDefault) {
       await this.prisma.taxRate.updateMany({ where: { id: { not: id } }, data: { isDefault: false } });
     }
     return this.prisma.taxRate.update({ where: { id }, data: body as Prisma.TaxRateUncheckedUpdateInput });
+  }
+
+  // ── GL / Accounting config ──────────────────────────────────────────────────
+
+  async getGlConfig() {
+    const config = await this.getOrCreate();
+    return config.glConfig;
+  }
+
+  async updateGlConfig(body: Record<string, unknown>) {
+    const config = await this.getOrCreate();
+    if (
+      body.defaultCostMethod !== undefined &&
+      !['weighted_average', 'fifo'].includes(body.defaultCostMethod as string)
+    ) {
+      throw new BadRequestException('defaultCostMethod must be "weighted_average" or "fifo"');
+    }
+    if (body.glEnabled !== undefined && typeof body.glEnabled !== 'boolean') {
+      throw new BadRequestException('glEnabled must be a boolean');
+    }
+    if (
+      body.glCutoverDate !== undefined &&
+      body.glCutoverDate !== null &&
+      Number.isNaN(Date.parse(body.glCutoverDate as string))
+    ) {
+      throw new BadRequestException('glCutoverDate must be a valid date');
+    }
+    const existing = (config.glConfig as Record<string, unknown>) ?? {};
+    const merged = { ...existing, ...body };
+    const updated = await this.prisma.workspaceConfig.update({
+      where: { id: config.id },
+      data: { glConfig: merged as Prisma.InputJsonValue },
+    });
+    this.workspaceConfig.invalidate();
+    return updated.glConfig;
   }
 
   async deleteTaxRate(id: string) {

@@ -64,6 +64,13 @@ export class PurchaseOrdersController {
     return this.pos.reject(id, user.id, user.role, body.reason.trim());
   }
 
+  @Post(':id/receive')
+  @HttpCode(200)
+  @RequirePermission('purchase-orders:edit')
+  receive(@Param('id') id: string, @Body() body: { warehouseId?: string }, @CurrentUser() user: AuthUser) {
+    return this.pos.receive(id, user.id, body?.warehouseId);
+  }
+
   @Post(':id/create-bill')
   @HttpCode(201)
   @RequirePermission('purchase-orders:create')

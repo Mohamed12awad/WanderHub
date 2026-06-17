@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ERP Domain Knowledge": {
+      "source": "danhvb/my-ba-skills",
+      "sourceType": "github",
+      "skillPath": "multi-agent-ba/.agent/skills/domain-knowledge/erp/SKILL.md",
+      "computedHash": "7e109014b0f4be824468b7b67c520acc23929af85b60a8d3ed0829319a3a8085"
+    }
+  }
+}

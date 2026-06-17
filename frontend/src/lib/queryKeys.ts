@@ -96,6 +96,11 @@ export const queryKeys = {
   inventory: {
     all: ["inventory"] as const,
   },
+  warehouses: {
+    all: ["warehouses"] as const,
+  },
+  inventoryValuation: (warehouseId?: string) => ["inventory-valuation", warehouseId ?? ""] as const,
+  productCategories: { all: ["product-categories"] as const },
 
   // ── Expenses ─────────────────────────────────────────────────
   expenses: {
@@ -114,4 +119,20 @@ export const queryKeys = {
   duplicates:(entity: string) => ["duplicates", entity] as const,
   importFields:(entity: string) => ["import-fields", entity] as const,
   accounts:  { all: ["accounts"] as const },
+  costCenters: { all: ["cost-centers"] as const },
+
+  // ── Accounting (GL) ──────────────────────────────────────────
+  accounting: {
+    chartOfAccounts: ["coa"] as const,
+    chartAccount:    (id: string) => ["coa", id] as const,
+    accountLedger:   (id: string, page?: number) => ["account-ledger", id, page ?? 1] as const,
+    journal:         (filter?: object) => filter ? ["journal", filter] as const : ["journal"] as const,
+    journalEntry:    (id: string) => ["journal-entry", id] as const,
+    glConfig:        ["gl-config"] as const,
+    trialBalance:    (asOf?: string) => asOf ? ["trial-balance", asOf] as const : ["trial-balance"] as const,
+    profitLoss:      (start?: string, end?: string) => ["profit-loss", start ?? "", end ?? ""] as const,
+    balanceSheet:    (asOf?: string) => ["balance-sheet", asOf ?? ""] as const,
+    cashFlow:        (start?: string, end?: string) => ["cash-flow", start ?? "", end ?? ""] as const,
+    periods:         ["accounting-periods"] as const,
+  },
 };

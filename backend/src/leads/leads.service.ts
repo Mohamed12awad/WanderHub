@@ -153,6 +153,11 @@ export class LeadsService {
       });
     }
 
+    await this.timeline.logUpdate({
+      eventType: 'lead.updated', title: 'Lead updated', linkedModel: 'Lead',
+      id, before: existing as Record<string, unknown>, changed: cleaned, userId,
+    });
+
     return toClient(lead);
   }
 

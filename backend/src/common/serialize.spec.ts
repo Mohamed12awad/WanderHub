@@ -1,4 +1,5 @@
-import { toClient } from './serialize';
+import { Prisma } from '@prisma/client';
+import { toClient, serializeResponse } from './serialize';
 
 describe('toClient', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -32,5 +33,32 @@ describe('toClient', () => {
   it('passes through primitives and null', () => {
     expect(toClient(null)).toBeNull();
     expect(toClient(5 as any)).toBe(5);
+  });
+});
+
+describe('serializeResponse decimal modes', () => {
+  it('number mode (legacy) converts Decimal to a JS number', () => {
+    const out = toClient({ total: new Prisma.Decimal('14.99') }) as any;
+    expect(out.total).toBe(14.99);
+    expect(typeof out.total).toBe('number');
+  });
+
+  it('string mode (new GL endpoints) converts Decimal to a canonical string', () => {
+    const out = serializeResponse({ total: new Prisma.Decimal('14.99') }, 'string') as any;
+    expect(out.total).toBe('14.99');
+    expect(typeof out.total).toBe('string');
+  });
+
+  it('never emits the raw Decimal {s,e,d} shape', () => {
+    const out: any = serializeResponse({ total: new Prisma.Decimal('100.5') }, 'string');
+    expect(out.total).not.toHaveProperty('s');
+    expect(out.total).not.toHaveProperty('d');
+  });
+
+  it('passes Buffers through untouched (file downloads must not be mangled)', () => {
+    const buf = Buffer.from('hello');
+    const out = serializeResponse(buf, 'number');
+    expect(Buffer.isBuffer(out)).toBe(true);
+    expect((out as Buffer).toString()).toBe('hello');
   });
 });

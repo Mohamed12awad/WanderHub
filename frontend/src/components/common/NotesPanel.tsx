@@ -41,7 +41,7 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
   const notes: Note[] = data?.data ?? [];
 
   const isAdminOrOwner = (note: Note) =>
-    note.createdBy._id === user?.id ||
+    note.createdBy._id === user?._id ||
     (user?.permissions ?? []).some((p) => p === '*' || p === 'notes:edit');
 
   const createMut = useMutation({

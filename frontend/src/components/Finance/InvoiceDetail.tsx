@@ -15,6 +15,7 @@ import RecordPaymentDialog from "./RecordPaymentDialog";
 import { DetailPageLayout } from "@/components/common/DetailPageLayout";
 import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
 import { RecordContextPanel } from "@/components/common/RecordContextPanel";
+import { DocumentJournalEntries } from "@/components/common/DocumentJournalEntries";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import LoadingSpinner from "@/components/common/spinner";
@@ -61,7 +62,7 @@ const InvoiceDetail: React.FC = () => {
   const canEdit = hasPerm('invoices:edit') || !approvalEnabled || isRejected;
   const isPaid = outstanding <= 0;
   const canRecordPayment = !isPaid && (hasPerm('invoices:create') || !approvalEnabled || approvalStatus === "approved");
-  const userCanApprove = canUserApprove("invoices", user!.role, perms);
+  const userCanApprove = user ? canUserApprove("invoices", user.role, perms) : false;
 
   const handleSend = async () => {
     setActionLoading(true);
@@ -105,6 +106,8 @@ const InvoiceDetail: React.FC = () => {
           title: `Copy of ${invoice.title}`,
           customer: invoice.customer._id,
           deal: invoice.deal?._id ?? "none",
+          costCenterId: invoice.costCenter?._id ?? "none",
+          costCenterLabel: invoice.costCenter ? `${invoice.costCenter.code} — ${invoice.costCenter.name}` : "None",
           currency: invoice.currency,
           taxRate: invoice.taxRate,
           notes: invoice.notes ?? "",
@@ -298,6 +301,7 @@ const InvoiceDetail: React.FC = () => {
                   </Link>
                 } />
               )}
+              <InfoRow label="Cost Center" value={invoice.costCenter ? `${invoice.costCenter.code} — ${invoice.costCenter.name}` : "—"} />
               <InfoRow label={f.currency} value={invoice.currency} />
               {invoice.exchangeRate != null && (
                 <InfoRow label="Exchange Rate" value={`${invoice.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${invoice.currency}`} />
@@ -433,6 +437,8 @@ const InvoiceDetail: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      <DocumentJournalEntries model="Invoice" id={id!} />
 
       {editingPayment && (
         <RecordPaymentDialog

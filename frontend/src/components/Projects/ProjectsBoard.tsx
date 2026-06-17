@@ -6,6 +6,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { GenericKanban, type KanbanColumn } from "@/components/common/GenericKanban";
 import { ViewToggle } from "./ViewToggle";
 import { CalendarDays, User } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+
+const COLUMN_KEYS = ["planning", "active", "on_hold", "completed", "cancelled"];
+const COLUMN_COLORS: Record<string, string> = {
+  planning: "#94a3b8", active: "#3b82f6", on_hold: "#f59e0b", completed: "#10b981", cancelled: "#f43f5e",
+};
 
 interface BoardProject {
   _id: string;
@@ -17,14 +23,6 @@ interface BoardProject {
   currency?: string;
   endDate?: string;
 }
-
-const COLUMNS: KanbanColumn[] = [
-  { key: "planning",  label: "Planning",  color: "#94a3b8" },
-  { key: "active",    label: "Active",    color: "#3b82f6" },
-  { key: "on_hold",   label: "On Hold",   color: "#f59e0b" },
-  { key: "completed", label: "Completed", color: "#10b981" },
-  { key: "cancelled", label: "Cancelled", color: "#f43f5e" },
-];
 
 function ProjectCard({ project }: { project: BoardProject }) {
   return (
@@ -67,6 +65,12 @@ function ProjectCard({ project }: { project: BoardProject }) {
 export function ProjectsBoard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { tr } = useLanguage();
+  const p = tr.projects;
+  const columns = useMemo<KanbanColumn[]>(
+    () => COLUMN_KEYS.map((key) => ({ key, label: p.statuses[key], color: COLUMN_COLORS[key] })),
+    [p],
+  );
 
   const { data, isPending } = useQuery({
     queryKey: ["projects-board"],
@@ -81,29 +85,29 @@ export function ProjectsBoard() {
       queryClient.invalidateQueries({ queryKey: ["projects-board"] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
-    onError: () => toast({ title: "Failed to move project.", variant: "destructive" }),
+    onError: () => toast({ title: p.moveFailed, variant: "destructive" }),
   });
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 flex-wrap shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Projects</h1>
-          <p className="text-sm text-muted-foreground">Drag a project between stages to update its status.</p>
+      <div className="flex items-start justify-between gap-4 px-6 py-4 border-b bg-card shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold tracking-tight truncate">{p.title}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5 truncate">{p.boardSubtitle}</p>
         </div>
         <ViewToggle active="board" />
       </div>
 
-      <div className="flex-1 min-h-0 px-6 pb-6">
+      <div className="flex-1 min-h-0 p-4 md:p-6">
         <GenericKanban<BoardProject>
           items={projects}
-          columns={COLUMNS}
-          groupBy={(p) => p.status}
-          getId={(p) => p._id}
+          columns={columns}
+          groupBy={(proj) => proj.status}
+          getId={(proj) => proj._id}
           isLoading={isPending}
           onMove={(id, status) => moveMut.mutate({ id, status })}
           renderCard={(project) => <ProjectCard project={project} />}
-          emptyColumnLabel="No projects"
+          emptyColumnLabel={p.noProjects}
         />
       </div>
     </div>

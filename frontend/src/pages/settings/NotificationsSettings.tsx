@@ -81,14 +81,14 @@ export default function NotificationsSettings() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-5">
+      <div className="page-w-narrow page-pad page-gap">
         {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h2 className="text-lg font-semibold">Notifications</h2>
         <p className="text-sm text-muted-foreground mt-0.5">

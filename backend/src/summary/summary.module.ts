@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { SummeryController } from './summery.controller';
-import { SummeryService } from './summery.service';
+import { SummaryController } from './summary.controller';
+import { SummaryService } from './summary.service';
 
 @Module({
-  controllers: [SummeryController],
-  providers: [SummeryService],
+  controllers: [SummaryController],
+  providers: [SummaryService],
 })
-export class SummeryModule {}
+export class SummaryModule {}

@@ -1,11 +1,24 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { translations, LANGUAGES, Lang, Tr } from "@/i18n/translations";
+
+// BCP-47 locale per language, used by the Intl formatters below so numbers,
+// currency and dates render in the conventions of the active language.
+const LOCALES: Record<Lang, string> = {
+  en: "en-US",
+  ar: "ar-EG",
+};
 
 interface LanguageContextProps {
   lang: Lang;
   setLang: (lang: Lang) => void;
   tr: Tr;
   isRTL: boolean;
+  /** Locale-aware number formatting (grouping, numerals). */
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  /** Locale-aware currency formatting. `currency` is an ISO code (e.g. "EGP"). */
+  formatCurrency: (value: number, currency: string, options?: Intl.NumberFormatOptions) => string;
+  /** Locale-aware date formatting. */
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
 }
 
 const LanguageContext = createContext<LanguageContextProps | undefined>(undefined);
@@ -30,11 +43,28 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     document.documentElement.lang = lang;
   }, [lang]);
 
-  return (
-    <LanguageContext.Provider value={{ lang, setLang, tr: translations[lang], isRTL }}>
-      {children}
-    </LanguageContext.Provider>
+  // Rebuilt only when the language changes so consumers get correctly-localized
+  // formatters without reallocating on every render.
+  const formatters = useMemo(() => {
+    const locale = LOCALES[lang];
+    return {
+      formatNumber: (value: number, options?: Intl.NumberFormatOptions) =>
+        new Intl.NumberFormat(locale, options).format(value),
+      formatCurrency: (value: number, currency: string, options?: Intl.NumberFormatOptions) =>
+        new Intl.NumberFormat(locale, { style: "currency", currency, ...options }).format(value),
+      formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) =>
+        new Intl.DateTimeFormat(locale, options ?? { year: "numeric", month: "short", day: "numeric" }).format(
+          value instanceof Date ? value : new Date(value),
+        ),
+    };
+  }, [lang]);
+
+  const value = useMemo(
+    () => ({ lang, setLang, tr: translations[lang], isRTL, ...formatters }),
+    [lang, isRTL, formatters],
   );
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 };
 
 export const useLanguage = () => {

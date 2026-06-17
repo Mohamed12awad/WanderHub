@@ -150,7 +150,7 @@ export class SalesOrdersService {
     return toClient(order);
   }
 
-  async update(id: string, body: UpdateSalesOrderDto) {
+  async update(id: string, body: UpdateSalesOrderDto, userId?: string) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Sales order not found');
     if (['invoiced', 'cancelled'].includes(order.status)) {
@@ -191,6 +191,12 @@ export class SalesOrdersService {
         include: SO_INCLUDE,
       });
     });
+
+    await this.timeline.logUpdate({
+      eventType: 'salesOrder.updated', title: 'Sales order updated', linkedModel: 'SalesOrder',
+      id, before: order as Record<string, unknown>, changed: data, userId, ignore: ['items'],
+    });
+
     return toClient(updated);
   }
 

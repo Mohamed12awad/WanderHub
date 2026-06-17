@@ -1,8 +1,20 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "ApprovalStatus" AS ENUM ('pending', 'approved', 'rejected');
 
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('task_assigned', 'deal_assigned', 'lead_assigned', 'approval_requested', 'approval_approved', 'approval_rejected', 'invoice_overdue', 'bill_overdue');
+
+-- CreateEnum
+CREATE TYPE "AccountType" AS ENUM ('asset', 'liability', 'equity', 'income', 'expense');
+
+-- CreateEnum
+CREATE TYPE "NormalBalance" AS ENUM ('debit', 'credit');
+
+-- CreateEnum
+CREATE TYPE "JournalStatus" AS ENUM ('draft', 'posted', 'reversed');
 
 -- CreateTable
 CREATE TABLE "Role" (
@@ -139,6 +151,20 @@ CREATE TABLE "Notification" (
 );
 
 -- CreateTable
+CREATE TABLE "ProductCategory" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT,
+    "costMethod" TEXT,
+    "parentId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ProductCategory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Product" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -148,6 +174,8 @@ CREATE TABLE "Product" (
     "description" TEXT,
     "notes" TEXT,
     "customFields" JSONB,
+    "tracksInventory" BOOLEAN NOT NULL DEFAULT true,
+    "categoryId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "deletedAt" TIMESTAMP(3),
@@ -157,11 +185,29 @@ CREATE TABLE "Product" (
 );
 
 -- CreateTable
+CREATE TABLE "Warehouse" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "address" JSONB,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "Warehouse_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "StockItem" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
+    "warehouseId" TEXT,
     "quantityOnHand" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "reorderLevel" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "avgCost" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "totalValue" DECIMAL(18,4) NOT NULL DEFAULT 0,
     "location" TEXT,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -172,8 +218,12 @@ CREATE TABLE "StockItem" (
 CREATE TABLE "StockMovement" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
+    "warehouseId" TEXT,
     "qty" DOUBLE PRECISION NOT NULL,
     "type" TEXT NOT NULL,
+    "unitCost" DECIMAL(18,4),
+    "costMethod" TEXT,
+    "sourceMovementId" TEXT,
     "refType" TEXT,
     "refId" TEXT,
     "note" TEXT,
@@ -182,6 +232,21 @@ CREATE TABLE "StockMovement" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "StockMovement_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StockCostLayer" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "warehouseId" TEXT,
+    "remainingQty" DOUBLE PRECISION NOT NULL,
+    "originalQty" DOUBLE PRECISION NOT NULL,
+    "unitCost" DECIMAL(18,4) NOT NULL,
+    "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sourceMovementId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "StockCostLayer_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -565,6 +630,7 @@ CREATE TABLE "WorkspaceConfig" (
     "invoiceDefaults" JSONB NOT NULL DEFAULT '{}',
     "passwordPolicy" JSONB NOT NULL DEFAULT '{}',
     "aiConfig" JSONB NOT NULL DEFAULT '{}',
+    "glConfig" JSONB NOT NULL DEFAULT '{}',
     "baseCurrency" TEXT NOT NULL DEFAULT 'EGP',
     "locale" TEXT NOT NULL DEFAULT 'en-US',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -638,6 +704,8 @@ CREATE TABLE "TaxRate" (
     "name" TEXT NOT NULL,
     "rate" DOUBLE PRECISION NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "liabilityAccountCode" TEXT,
+    "inputAccountCode" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -872,6 +940,77 @@ CREATE TABLE "ProjectMember" (
     CONSTRAINT "ProjectMember_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "ChartOfAccount" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "type" "AccountType" NOT NULL,
+    "normalBalance" "NormalBalance" NOT NULL,
+    "parentId" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "currency" TEXT NOT NULL DEFAULT 'EGP',
+    "cashAccountId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ChartOfAccount_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "JournalEntry" (
+    "id" TEXT NOT NULL,
+    "entryNumber" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "memo" TEXT,
+    "sourceType" TEXT NOT NULL,
+    "sourceId" TEXT NOT NULL,
+    "status" "JournalStatus" NOT NULL DEFAULT 'posted',
+    "reversesEntryId" TEXT,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "JournalEntry_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "JournalLine" (
+    "id" TEXT NOT NULL,
+    "journalEntryId" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "debit" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "credit" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "currency" TEXT NOT NULL DEFAULT 'EGP',
+    "baseAmount" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "memo" TEXT,
+    "customerId" TEXT,
+    "supplierId" TEXT,
+    "projectId" TEXT,
+    "productId" TEXT,
+    "warehouseId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "JournalLine_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AccountBalance" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "period" TEXT NOT NULL,
+    "openingBalance" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "periodDebit" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "periodCredit" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "closingBalance" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "closedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AccountBalance_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
 
@@ -927,10 +1066,37 @@ CREATE INDEX "Notification_userId_read_idx" ON "Notification"("userId", "read");
 CREATE INDEX "Notification_userId_createdAt_idx" ON "Notification"("userId", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StockItem_productId_key" ON "StockItem"("productId");
+CREATE UNIQUE INDEX "ProductCategory_code_key" ON "ProductCategory"("code");
+
+-- CreateIndex
+CREATE INDEX "ProductCategory_deletedAt_idx" ON "ProductCategory"("deletedAt");
+
+-- CreateIndex
+CREATE INDEX "Product_categoryId_idx" ON "Product"("categoryId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Warehouse_code_key" ON "Warehouse"("code");
+
+-- CreateIndex
+CREATE INDEX "Warehouse_isDefault_idx" ON "Warehouse"("isDefault");
+
+-- CreateIndex
+CREATE INDEX "Warehouse_deletedAt_idx" ON "Warehouse"("deletedAt");
+
+-- CreateIndex
+CREATE INDEX "StockItem_warehouseId_idx" ON "StockItem"("warehouseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StockItem_productId_warehouseId_key" ON "StockItem"("productId", "warehouseId");
 
 -- CreateIndex
 CREATE INDEX "StockMovement_productId_createdAt_idx" ON "StockMovement"("productId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "StockMovement_warehouseId_idx" ON "StockMovement"("warehouseId");
+
+-- CreateIndex
+CREATE INDEX "StockCostLayer_productId_warehouseId_receivedAt_idx" ON "StockCostLayer"("productId", "warehouseId", "receivedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Quote_quoteNumber_key" ON "Quote"("quoteNumber");
@@ -1199,6 +1365,48 @@ CREATE INDEX "ProjectMember_userId_idx" ON "ProjectMember"("userId");
 -- CreateIndex
 CREATE UNIQUE INDEX "ProjectMember_projectId_userId_key" ON "ProjectMember"("projectId", "userId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "ChartOfAccount_code_key" ON "ChartOfAccount"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ChartOfAccount_cashAccountId_key" ON "ChartOfAccount"("cashAccountId");
+
+-- CreateIndex
+CREATE INDEX "ChartOfAccount_type_idx" ON "ChartOfAccount"("type");
+
+-- CreateIndex
+CREATE INDEX "ChartOfAccount_parentId_idx" ON "ChartOfAccount"("parentId");
+
+-- CreateIndex
+CREATE INDEX "ChartOfAccount_deletedAt_idx" ON "ChartOfAccount"("deletedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "JournalEntry_entryNumber_key" ON "JournalEntry"("entryNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "JournalEntry_reversesEntryId_key" ON "JournalEntry"("reversesEntryId");
+
+-- CreateIndex
+CREATE INDEX "JournalEntry_date_status_idx" ON "JournalEntry"("date", "status");
+
+-- CreateIndex
+CREATE INDEX "JournalEntry_sourceType_sourceId_idx" ON "JournalEntry"("sourceType", "sourceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "JournalEntry_sourceType_sourceId_key" ON "JournalEntry"("sourceType", "sourceId");
+
+-- CreateIndex
+CREATE INDEX "JournalLine_accountId_idx" ON "JournalLine"("accountId");
+
+-- CreateIndex
+CREATE INDEX "JournalLine_journalEntryId_idx" ON "JournalLine"("journalEntryId");
+
+-- CreateIndex
+CREATE INDEX "AccountBalance_accountId_period_idx" ON "AccountBalance"("accountId", "period");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AccountBalance_accountId_period_key" ON "AccountBalance"("accountId", "period");
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -1236,13 +1444,28 @@ ALTER TABLE "Lead" ADD CONSTRAINT "Lead_convertedToId_fkey" FOREIGN KEY ("conver
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ProductCategory" ADD CONSTRAINT "ProductCategory_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "ProductCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "ProductCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Product" ADD CONSTRAINT "Product_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StockItem" ADD CONSTRAINT "StockItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StockItem" ADD CONSTRAINT "StockItem_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "Warehouse"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StockMovement" ADD CONSTRAINT "StockMovement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockMovement" ADD CONSTRAINT "StockMovement_warehouseId_fkey" FOREIGN KEY ("warehouseId") REFERENCES "Warehouse"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StockMovement" ADD CONSTRAINT "StockMovement_sourceMovementId_fkey" FOREIGN KEY ("sourceMovementId") REFERENCES "StockMovement"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Quote" ADD CONSTRAINT "Quote_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1486,3 +1709,24 @@ ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChartOfAccount" ADD CONSTRAINT "ChartOfAccount_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "ChartOfAccount"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ChartOfAccount" ADD CONSTRAINT "ChartOfAccount_cashAccountId_fkey" FOREIGN KEY ("cashAccountId") REFERENCES "Account"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "JournalEntry" ADD CONSTRAINT "JournalEntry_reversesEntryId_fkey" FOREIGN KEY ("reversesEntryId") REFERENCES "JournalEntry"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "JournalEntry" ADD CONSTRAINT "JournalEntry_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "JournalLine" ADD CONSTRAINT "JournalLine_journalEntryId_fkey" FOREIGN KEY ("journalEntryId") REFERENCES "JournalEntry"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "JournalLine" ADD CONSTRAINT "JournalLine_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "ChartOfAccount"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AccountBalance" ADD CONSTRAINT "AccountBalance_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "ChartOfAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;

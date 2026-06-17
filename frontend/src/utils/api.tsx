@@ -11,6 +11,7 @@ import {
   TaskFormData,
   QuoteFormData,
   InvoiceFormData,
+  CostCenter,
 } from "@/types/types";
 
 import { getAccessToken, setAccessToken, clearAccessToken } from "./tokenStore";
@@ -130,6 +131,12 @@ export const importRecords = (
   payload: { mapping: Record<string, string>; rows: Record<string, string>[] },
 ) => api.post<ImportResult>(`/import/${entity}`, payload);
 
+// ── Export ──────────────────────────────────────────────────────────────────────
+// Streams the full module dataset as CSV. Fetched as a blob (not a plain link) so
+// the in-memory Bearer token is sent; the caller saves it via saveBlob().
+export const exportEntity = (entity: string) =>
+  api.get<Blob>(`/export/${entity}`, { responseType: "blob" });
+
 // ── Dedup + merge ───────────────────────────────────────────────────────────────
 export type DuplicateGroup = {
   field: "phone" | "email";
@@ -246,11 +253,11 @@ export const updateProduct = (id: string, data: Product) =>
 export const deleteProduct = (id: string): Promise<void> =>
   api.delete(`/products/${id}`);
 
-// Summery API Requests
-export const getSummery = (period?: string, range?: { startDate?: string; endDate?: string }) =>
-  api.get("/summery", { params: { timePeriod: period, ...range } });
+// Summary API Requests
+export const getSummary = (period?: string, range?: { startDate?: string; endDate?: string }) =>
+  api.get("/summary", { params: { timePeriod: period, ...range } });
 
-export const getPendingApprovals = () => api.get("/summery/pending-approvals");
+export const getPendingApprovals = () => api.get("/summary/pending-approvals");
 export const getLeadsReport = (params?: ReportFilters) => api.get("/reports/leads", { params });
 
 // Reports API Requests
@@ -334,7 +341,11 @@ export const getTasks = (params?: {
   linkedTo?: string;
   overdue?: string;
   mine?: string;
+  projectId?: string;
+  q?: string;
   page?: number;
+  limit?: number;
+  [key: string]: unknown;
 }) => api.get("/tasks", { params });
 export const getTaskSummary = () => api.get("/tasks/summary");
 export const getTaskById = (id: string) => api.get(`/tasks/${id}`);
@@ -402,9 +413,9 @@ export const editInvoicePayment = (
 
 // Accounts API Requests
 export const getAccounts = () => api.get("/accounts");
-export const createAccount = (data: { name: string; type: string; currency: string; balance?: number; notes?: string }) =>
+export const createAccount = (data: { name: string; type: string; currency: string; balance?: number; notes?: string; chartOfAccountId?: string }) =>
   api.post("/accounts", data);
-export const updateAccount = (id: string, data: { name?: string; type?: string; currency?: string; balance?: number; notes?: string }) =>
+export const updateAccount = (id: string, data: { name?: string; type?: string; currency?: string; balance?: number; notes?: string; chartOfAccountId?: string }) =>
   api.patch(`/accounts/${id}`, data);
 export const deleteAccount = (id: string): Promise<void> => api.delete(`/accounts/${id}`);
 export const getAccountStatement = (id: string, params?: { page?: number; limit?: number }) =>
@@ -454,6 +465,8 @@ export const getExpenseTrend = (params?: ReportFilters) =>
 // New analytics — Operations
 export const getTopProducts = (params?: ReportFilters) =>
   api.get("/reports/top-products", { params });
+export const receivePurchaseOrder = (id: string, warehouseId?: string) =>
+  api.post(`/procurement/purchase-orders/${id}/receive`, warehouseId ? { warehouseId } : {});
 export const getInventoryValuation = () => api.get("/reports/inventory-valuation");
 export const getTaskStats = (params?: ReportFilters) =>
   api.get("/reports/task-stats", { params });
@@ -473,13 +486,42 @@ export const updateApprovalSettings = (approvals: { module: string; approverRole
 
 export const getWorkspaceSettings = () => api.get("/settings/workspace");
 export const updateWorkspaceSettings = (data: {
-  fieldGroups?: { module: string; fields: { id: string; name: string; label: string; type: string; required: boolean; options?: string }[] }[];
+  fieldGroups?: {
+    module: string;
+    fields: {
+      id: string;
+      name: string;
+      label: string;
+      type: string;
+      required: boolean;
+      hidden?: boolean;
+      options?: string;
+      isSystem?: boolean;
+      filterable?: boolean;
+      order?: number;
+      section?: string;
+      multiselect?: boolean;
+      defaultValue?: string;
+      helpText?: string;
+      placeholder?: string;
+      min?: number;
+      max?: number;
+      pattern?: string;
+      maxLength?: number;
+    }[];
+    sections?: { id: string; label: string; order?: number }[];
+  }[];
   moduleSettings?: { module: string; enabled: boolean }[];
+  pipelineStages?: unknown[];
 }) => api.put("/settings/workspace", data);
 
 export const getOrgSettings = () => api.get("/settings/organization");
 export const updateOrgSettings = (data: { baseCurrency?: string; locale?: string }) =>
   api.put("/settings/organization", data);
+
+export const updateLandingPage = (defaultLandingPage: string | null) =>
+  api.put("/users/me/landing-page", { defaultLandingPage });
+export const markOnboarded = () => api.put("/users/me/onboarded", {});
 
 // Leads
 export const getLeads = (params?: { page?: number; limit?: number; q?: string; [key: string]: unknown }) =>
@@ -589,7 +631,7 @@ export const deleteMilestone = (projectId: string, milestoneId: string): Promise
   api.delete(`/projects/${projectId}/milestones/${milestoneId}`);
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
-export const getInventory = (params?: { page?: number; limit?: number; q?: string }) =>
+export const getInventory = (params?: { page?: number; limit?: number; q?: string; warehouseId?: string }) =>
   api.get("/inventory", { params });
 export const getLowStock = () => api.get("/inventory/low-stock");
 export const getInventoryMovements = (productId?: string) =>
@@ -642,16 +684,126 @@ export const updateInvoiceDefaults = (data: {
   notes?: string;
   terms?: string;
   quotesValidDays?: number;
+  taxInclusive?: boolean;
 }) => api.put("/settings/invoice-defaults", data);
 
 // ── Tax Rates ─────────────────────────────────────────────────────────────────
+export type TaxRatePayload = {
+  name: string;
+  rate: number;
+  isDefault?: boolean;
+  liabilityAccountCode?: string | null;
+  inputAccountCode?: string | null;
+};
 export const getTaxRates = () => api.get("/settings/tax-rates");
-export const createTaxRate = (data: { name: string; rate: number; isDefault?: boolean }) =>
+export const createTaxRate = (data: TaxRatePayload) =>
   api.post("/settings/tax-rates", data);
-export const updateTaxRate = (id: string, data: { name?: string; rate?: number; isDefault?: boolean }) =>
+export const updateTaxRate = (id: string, data: Partial<TaxRatePayload>) =>
   api.patch(`/settings/tax-rates/${id}`, data);
 export const deleteTaxRate = (id: string): Promise<void> =>
   api.delete(`/settings/tax-rates/${id}`);
+
+// ── GL / Accounting config ────────────────────────────────────────────────────
+export const getGlConfig = () => api.get("/settings/gl-config");
+export const updateGlConfig = (data: Record<string, unknown>) =>
+  api.put("/settings/gl-config", data);
+
+// ── Cost Centers ─────────────────────────────────────────────────────────────
+export type CostCenterPayload = {
+  code: string;
+  name: string;
+  isActive?: boolean;
+  parentId?: string | null;
+};
+export const getCostCenters = (params?: { q?: string; isActive?: boolean }) =>
+  api.get<CostCenter[]>("/cost-centers", { params });
+export const getCostCenter = (id: string) => api.get<CostCenter>(`/cost-centers/${id}`);
+export const createCostCenter = (data: CostCenterPayload) => api.post<CostCenter>("/cost-centers", data);
+export const updateCostCenter = (id: string, data: Partial<CostCenterPayload>) =>
+  api.patch<CostCenter>(`/cost-centers/${id}`, data);
+export const deleteCostCenter = (id: string): Promise<void> => api.delete(`/cost-centers/${id}`);
+
+// ── Accounting — Chart of Accounts ────────────────────────────────────────────
+export type ChartAccountPayload = {
+  code: string;
+  name: string;
+  type: "asset" | "liability" | "equity" | "income" | "expense";
+  parentId?: string | null;
+  currency?: string;
+  isActive?: boolean;
+  cashAccountId?: string | null;
+};
+export const getChartOfAccounts = (params?: Record<string, string | number | undefined>) =>
+  api.get("/accounting/chart-of-accounts", { params });
+export const getChartOfAccount = (id: string) => api.get(`/accounting/chart-of-accounts/${id}`);
+export const getChartAccountLedger = (id: string, params?: { page?: number; from?: string; to?: string }) =>
+  api.get(`/accounting/chart-of-accounts/${id}/ledger`, { params });
+export const createChartOfAccount = (data: ChartAccountPayload) =>
+  api.post("/accounting/chart-of-accounts", data);
+export const updateChartOfAccount = (id: string, data: Partial<ChartAccountPayload>) =>
+  api.patch(`/accounting/chart-of-accounts/${id}`, data);
+export const deleteChartOfAccount = (id: string): Promise<void> =>
+  api.delete(`/accounting/chart-of-accounts/${id}`);
+
+// ── Accounting — Journal ──────────────────────────────────────────────────────
+export type JournalLinePayload = {
+  accountId: string;
+  debit?: number;
+  credit?: number;
+  currency?: string;
+  memo?: string;
+};
+export type JournalEntryPayload = {
+  date: string;
+  memo?: string;
+  lines: JournalLinePayload[];
+};
+export const getJournalEntries = (params?: { page?: number; limit?: number; status?: string; sourceType?: string; q?: string }) =>
+  api.get("/accounting/journal", { params });
+export const getJournalEntry = (id: string) => api.get(`/accounting/journal/${id}`);
+export const getDocumentJournalEntries = (model: "Invoice" | "VendorBill" | "ExpenseReport", id: string) =>
+  api.get(`/accounting/journal/for/${model}/${id}`);
+export const createJournalEntry = (data: JournalEntryPayload) =>
+  api.post("/accounting/journal", data);
+export const reverseJournalEntry = (id: string) => api.post(`/accounting/journal/${id}/reverse`);
+export const runReconciliation = () => api.post("/accounting/reconcile");
+
+// ── Accounting — Statements ───────────────────────────────────────────────────
+export const getTrialBalance = (params?: { asOf?: string }) =>
+  api.get("/accounting/trial-balance", { params });
+export const getIncomeStatement = (params?: { start?: string; end?: string }) =>
+  api.get("/accounting/profit-loss", { params });
+export const getBalanceSheet = (params?: { asOf?: string }) =>
+  api.get("/accounting/balance-sheet", { params });
+export const getCashFlowStatement = (params?: { start?: string; end?: string }) =>
+  api.get("/accounting/cash-flow", { params });
+
+// ── Warehouses ────────────────────────────────────────────────────────────────
+export type WarehousePayload = { name: string; code: string; address?: unknown; isDefault?: boolean; isActive?: boolean };
+export const getWarehouses = (params?: Record<string, string | number | undefined>) =>
+  api.get("/warehouses", { params });
+export const createWarehouse = (data: WarehousePayload) => api.post("/warehouses", data);
+export const updateWarehouse = (id: string, data: Partial<WarehousePayload>) => api.patch(`/warehouses/${id}`, data);
+export const deleteWarehouse = (id: string): Promise<void> => api.delete(`/warehouses/${id}`);
+export const transferStock = (data: { productId: string; fromWarehouseId: string; toWarehouseId: string; qty: number; note?: string }) =>
+  api.post("/inventory/transfers", data);
+export const returnStock = (data: { movementId: string; qty: number; note?: string }) =>
+  api.post("/inventory/returns", data);
+export const getStockValuation = (params?: { warehouseId?: string; q?: string; page?: number; limit?: number }) =>
+  api.get("/inventory/valuation", { params });
+
+// ── Product categories ────────────────────────────────────────────────────────
+export type ProductCategoryPayload = { name: string; code?: string | null; costMethod?: string | null; parentId?: string | null };
+export const getProductCategories = (params?: Record<string, string | number | undefined>) =>
+  api.get("/product-categories", { params });
+export const createProductCategory = (data: ProductCategoryPayload) => api.post("/product-categories", data);
+export const updateProductCategory = (id: string, data: Partial<ProductCategoryPayload>) => api.patch(`/product-categories/${id}`, data);
+export const deleteProductCategory = (id: string): Promise<void> => api.delete(`/product-categories/${id}`);
+
+// ── Accounting — Period close ─────────────────────────────────────────────────
+export const getClosedPeriods = () => api.get("/accounting/periods");
+export const closePeriod = (period: string) => api.post(`/accounting/periods/${period}/close`);
+export const reopenPeriod = (period: string) => api.post(`/accounting/periods/${period}/reopen`);
 
 // ── Notification Preferences ──────────────────────────────────────────────────
 export const getNotificationPreferences = () =>

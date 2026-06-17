@@ -62,7 +62,7 @@ export default function ExchangeRatesSettings() {
   };
 
   return (
-    <div className="p-6 max-w-3xl space-y-4">
+    <div className="page-w-narrow page-pad page-gap">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Exchange Rates</h2>

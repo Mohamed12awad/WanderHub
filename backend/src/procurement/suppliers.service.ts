@@ -6,12 +6,14 @@ import { UNPAGINATED_MAX } from '../common/paginate';
 import { CustomFieldsService } from '../common/custom-fields.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
+import { TimelineService } from '../timeline/timeline.service';
 
 @Injectable()
 export class SuppliersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly customFields: CustomFieldsService,
+    private readonly timeline: TimelineService,
   ) {}
 
   async findAll(query: Record<string, string>) {
@@ -64,7 +66,7 @@ export class SuppliersService {
     return toClient(supplier);
   }
 
-  async update(id: string, body: UpdateSupplierDto) {
+  async update(id: string, body: UpdateSupplierDto, userId?: string) {
     const existing = await this.prisma.supplier.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
     const { address, ...rest } = body as unknown as Record<string, unknown>;
@@ -80,6 +82,12 @@ export class SuppliersService {
       where: { id },
       data: data as Prisma.SupplierUncheckedUpdateInput,
     });
+
+    await this.timeline.logUpdate({
+      eventType: 'supplier.updated', title: 'Supplier updated', linkedModel: 'Supplier',
+      id, before: existing as Record<string, unknown>, changed: data, userId,
+    });
+
     return toClient(supplier);
   }
 

@@ -46,8 +46,8 @@ export class SalesOrdersController {
 
   @Put(':id')
   @RequirePermission('sales-orders:edit')
-  update(@Param('id') id: string, @Body() body: UpdateSalesOrderDto) {
-    return this.salesOrders.update(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateSalesOrderDto, @CurrentUser() user: AuthUser) {
+    return this.salesOrders.update(id, body, user.id);
   }
 
   @Patch(':id/status')

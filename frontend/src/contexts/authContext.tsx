@@ -9,13 +9,16 @@ import React, {
 import { useNavigate } from "react-router-dom";
 import { setAccessToken, clearAccessToken } from "../utils/tokenStore";
 import { refreshAccessToken } from "../utils/api";
+import { resolveHomeRoute } from "@/lib/resolveHomeRoute";
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: string;
   permissions: string[];
+  defaultLandingPage?: string | null;
+  hasOnboarded?: boolean;
 }
 
 export type AuthError = "network" | "credentials" | "blocked";
@@ -57,7 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         setIsLoggedIn(true);
         setUser(response.data.user);
         localStorage.setItem("user", JSON.stringify(response.data.user));
-        navigate("/dashboard");
+        navigate(resolveHomeRoute(response.data.user));
       }
     } catch (err) {
       if (axios.isAxiosError(err)) {

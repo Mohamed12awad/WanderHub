@@ -39,7 +39,7 @@ backend/
     procurement/     suppliers + purchase-orders + vendor-bills
     projects/ tasks/ activities/ notes/   delivery & collaboration
     products/ inventory/             catalog & stock
-    accounts/ reports/ summery/ search/   finance accounts, analytics, search
+    accounts/ reports/ summary/ search/   finance accounts, analytics, search
     import/ dedup/ bulk/ saved-views/     data tooling (Stage 1)
     api-keys/ public-api/            public REST API
     settings/ roles/ users/ logs/    administration

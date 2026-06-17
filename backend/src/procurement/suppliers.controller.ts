@@ -4,6 +4,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ModuleGuard } from '../common/module.guard';
 import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -35,8 +36,8 @@ export class SuppliersController {
 
   @Put(':id')
   @RequirePermission('suppliers:edit')
-  update(@Param('id') id: string, @Body() body: UpdateSupplierDto) {
-    return this.suppliers.update(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateSupplierDto, @CurrentUser() user: AuthUser) {
+    return this.suppliers.update(id, body, user.id);
   }
 
   @Delete(':id')

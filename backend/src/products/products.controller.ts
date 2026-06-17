@@ -4,6 +4,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { ModuleGuard } from '../common/module.guard';
 import { RequireModule } from '../common/require-module.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -35,8 +36,8 @@ export class ProductsController {
 
   @Put(':id')
   @RequirePermission('products:edit')
-  update(@Param('id') id: string, @Body() body: UpdateProductDto) {
-    return this.products.update(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateProductDto, @CurrentUser() user: AuthUser) {
+    return this.products.update(id, body, user.id);
   }
 
   @Delete(':id')

@@ -24,7 +24,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
   quotes: "Quotes", invoices: "Invoices",
   "sales-orders": "Sales Orders",
   reports: "Reports", users: "Users", roles: "Roles",
-  settings: "Settings", logs: "Logs",
+  settings: "Settings", accounting: "Accounting", logs: "Logs",
   suppliers: "Suppliers", "purchase-orders": "Purchase Orders", "vendor-bills": "Vendor Bills",
   projects: "Projects",
 };

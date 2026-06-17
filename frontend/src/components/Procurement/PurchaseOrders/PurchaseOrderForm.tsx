@@ -14,19 +14,15 @@ import { StickyFormBar } from "@/components/common/StickyFormBar";
 import LineItemsTable, { LineItemRow, toLineItemPayload } from "@/components/Finance/LineItemsTable";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { createPurchaseOrder, updatePurchaseOrder, getPurchaseOrderById, getSuppliers } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const CURRENCIES = ["EGP", "USD", "EUR", "GBP", "AED", "SAR"];
 
-const PO_STATUSES = [
-  { value: "draft",     label: "Draft" },
-  { value: "sent",      label: "Sent" },
-  { value: "confirmed", label: "Confirmed" },
-  { value: "received",  label: "Received" },
-  { value: "cancelled", label: "Cancelled" },
-];
+const PO_STATUS_KEYS = ["draft", "sent", "confirmed", "received", "cancelled"];
 
 const schema = z.object({
   title:        z.string().min(1, "Title is required"),
@@ -44,6 +40,9 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
   const navigate   = useNavigate();
   const { id }     = useParams();
   const location   = useLocation();
+  const { tr }     = useLanguage();
+  const po         = tr.purchaseOrders;
+  const poStatuses = PO_STATUS_KEYS.map((value) => ({ value, label: po.statuses[value] }));
   const cloneData  = mode === "add" ? (location.state as any)?.clone : undefined;
 
   const [items, setItems]               = useState<LineItemRow[]>(cloneData?.items ?? []);
@@ -62,6 +61,7 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
       notes: cloneData?.notes ?? "", taxRate: cloneData?.taxRate ?? 14,
     },
   });
+  const values = form.watch();
 
   const fetchSuppliers = useCallback(
     (q: string) => getSuppliers({ page: 1, limit: 20, q }).then((r) =>
@@ -89,20 +89,26 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
   }, [poData, form]);
 
   const backHref = "/procurement/purchase-orders";
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { values, items, customFields },
+    { enabled: mode === "add" || !!poData?.data },
+  );
 
   const mutation = useSaveMutation<Record<string, unknown>>({
     save: (payload) => mode === "add" ? createPurchaseOrder(payload as any) : updatePurchaseOrder(id!, payload as any),
     invalidate: [queryKeys.purchaseOrders.all],
-    successMessage: "Purchase order saved",
-    errorMessage:   "Failed to save purchase order",
+    successMessage: po.saved,
+    errorMessage:   po.saveFailed,
     onSuccess: (res: any) => {
+      allowNavigation();
+      resetSnapshot();
       const newId = res?.data?._id ?? id;
       navigate(newId ? `/procurement/purchase-orders/${newId}` : backHref);
     },
   });
 
   const onSubmit = (values: FormValues) => {
-    if (items.length === 0) { setItemsError("Please add at least one item"); return; }
+    if (items.length === 0) { setItemsError(po.validation.itemsRequired); return; }
     setItemsError("");
     mutation.mutate({
       title: values.title.trim(), supplier: values.supplierId, status: values.status, currency: values.currency,
@@ -111,34 +117,34 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
     });
   };
 
-  if (mode === "edit" && isFetching) return <div className="p-6">Loading…</div>;
+  if (mode === "edit" && isFetching) return <div className="p-6">{tr.common.loading}</div>;
 
   return (
     <EntityFormPage
-      title={mode === "add" ? "New Purchase Order" : "Edit Purchase Order"}
+      title={mode === "add" ? po.new : po.edit}
       backHref={backHref}
       breadcrumb={[
-        { label: "Purchase Orders", href: backHref },
-        { label: mode === "add" ? "New" : "Edit" },
+        { label: po.title, href: backHref },
+        { label: mode === "add" ? tr.common.new : tr.common.edit },
       ]}
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-6">
             <Card>
-              <CardHeader><CardTitle className="text-lg">Details</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">{po.details}</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <TextField<FormValues> name="title" label="Title" required placeholder="e.g. Q3 hardware restock" />
+                <TextField<FormValues> name="title" label={po.fields.title} required placeholder={po.placeholders.title} />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {/* Supplier */}
                   <FormField control={form.control} name="supplierId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Supplier <span className="text-destructive ms-1">*</span></FormLabel>
+                      <FormLabel>{po.fields.supplier} <span className="text-destructive ms-1">*</span></FormLabel>
                       <FormControl>
                         <AsyncSearchableSelect value={field.value ?? ""} onChange={field.onChange}
                           fetchFn={fetchSuppliers} selectedLabel={supplierLabel}
-                          placeholder="Select Supplier" searchPlaceholder="Search suppliers…"
+                          placeholder={po.placeholders.supplier} searchPlaceholder={po.placeholders.supplierSearch}
                           onSelectItem={(item) => setSupplierLabel(item.label)} />
                       </FormControl>
                       <FormMessage />
@@ -148,7 +154,7 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
                   {/* Currency */}
                   <FormField control={form.control} name="currency" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Currency</FormLabel>
+                      <FormLabel>{po.fields.currency}</FormLabel>
                       <FormControl>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
@@ -160,20 +166,20 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
                     </FormItem>
                   )} />
 
-                  <TextField<FormValues> name="expectedDate" label="Expected Date" type="date" />
+                  <TextField<FormValues> name="expectedDate" label={po.fields.expectedDate} type="date" />
 
                   {/* Status */}
                   <FormField control={form.control} name="status" render={({ field }) => {
                     const value = field.value ?? "";
-                    const opts = value && !PO_STATUSES.some((s) => s.value === value)
-                      ? [...PO_STATUSES, { value, label: value }]
-                      : PO_STATUSES;
+                    const opts = value && !poStatuses.some((s) => s.value === value)
+                      ? [...poStatuses, { value, label: value }]
+                      : poStatuses;
                     return (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel>{po.fields.status}</FormLabel>
                       <FormControl>
                         <Select key={value} value={value} onValueChange={field.onChange}>
-                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder={po.placeholders.status} /></SelectTrigger>
                           <SelectContent>
                             {opts.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                           </SelectContent>
@@ -184,7 +190,7 @@ export default function PurchaseOrderForm({ mode }: { mode: "add" | "edit" }) {
                   }} />
                 </div>
 
-                <TextareaField<FormValues> name="notes" label="Notes" placeholder="Terms, conditions, or shipping notes…" />
+                <TextareaField<FormValues> name="notes" label={po.fields.notes} placeholder={po.placeholders.notes} />
 
                 <DynamicFields module="purchaseOrders" values={customFields} onChange={(k, v) => setCustomFields((prev) => ({ ...prev, [k]: v }))} />
               </CardContent>

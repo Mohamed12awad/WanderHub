@@ -57,6 +57,9 @@ export function Products() {
       noSearchMessage={p.noSearch}
       filterConfigs={PRODUCT_FILTERS}
       module="products"
+      importConfig={{ entity: "products", title: "Products", permission: "products:create" }}
+      exportConfig={{ entity: "products", filename: "products" }}
+      bulkConfig={{ entity: "products" }}
     />
   );
 }

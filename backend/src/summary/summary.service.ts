@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CurrencyService } from '../common/currency.service';
 
 @Injectable()
-export class SummeryService {
+export class SummaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly currency: CurrencyService,
@@ -63,7 +63,7 @@ export class SummeryService {
     return { total: Number(totalAgg._sum.amount ?? 0), categories };
   }
 
-  async getSummery(timePeriod?: string, startDate?: string, endDate?: string) {
+  async getSummary(timePeriod?: string, startDate?: string, endDate?: string) {
     const now = new Date();
     let currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date;
 
@@ -77,7 +77,7 @@ export class SummeryService {
       const span = currentEnd.getTime() - currentStart.getTime();
       previousEnd = new Date(currentStart.getTime() - 1);
       previousStart = new Date(currentStart.getTime() - span - 1);
-      return this.buildSummery(currentStart, currentEnd, previousStart, previousEnd);
+      return this.buildSummary(currentStart, currentEnd, previousStart, previousEnd);
     }
 
     switch (timePeriod) {
@@ -104,11 +104,11 @@ export class SummeryService {
       }
     }
 
-    return this.buildSummery(currentStart, currentEnd, previousStart, previousEnd);
+    return this.buildSummary(currentStart, currentEnd, previousStart, previousEnd);
   }
 
   /** Compute the full current-vs-previous metric payload for two periods. */
-  private async buildSummery(
+  private async buildSummary(
     currentStart: Date,
     currentEnd: Date,
     previousStart: Date,

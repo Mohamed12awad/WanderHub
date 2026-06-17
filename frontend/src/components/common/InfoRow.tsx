@@ -9,7 +9,8 @@ interface InfoRowProps {
 
 /**
  * Single detail-view row: fixed 160px label column, value on the right.
- * Renders nothing when both value and children are empty/null/undefined.
+ * The label is ALWAYS rendered; when the value is empty a muted "—" placeholder
+ * is shown so the field stays visible (labels must not disappear when empty).
  *
  * Usage:
  *   <InfoRow label="Status" value={customer.status} />
@@ -17,14 +18,16 @@ interface InfoRowProps {
  */
 export function InfoRow({ label, value, children }: InfoRowProps) {
   const content = children ?? value;
-  if (content == null || content === "") return null;
+  const isEmpty = content == null || content === "";
 
   return (
     <div className="mb-2 grid grid-cols-[160px_1fr] items-start gap-2">
       <Label className="text-sm font-medium text-foreground/60 pt-0.5">
         {label}
       </Label>
-      <div className="text-sm text-foreground">{content}</div>
+      <div className="text-sm text-foreground">
+        {isEmpty ? <span className="text-muted-foreground/60">—</span> : content}
+      </div>
     </div>
   );
 }

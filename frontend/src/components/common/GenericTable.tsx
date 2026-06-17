@@ -3,7 +3,7 @@ import type { JSX, ReactElement, ReactNode } from "react";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useSearchParams } from "react-router-dom";
-import { PlusCircle, Search, Download, Upload, SlidersHorizontal, X, Inbox, ArrowUpDown, ArrowUp, ArrowDown, Users, Bookmark, Save, Trash2 } from "lucide-react";
+import { PlusCircle, Search, Download, Upload, SlidersHorizontal, X, ArrowUpDown, ArrowUp, ArrowDown, Users, Bookmark, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,11 +16,14 @@ import { Link } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { downloadCSV } from "@/utils/csv";
+import { downloadCSV, saveBlob } from "@/utils/csv";
+import { exportEntity } from "@/utils/api";
 import { ImportDialog } from "@/components/common/ImportDialog";
 import { DedupDialog } from "@/components/common/DedupDialog";
 import { BulkActionBar } from "@/components/common/BulkActionBar";
 import { PermissionGate } from "@/components/common/PermissionGate";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
 import type { Permission } from "@/config/permissions";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -59,8 +62,15 @@ type GenericTableProps<T extends DataItem> = {
   emptyMessage?: string;
   noSearchMessage?: (q: string) => string;
   exportConfig?: {
-    filename: string;
-    getRow: (item: T) => Record<string, unknown>;
+    filename?: string;
+    /** Builds a CSV row from a loaded item (client-side fallback export). */
+    getRow?: (item: T) => Record<string, unknown>;
+    /**
+     * When set, Export streams the FULL module dataset from the backend
+     * (`/export/:entity`) instead of only the rows currently loaded in the table.
+     * Takes precedence over `getRow`.
+     */
+    entity?: string;
   };
   importConfig?: {
     /** Import target key understood by the backend, e.g. "customers". */
@@ -88,9 +98,13 @@ type GenericTableProps<T extends DataItem> = {
     options: { value: string; label: string }[];
   };
   topContent?: React.ReactNode;
+  /** Compact controls rendered inline in the header (e.g. a list/board toggle). */
+  headerExtra?: React.ReactNode;
 };
 
 const SKELETON_WIDTHS = ["w-28", "w-20", "w-24", "w-16", "w-32", "w-12"];
+const SELECTION_CELL_CLASS = "w-10 min-w-10 max-w-10 p-0 text-center";
+const SELECTION_CHECKBOX_WRAP_CLASS = "flex h-full min-h-9 items-center justify-center";
 
 function withMobileLabels(row: JSX.Element, headers: string[], hasSelection: boolean) {
   if (!isValidElement(row)) return row;
@@ -149,15 +163,36 @@ export function GenericTable<T extends DataItem>({
   module,
   quickStatusFilter,
   topContent,
+  headerExtra,
 }: GenericTableProps<T>) {
-  const { tr } = useLanguage();
+  const { tr, isRTL } = useLanguage();
   const queryClient = useQueryClient();
   const { getFilterableCustomFields } = useWorkspaceSettings();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [exporting, setExporting] = useState(false);
+
+  // Export handler: prefer a full-dataset backend stream when `entity` is set;
+  // otherwise fall back to a client-side CSV of the rows currently loaded.
+  const handleExport = async () => {
+    if (!exportConfig) return;
+    if (exportConfig.entity) {
+      try {
+        setExporting(true);
+        const res = await exportEntity(exportConfig.entity);
+        saveBlob(res.data as Blob, exportConfig.filename ?? exportConfig.entity);
+      } catch {
+        toast({ title: "Export failed", variant: "destructive" });
+      } finally {
+        setExporting(false);
+      }
+    } else if (exportConfig.getRow) {
+      downloadCSV(filtered.map(exportConfig.getRow), exportConfig.filename ?? "export");
+    }
+  };
 
   const committedQ    = searchParams.get("q") ?? "";
   const page          = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const limit         = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "25")));
+  const limit         = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "10")));
   const sortBy        = searchParams.get("sort") ?? "";
   const sortDir       = (searchParams.get("dir") ?? "asc") as "asc" | "desc";
 
@@ -349,7 +384,7 @@ export function GenericTable<T extends DataItem>({
     if (pendingDeleteId) { mutation.mutate(pendingDeleteId); setPendingDeleteId(null); }
   };
 
-  if (error) return <div className="p-6 text-sm text-destructive">{tr.common.errorLoading}</div>;
+  if (error) return <div className="p-6"><ErrorState description={tr.common.errorLoading} /></div>;
 
   const rawPayload  = data?.data;
   const isPaged     = rawPayload !== undefined && !Array.isArray(rawPayload) && "data" in rawPayload;
@@ -399,6 +434,7 @@ export function GenericTable<T extends DataItem>({
           <p className="text-sm text-muted-foreground mt-0.5 truncate">{description}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {headerExtra}
           {importConfig && (() => {
             const importBtn = (
               <Button
@@ -427,8 +463,10 @@ export function GenericTable<T extends DataItem>({
           {exportConfig && (
             <Button
               variant="outline" size="sm" className="h-8 gap-1.5"
-              onClick={() => downloadCSV(filtered.map(exportConfig.getRow), exportConfig.filename)}
-              disabled={filtered.length === 0}
+              onClick={handleExport}
+              // Backend export streams the whole dataset, so it's enabled even when
+              // the current page is empty; the client-side fallback needs loaded rows.
+              disabled={exporting || (!exportConfig.entity && filtered.length === 0)}
             >
               <Download className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{tr.common.exportCsv}</span>
@@ -489,7 +527,7 @@ export function GenericTable<T extends DataItem>({
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[320px] p-0 flex flex-col">
+              <SheetContent side={isRTL ? "left" : "right"} className="w-[320px] p-0 flex flex-col">
                 <SheetHeader className="px-5 py-4 border-b shrink-0">
                   <div className="flex items-center justify-between">
                     <SheetTitle className="text-base">{tr.table.filters}</SheetTitle>
@@ -669,19 +707,21 @@ export function GenericTable<T extends DataItem>({
           <TableHeader className="max-md:hidden">
             <TableRow className="hover:bg-transparent bg-muted/30 border-b-2 border-border/60">
               {bulkConfig && (
-                <TableHead className="w-8">
-                  <Checkbox
-                    checked={filtered.length > 0 && filtered.every((i) => selected.has(i._id))}
-                    onCheckedChange={(c) =>
-                      setSelected((prev) => {
-                        const n = new Set(prev);
-                        if (c) filtered.forEach((i) => n.add(i._id));
-                        else filtered.forEach((i) => n.delete(i._id));
-                        return n;
-                      })
-                    }
-                    aria-label="Select all"
-                  />
+                <TableHead className={SELECTION_CELL_CLASS}>
+                  <div className={SELECTION_CHECKBOX_WRAP_CLASS}>
+                    <Checkbox
+                      checked={filtered.length > 0 && filtered.every((i) => selected.has(i._id))}
+                      onCheckedChange={(c) =>
+                        setSelected((prev) => {
+                          const n = new Set(prev);
+                          if (c) filtered.forEach((i) => n.add(i._id));
+                          else filtered.forEach((i) => n.delete(i._id));
+                          return n;
+                        })
+                      }
+                      aria-label="Select all"
+                    />
+                  </div>
                 </TableHead>
               )}
               {headers.map((header) => {
@@ -737,22 +777,14 @@ export function GenericTable<T extends DataItem>({
 
             {!isPending && filtered.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={headers.length + 1 + (bulkConfig ? 1 : 0)} className="py-20 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                      <Inbox className="h-6 w-6 text-muted-foreground/50" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-foreground/70">
-                        {committedQ
-                          ? (noSearchMessage ? noSearchMessage(committedQ) : tr.table.noResults(committedQ))
-                          : (emptyMessage ?? tr.table.noData(title))}
-                      </p>
-                      {!committedQ && (
-                        <p className="text-xs text-muted-foreground">{tr.table.getStarted(title)}</p>
-                      )}
-                    </div>
-                    {!committedQ && (
+                <TableCell colSpan={headers.length + 1 + (bulkConfig ? 1 : 0)} className="text-center">
+                  <EmptyState
+                    className="py-20"
+                    title={committedQ
+                      ? (noSearchMessage ? noSearchMessage(committedQ) : tr.table.noResults(committedQ))
+                      : (emptyMessage ?? tr.table.noData(title))}
+                    description={!committedQ ? tr.table.getStarted(title) : undefined}
+                    action={!committedQ && (
                       onAdd ? (
                         <Button size="sm" variant="outline" className="gap-1.5 mt-1" onClick={onAdd}>
                           <PlusCircle className="h-3.5 w-3.5" />
@@ -767,7 +799,7 @@ export function GenericTable<T extends DataItem>({
                         </Link>
                       ) : null
                     )}
-                  </div>
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -775,8 +807,10 @@ export function GenericTable<T extends DataItem>({
             {!isPending && filtered.map((item) => withMobileLabels(
               renderRow(item, handleDelete,
                 bulkConfig ? (
-                  <TableCell onClick={(e) => e.stopPropagation()} className="w-8">
-                    <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
+                  <TableCell onClick={(e) => e.stopPropagation()} className={SELECTION_CELL_CLASS}>
+                    <div className={SELECTION_CHECKBOX_WRAP_CLASS}>
+                      <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
+                    </div>
                   </TableCell>
                 ) : undefined,
               ),

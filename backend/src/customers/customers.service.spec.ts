@@ -23,7 +23,7 @@ function buildPrisma() {
   } as any;
 }
 
-const timelineMock = { log: jest.fn().mockResolvedValue(undefined) } as any;
+const timelineMock = { log: jest.fn().mockResolvedValue(undefined), logUpdate: jest.fn().mockResolvedValue(undefined) } as any;
 const visibilityMock = { ownershipWhere: jest.fn().mockResolvedValue({}) } as any;
 const customFieldsMock = { validateAndClean: jest.fn().mockResolvedValue({}) } as any;
 const dealsMock = {} as any;

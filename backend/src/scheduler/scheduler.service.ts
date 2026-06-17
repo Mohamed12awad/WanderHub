@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationDispatcher } from '../notifications/notification-dispatcher';
+import { ReconciliationService } from '../accounting/reconciliation.service';
 
 /**
  * Background maintenance. In a long-running deployment the @Cron decorators
@@ -15,6 +16,7 @@ export class SchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: NotificationDispatcher,
+    private readonly reconciliation: ReconciliationService,
   ) {}
 
   /**
@@ -72,16 +74,22 @@ export class SchedulerService {
     return { invoices: dueInvoices.length, bills: dueBills.length };
   }
 
-  /** Runs the full maintenance cycle (overdue sweep + email delivery). */
+  /** Runs the full maintenance cycle (overdue sweep + email delivery + GL reconciliation). */
   async runMaintenance() {
     const overdue = await this.runOverdueSweep();
     const email = await this.dispatcher.drainOutbox();
-    return { overdue, email };
+    const reconciliation = await this.reconciliation.reconcile();
+    return { overdue, email, reconciliation };
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async dailyOverdueSweep() {
     await this.runOverdueSweep();
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async dailyGlReconciliation() {
+    await this.reconciliation.reconcile();
   }
 
   @Cron(CronExpression.EVERY_5_MINUTES)

@@ -1,18 +1,13 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
+import { RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 
-import { AuthProvider } from "./contexts/authContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
-import DefaultLayout from "./pages/main";
-import PrivateRoute from "./components/PrivateRoute";
 import { ThemeProvider } from "./contexts/ThemeProvider";
 import { Toaster } from "./components/ui/toaster";
 import { toast } from "./components/ui/use-toast";
-import { SearchPalette } from "./components/common/SearchPalette";
-import { ErrorBoundary } from "./components/common/ErrorBoundary";
+import { router } from "./pages/main";
 
 const queryClient = new QueryClient({
   // Surface background query failures the user would otherwise never see.
@@ -44,32 +39,18 @@ const queryClient = new QueryClient({
   },
 });
 
+// Providers that don't depend on router hooks wrap RouterProvider. AuthProvider
+// (uses useNavigate) and SearchPalette now live INSIDE the data router — see the
+// AppShell layout route in ./pages/main.
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <Router>
-        <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-              <ErrorBoundary>
-                <Routes>
-                  <Route path="/login" element={<Login />} />
-                  <Route
-                    path="/*"
-                    element={
-                      <PrivateRoute>
-                        <DefaultLayout />
-                      </PrivateRoute>
-                    }
-                  />
-                </Routes>
-              </ErrorBoundary>
-              <Toaster />
-              <SearchPalette />
-            </ThemeProvider>
-          </QueryClientProvider>
-        </AuthProvider>
-      </Router>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </ThemeProvider>
+      </QueryClientProvider>
     </LanguageProvider>
   );
 };

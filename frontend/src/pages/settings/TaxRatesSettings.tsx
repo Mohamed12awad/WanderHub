@@ -11,9 +11,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } from "@/utils/api";
+import { getTaxRates, createTaxRate, updateTaxRate, deleteTaxRate, getChartOfAccounts } from "@/utils/api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
@@ -22,11 +26,13 @@ interface TaxRate {
   name: string;
   rate: number;
   isDefault: boolean;
+  liabilityAccountCode?: string | null;
+  inputAccountCode?: string | null;
   createdAt: string;
 }
 
-interface FormState { name: string; rate: string; isDefault: boolean; }
-const emptyForm = (): FormState => ({ name: "", rate: "", isDefault: false });
+interface FormState { name: string; rate: string; isDefault: boolean; liabilityAccountCode: string; inputAccountCode: string; }
+const emptyForm = (): FormState => ({ name: "", rate: "", isDefault: false, liabilityAccountCode: "", inputAccountCode: "" });
 
 export default function TaxRatesSettings() {
   const { toast } = useToast();
@@ -45,10 +51,13 @@ export default function TaxRatesSettings() {
   });
   const taxRates: TaxRate[] = data?.data ?? [];
 
+  const { data: coaData } = useQuery({ queryKey: queryKeys.accounting.chartOfAccounts, queryFn: () => getChartOfAccounts(), staleTime: 60000 });
+  const accounts: { _id: string; code: string; name: string }[] = coaData?.data ?? [];
+
   const openCreate = () => { setEditing(null); setForm(emptyForm()); setDialogOpen(true); };
   const openEdit = (t: TaxRate) => {
     setEditing(t);
-    setForm({ name: t.name, rate: String(t.rate), isDefault: t.isDefault });
+    setForm({ name: t.name, rate: String(t.rate), isDefault: t.isDefault, liabilityAccountCode: t.liabilityAccountCode ?? "", inputAccountCode: t.inputAccountCode ?? "" });
     setDialogOpen(true);
   };
 
@@ -60,7 +69,11 @@ export default function TaxRatesSettings() {
       return;
     }
     setSaving(true);
-    const payload = { name: form.name.trim(), rate, isDefault: form.isDefault };
+    const payload = {
+      name: form.name.trim(), rate, isDefault: form.isDefault,
+      liabilityAccountCode: form.liabilityAccountCode || null,
+      inputAccountCode: form.inputAccountCode || null,
+    };
     try {
       if (editing) {
         await updateTaxRate(editing.id, payload);
@@ -89,7 +102,7 @@ export default function TaxRatesSettings() {
   };
 
   return (
-    <div className="p-6 max-w-3xl space-y-4">
+    <div className="page-w-narrow page-pad page-gap">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Tax Rates</h2>
@@ -172,6 +185,26 @@ export default function TaxRatesSettings() {
                 placeholder="e.g. 14"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Output tax account (sales)</Label>
+              <Select value={form.liabilityAccountCode || "none"} onValueChange={(v) => setForm({ ...form, liabilityAccountCode: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Use GL default" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Use GL default</SelectItem>
+                  {accounts.map((a) => <SelectItem key={a._id} value={a.code}>{a.code} — {a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Input tax account (purchases)</Label>
+              <Select value={form.inputAccountCode || "none"} onValueChange={(v) => setForm({ ...form, inputAccountCode: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Use GL default" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Use GL default</SelectItem>
+                  {accounts.map((a) => <SelectItem key={a._id} value={a.code}>{a.code} — {a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Switch

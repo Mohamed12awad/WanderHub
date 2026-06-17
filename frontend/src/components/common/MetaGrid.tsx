@@ -25,8 +25,9 @@ export function MetaGrid({
 }
 
 /**
- * Single label/value pair. Renders nothing when empty so callers can list every
- * possible field without conditional clutter.
+ * Single label/value pair. The label is ALWAYS rendered; when the value is empty
+ * a muted "—" placeholder is shown so callers can list every possible field and
+ * the label stays visible even with no data.
  */
 export function MetaField({
   label,
@@ -38,13 +39,15 @@ export function MetaField({
   children?: ReactNode;
 }) {
   const content = children ?? value;
-  if (content == null || content === "") return null;
+  const isEmpty = content == null || content === "";
   return (
     <div className="min-w-0">
       <dt className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="break-words text-sm text-foreground">{content}</dd>
+      <dd className="break-words text-sm text-foreground">
+        {isEmpty ? <span className="text-muted-foreground/60">—</span> : content}
+      </dd>
     </div>
   );
 }

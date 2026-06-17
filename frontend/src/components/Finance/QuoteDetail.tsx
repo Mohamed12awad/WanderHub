@@ -56,7 +56,7 @@ const QuoteDetail: React.FC = () => {
   const isRejected = approvalStatus === "rejected";
   const canEdit = hasPerm('quotes:edit') || !approvalEnabled || isRejected;
   const canConvert = hasPerm('quotes:edit') || !approvalEnabled || approvalStatus === "approved";
-  const userCanApprove = canUserApprove("quotes", user!.role, perms);
+  const userCanApprove = user ? canUserApprove("quotes", user.role, perms) : false;
 
   const handleConvert = async () => {
     setConverting(true);

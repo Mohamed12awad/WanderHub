@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { RowActions } from "@/components/common/RowActions";
 import { Supplier } from "@/types/types";
-import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   supplier: Supplier;
@@ -11,6 +11,7 @@ interface Props {
 
 export default function SupplierRow({ supplier, handleDelete }: Props) {
   const navigate = useNavigate();
+  const { tr, formatDate } = useLanguage();
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/procurement/suppliers/${supplier._id}`)}>
@@ -25,11 +26,11 @@ export default function SupplierRow({ supplier, handleDelete }: Props) {
               : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
           }`}
         >
-          {supplier.status === "active" ? "Active" : "Inactive"}
+          {supplier.status === "active" ? tr.suppliers.active : tr.suppliers.inactive}
         </span>
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">
-        {format(new Date(supplier.createdAt), "MMM d, yyyy")}
+        {formatDate(supplier.createdAt)}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <RowActions

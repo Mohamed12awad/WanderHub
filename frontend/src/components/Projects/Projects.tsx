@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { GenericTable } from "@/components/common/GenericTable";
 import { getProjects, deleteProject } from "@/utils/api";
 import ProjectRow from "./ProjectRow";
@@ -6,8 +7,15 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 export function Projects() {
   const { tr } = useLanguage();
-  const p = (tr as any).projects;
-  const headers = p?.headers ?? ["Name", "Customer", "Manager", "Status", "Budget", "End Date", ""];
+  const p = tr.projects;
+
+  // Status options reuse the shared project status labels; memoized on `tr` so
+  // they re-localize on language change without reallocating each render.
+  const statusOptions = useMemo(
+    () => ["planning", "active", "on_hold", "completed", "cancelled"]
+      .map((value) => ({ value, label: p.statuses[value] })),
+    [p],
+  );
 
   return (
     <GenericTable
@@ -16,27 +24,20 @@ export function Projects() {
         getProjects({ page, limit, q, ...(sort ? { sort, dir } : {}), ...(filters ?? {}) })
       }
       deleteData={deleteProject}
-      headers={headers}
-      sortableHeaders={["Name"]}
+      headers={p.headers}
+      sortableHeaders={[p.headers[0]]}
       renderRow={(item: Record<string, unknown>, handleDelete) => (
         <ProjectRow key={item._id as string} {...(item as any)} handleDelete={handleDelete} />
       )}
-      title={p?.title ?? "Projects"}
-      description={p?.description ?? "Manage client projects, milestones, and budgets."}
+      title={p.title}
+      description={p.description}
       addLink="/projects/new"
-      addLabel={p?.add ?? "Add Project"}
+      addLabel={p.add}
       module="projects"
+      importConfig={{ entity: "projects", title: "Projects", permission: "projects:create" }}
+      exportConfig={{ entity: "projects", filename: "projects" }}
       topContent={<div className="flex justify-end"><ViewToggle active="list" /></div>}
-      quickStatusFilter={{
-        field: "status",
-        options: [
-          { value: "planning", label: "Planning" },
-          { value: "active", label: "Active" },
-          { value: "on_hold", label: "On Hold" },
-          { value: "completed", label: "Completed" },
-          { value: "cancelled", label: "Cancelled" },
-        ],
-      }}
+      quickStatusFilter={{ field: "status", options: statusOptions }}
     />
   );
 }

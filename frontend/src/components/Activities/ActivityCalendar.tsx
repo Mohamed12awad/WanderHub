@@ -10,6 +10,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PageShell } from "@/components/common/PageShell";
+import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -243,31 +245,30 @@ export function ActivityCalendar() {
   const showAllActivities  = showAllDay ? getForDay(showAllDay) : [];
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{c.title}</h1>
-          <p className="text-sm text-muted-foreground">{format(current, "MMMM yyyy")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline" size="sm" className="gap-1.5 h-8"
-            onClick={() => setAddOpen(true)}
-          >
-            <PlusCircle className="h-3.5 w-3.5" />New Activity
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(subMonths(current, 1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => { setCurrent(new Date()); setSelected(new Date()); }}>
-            {c.today}
-          </Button>
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(addMonths(current, 1))}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+    <PageShell width="default">
+      <PageHeader
+        title={c.title}
+        description={format(current, "MMMM yyyy")}
+        primaryAction={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline" size="sm" className="gap-1.5 h-8"
+              onClick={() => setAddOpen(true)}
+            >
+              <PlusCircle className="h-3.5 w-3.5" />New Activity
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(subMonths(current, 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={() => { setCurrent(new Date()); setSelected(new Date()); }}>
+              {c.today}
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(addMonths(current, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        }
+      />
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         {/* Calendar grid */}
         <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -515,6 +516,6 @@ export function ActivityCalendar() {
         onOpenChange={setAddOpen}
         onCreated={invalidate}
       />
-    </div>
+    </PageShell>
   );
 }

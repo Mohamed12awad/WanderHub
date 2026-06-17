@@ -1,5 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { PlusCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { GenericTable } from "@/components/common/GenericTable";
+import { ViewSwitch } from "@/components/common/ViewSwitch";
+import LeadsBoard from "./LeadsBoard";
 import LeadRow from "./leadRow";
 import { deleteLead, getLeads } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -20,6 +25,14 @@ type Lead = {
 export function Leads() {
   const { tr } = useLanguage();
   const l = tr.leads;
+  const [view, setView] = useState<"list" | "board">("list");
+  const switcher = <ViewSwitch active={view} onChange={setView} />;
+  const boardHeader = (
+    <div className="flex items-center gap-2">
+      <Link to="/leads/add"><Button size="sm" className="h-8 gap-1.5"><PlusCircle className="h-3.5 w-3.5" />{l.add}</Button></Link>
+      {switcher}
+    </div>
+  );
 
   const LEAD_FILTERS = useMemo<FilterConfig[]>(() => [
     { label: l.fields.source, field: "source", type: "text" },
@@ -27,9 +40,12 @@ export function Leads() {
     { label: tr.contacts.filters.createdDate, field: "createdAt", type: "date-range" },
   ], [l, tr]);
 
+  if (view === "board") return <LeadsBoard headerExtra={boardHeader} />;
+
   return (
     <GenericTable<Lead>
       queryKey="leads"
+      headerExtra={switcher}
       fetchData={({ page, limit, q, filters, sort, dir }) =>
         getLeads({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })
       }
@@ -48,6 +64,7 @@ export function Leads() {
       addLink="/leads/add"
       addLabel={l.add}
       importConfig={{ entity: "leads", title: "Leads" }}
+      exportConfig={{ entity: "leads", filename: "leads" }}
       dedupConfig={{ entity: "leads", title: "Leads" }}
       bulkConfig={{
         entity: "leads",

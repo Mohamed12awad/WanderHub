@@ -10,4 +10,7 @@ export class CreateMilestoneDto {
 
   @IsOptional() @IsString() dueDate?: string;
   @IsOptional() @IsNumber() order?: number;
+
+  // Planning figure. Actual cost is computed (not stored) from attributed expenses.
+  @IsOptional() @IsNumber() estimatedCost?: number;
 }

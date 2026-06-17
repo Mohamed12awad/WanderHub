@@ -9,6 +9,7 @@ import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { cn } from "@/lib/utils";
 import { TrendingUp, Calendar, User } from "lucide-react";
 import { GenericKanban, type KanbanColumn } from "@/components/common/GenericKanban";
+import { ErrorState } from "@/components/common/ErrorState";
 
 interface Deal {
   _id: string;
@@ -158,17 +159,17 @@ export function Pipeline() {
   const totalValue = deals.reduce((s, d) => s + dealValue(d), 0);
   const currency = deals[0]?.currency ?? "EGP";
 
-  if (error) return <div className="p-6 text-sm text-destructive">Error loading pipeline.</div>;
+  if (error) return <div className="p-6"><ErrorState description="Error loading pipeline." /></div>;
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 flex-wrap shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{tr.pipeline.title}</h1>
-          <p className="text-sm text-muted-foreground">{tr.pipeline.subtitle}</p>
+      {/* Header — shared board-header style (matches KanbanBoardPage / GenericTable) */}
+      <div className="flex items-start justify-between gap-4 px-6 py-4 border-b bg-card shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold tracking-tight truncate">{tr.pipeline.title}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5 truncate">{tr.pipeline.subtitle}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           {deals.length > 0 && (
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Pipeline value</p>

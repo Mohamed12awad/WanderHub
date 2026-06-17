@@ -12,6 +12,7 @@ import { Trash2, Plus } from "lucide-react";
 export const EXPENSE_CATEGORIES = [
   { value: "marketing", label: "Marketing & Advertising" },
   { value: "transportation", label: "Transportation" },
+  { value: "operations", label: "Operations" },
   { value: "utilities", label: "Utilities" },
   { value: "meals", label: "Meals" },
   { value: "lodging", label: "Lodging" },

@@ -1,12 +1,24 @@
 import React, { lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+  Navigate,
+  Outlet,
+  useLocation,
+} from "react-router-dom";
 import { ModulesProvider } from "@/contexts/ModulesContext";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 
+import { AuthProvider, useAuth } from "@/contexts/authContext";
+import { resolveHomeRoute } from "@/lib/resolveHomeRoute";
 import NavBar from "@/components/layout/NavBar";
 import Sidebar from "@/components/layout/Sidebar";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Protected } from "@/components/common/Protected";
+import { SearchPalette } from "@/components/common/SearchPalette";
+import LoadingSpinner from "@/components/common/spinner";
+import Login from "./Login";
 import NotFound from "./NotFound";
 
 // Route-level code splitting — all pages load on demand
@@ -27,6 +39,9 @@ const AddProduct       = lazy(() => import("@/components/Products/AddProduct"));
 const EditProduct      = lazy(() => import("@/components/Products/EditProduct"));
 const ViewProduct      = lazy(() => import("@/components/Products/ViewProduct"));
 const Inventory        = lazy(() => import("@/components/Inventory/Inventory").then((m) => ({ default: m.Inventory })));
+const Warehouses       = lazy(() => import("@/components/Inventory/Warehouses"));
+const StockTransfer    = lazy(() => import("@/components/Inventory/StockTransfer"));
+const Valuation        = lazy(() => import("@/components/Inventory/Valuation"));
 const Expenses         = lazy(() => import("@/components/Expenses/Expenses").then((m) => ({ default: m.Expenses })));
 const AddExpenseReport = lazy(() => import("@/components/Expenses/AddExpenses"));
 const EditExpenseReport = lazy(() => import("@/components/Expenses/EditExpenses"));
@@ -39,6 +54,7 @@ const ActivityCalendar = lazy(() => import("@/components/Activities/ActivityCale
 const ActivitiesPage   = lazy(() => import("@/pages/ActivitiesPage").then((m) => ({ default: m.ActivitiesPage })));
 const Tasks            = lazy(() => import("@/pages/Tasks").then((m) => ({ default: m.Tasks })));
 const Settings         = lazy(() => import("@/pages/Settings"));
+const Onboarding       = lazy(() => import("@/pages/Onboarding"));
 const QuotesPage       = lazy(() => import("@/pages/Finance").then((m) => ({ default: m.QuotesPage })));
 const InvoicesPage     = lazy(() => import("@/pages/Finance").then((m) => ({ default: m.InvoicesPage })));
 const QuoteForm        = lazy(() => import("@/components/Finance/QuoteForm"));
@@ -71,6 +87,18 @@ const SalesOrdersPage = lazy(() => import("@/components/SalesOrders/SalesOrders"
 const SalesOrderForm  = lazy(() => import("@/components/SalesOrders/SalesOrderForm"));
 const ViewSalesOrder  = lazy(() => import("@/components/SalesOrders/ViewSalesOrder"));
 
+// ── Accounting (GL) ─────────────────────────────────────────────────────────────
+const ChartOfAccounts   = lazy(() => import("@/components/Accounting/ChartOfAccounts"));
+const AccountLedger     = lazy(() => import("@/components/Accounting/AccountLedger"));
+const JournalEntries    = lazy(() => import("@/components/Accounting/JournalEntries"));
+const JournalEntryDetail = lazy(() => import("@/components/Accounting/JournalEntryDetail"));
+const TrialBalance      = lazy(() => import("@/components/Accounting/TrialBalance"));
+const ProfitLoss        = lazy(() => import("@/components/Accounting/ProfitLoss"));
+const BalanceSheet      = lazy(() => import("@/components/Accounting/BalanceSheet"));
+const CashFlow          = lazy(() => import("@/components/Accounting/CashFlow"));
+const AccountingPeriods = lazy(() => import("@/components/Accounting/Periods"));
+const AccountingAudit    = lazy(() => import("@/components/Accounting/Audit"));
+
 // ── Projects ──────────────────────────────────────────────────────────────────
 const ProjectsPage  = lazy(() => import("@/components/Projects/Projects").then((m) => ({ default: m.Projects })));
 const ProjectsBoard = lazy(() => import("@/components/Projects/ProjectsBoard").then((m) => ({ default: m.ProjectsBoard })));
@@ -84,85 +112,53 @@ const PageLoader = () => (
   </div>
 );
 
-const AppRoutes = () => (
-  <Suspense fallback={<PageLoader />}>
-    <Routes>
-      <Route index element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard"                    element={<Dashboard />} />
-      <Route path="/customers"                    element={<Protected permission="contacts:view"><Customers /></Protected>} />
-      <Route path="/customers/add"                element={<Protected permission="contacts:create"><AddCustomer /></Protected>} />
-      <Route path="/customers/:id"                element={<Protected permission="contacts:view"><ViewCustomer /></Protected>} />
-      <Route path="/customers/:id/edit"           element={<Protected permission="contacts:edit"><EditCustomer /></Protected>} />
-      <Route path="/users"                        element={<Protected permission="users:view"><Users /></Protected>} />
-      <Route path="/users/add"                    element={<Protected permission="users:create"><AddUser /></Protected>} />
-      <Route path="/users/:id/edit"               element={<Protected permission="users:edit"><EditUser /></Protected>} />
-      <Route path="/deals"                        element={<Protected permission="deals:view"><Deals /></Protected>} />
-      <Route path="/deals/add"                    element={<Protected permission="deals:create"><AddDeal /></Protected>} />
-      <Route path="/deals/:id"                    element={<Protected permission="deals:view"><ViewDeal /></Protected>} />
-      <Route path="/deals/:id/edit"               element={<Protected permission="deals:edit"><EditDeal /></Protected>} />
-      <Route path="/products"                     element={<Protected permission="products:view"><Products /></Protected>} />
-      <Route path="/products/add"                 element={<Protected permission="products:create"><AddProduct /></Protected>} />
-      <Route path="/products/:id"                 element={<Protected permission="products:view"><ViewProduct /></Protected>} />
-      <Route path="/products/:id/edit"            element={<Protected permission="products:edit"><EditProduct /></Protected>} />
-      <Route path="/inventory"                    element={<Protected permission="products:view"><Inventory /></Protected>} />
-      <Route path="/expenses"                     element={<Protected permission="expenses:view"><Expenses /></Protected>} />
-      <Route path="/expenses/add"                 element={<Protected permission="expenses:create"><AddExpenseReport /></Protected>} />
-      <Route path="/expenses/:id"                 element={<Protected permission="expenses:view"><ViewExpense /></Protected>} />
-      <Route path="/expenses/:id/edit"            element={<Protected permission="expenses:edit"><EditExpenseReport /></Protected>} />
-      <Route path="/reports"                      element={<Protected permission="reports:view"><Reports /></Protected>} />
-      <Route path="/pipeline"                     element={<Protected permission="deals:view"><Pipeline /></Protected>} />
-      <Route path="/calendar"                     element={<Protected permission="activities:view"><ActivityCalendar /></Protected>} />
-      <Route path="/activities"                   element={<Protected permission="activities:view"><ActivitiesPage /></Protected>} />
-      <Route path="/tasks"                        element={<Protected permission="tasks:view"><Tasks /></Protected>} />
-      <Route path="/logs"                         element={<Protected permission="logs:view"><Logs /></Protected>} />
-      <Route path="/roles"                        element={<Protected permission="roles:view"><Roles /></Protected>} />
-      <Route path="/settings/*"                   element={<Settings />} />
-      <Route path="/finance/quotes"               element={<Protected permission="quotes:view"><QuotesPage /></Protected>} />
-      <Route path="/finance/invoices"             element={<Protected permission="invoices:view"><InvoicesPage /></Protected>} />
-      <Route path="/finance/quotes/new"           element={<Protected permission="quotes:create"><QuoteForm /></Protected>} />
-      <Route path="/finance/quotes/:id"           element={<Protected permission="quotes:view"><QuoteDetail /></Protected>} />
-      <Route path="/finance/quotes/:id/edit"      element={<Protected permission="quotes:edit"><QuoteForm /></Protected>} />
-      <Route path="/finance/invoices/new"         element={<Protected permission="invoices:create"><InvoiceForm /></Protected>} />
-      <Route path="/finance/invoices/:id"         element={<Protected permission="invoices:view"><InvoiceDetail /></Protected>} />
-      <Route path="/finance/invoices/:id/edit"    element={<Protected permission="invoices:edit"><InvoiceForm /></Protected>} />
-      <Route path="/finance/payments"             element={<Protected permission="invoices:view"><Payments /></Protected>} />
-      <Route path="/leads"                        element={<Protected permission="leads:view"><LeadsPage /></Protected>} />
-      <Route path="/leads/add"                    element={<Protected permission="leads:create"><AddLead /></Protected>} />
-      <Route path="/leads/:id"                    element={<Protected permission="leads:view"><ViewLead /></Protected>} />
-      <Route path="/leads/:id/edit"               element={<Protected permission="leads:edit"><EditLead /></Protected>} />
-
-      {/* Procurement */}
-      <Route path="/procurement/suppliers"               element={<Protected permission="suppliers:view"><SuppliersPage /></Protected>} />
-      <Route path="/procurement/suppliers/add"            element={<Protected permission="suppliers:create"><AddSupplier /></Protected>} />
-      <Route path="/procurement/suppliers/:id"            element={<Protected permission="suppliers:view"><ViewSupplier /></Protected>} />
-      <Route path="/procurement/suppliers/:id/edit"       element={<Protected permission="suppliers:edit"><EditSupplier /></Protected>} />
-      <Route path="/procurement/purchase-orders"          element={<Protected permission="purchase-orders:view"><PurchaseOrdersPage /></Protected>} />
-      <Route path="/procurement/purchase-orders/new"      element={<Protected permission="purchase-orders:create"><AddPurchaseOrder /></Protected>} />
-      <Route path="/procurement/purchase-orders/:id"      element={<Protected permission="purchase-orders:view"><ViewPurchaseOrder /></Protected>} />
-      <Route path="/procurement/purchase-orders/:id/edit" element={<Protected permission="purchase-orders:edit"><EditPurchaseOrder /></Protected>} />
-      <Route path="/procurement/bills"                    element={<Protected permission="vendor-bills:view"><VendorBillsPage /></Protected>} />
-      <Route path="/procurement/bills/new"                element={<Protected permission="vendor-bills:create"><AddVendorBill /></Protected>} />
-      <Route path="/procurement/bills/:id"                element={<Protected permission="vendor-bills:view"><ViewVendorBill /></Protected>} />
-      <Route path="/procurement/bills/:id/edit"           element={<Protected permission="vendor-bills:edit"><EditVendorBill /></Protected>} />
-      <Route path="/procurement/vendor-payments"          element={<Protected permission="vendor-bills:view"><VendorPaymentsPage /></Protected>} />
-
-      {/* Sales Orders */}
-      <Route path="/sales-orders"          element={<Protected permission="sales-orders:view"><SalesOrdersPage /></Protected>} />
-      <Route path="/sales-orders/new"      element={<Protected permission="sales-orders:create"><SalesOrderForm mode="add" /></Protected>} />
-      <Route path="/sales-orders/:id"      element={<Protected permission="sales-orders:view"><ViewSalesOrder /></Protected>} />
-      <Route path="/sales-orders/:id/edit" element={<Protected permission="sales-orders:edit"><SalesOrderForm mode="edit" /></Protected>} />
-
-      {/* Projects */}
-      <Route path="/projects"          element={<Protected permission="projects:view"><ProjectsPage /></Protected>} />
-      <Route path="/projects/board"    element={<Protected permission="projects:view"><ProjectsBoard /></Protected>} />
-      <Route path="/projects/new"      element={<Protected permission="projects:create"><AddProject /></Protected>} />
-      <Route path="/projects/:id"      element={<Protected permission="projects:view"><ViewProject /></Protected>} />
-      <Route path="/projects/:id/edit" element={<Protected permission="projects:edit"><EditProject /></Protected>} />
-
-      <Route path="*"                             element={<NotFound />} />
-    </Routes>
-  </Suspense>
+/**
+ * Top-level layout route. Hosts the providers that need router hooks (AuthProvider
+ * uses `useNavigate`) so they live INSIDE the data router, plus the always-mounted
+ * command palette. Language/Query/Theme providers wrap RouterProvider in App.tsx.
+ */
+const AppShell: React.FC = () => (
+  <AuthProvider>
+    <ErrorBoundary>
+      <Outlet />
+    </ErrorBoundary>
+    <SearchPalette />
+  </AuthProvider>
 );
+
+/**
+ * Auth gate + first-run redirect. Provides ModulesContext to everything below
+ * (the onboarding flow needs it too) and renders an <Outlet/> so onboarding can
+ * appear full-screen while the rest of the app gets the sidebar/navbar chrome.
+ */
+const RequireAuth: React.FC = () => {
+  const { isLoggedIn, loading, user } = useAuth();
+  const location = useLocation();
+  if (loading) return <LoadingSpinner loading={loading} />;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
+  // First-run: force the onboarding flow until it's completed.
+  if (user && user.hasOnboarded === false && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return (
+    <ModulesProvider>
+      <Outlet />
+    </ModulesProvider>
+  );
+};
+
+/** The authenticated app shell (sidebar + navbar + scrollable main). */
+const AppChrome: React.FC = () => (
+  <SidebarProvider>
+    <MainLayout />
+  </SidebarProvider>
+);
+
+/** Index route → the user's configured (or first-permitted) landing page. */
+const HomeRedirect: React.FC = () => {
+  const { user } = useAuth();
+  return <Navigate to={resolveHomeRoute(user)} replace />;
+};
 
 const MainLayout: React.FC = () => {
   const { collapsed } = useSidebar();
@@ -177,19 +173,173 @@ const MainLayout: React.FC = () => {
       <NavBar />
       <main className="overflow-auto h-full">
         <ErrorBoundary>
-          <AppRoutes />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </ErrorBoundary>
       </main>
     </div>
   );
 };
 
-const DefaultLayout: React.FC = () => (
-  <ModulesProvider>
-    <SidebarProvider>
-      <MainLayout />
-    </SidebarProvider>
-  </ModulesProvider>
-);
+export const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppShell />}>
+      <Route path="/login" element={<Login />} />
 
-export default DefaultLayout;
+      <Route element={<RequireAuth />}>
+        {/* Full-screen first-run flow (no sidebar/navbar) */}
+        <Route path="onboarding" element={<Onboarding />} />
+
+        <Route element={<AppChrome />}>
+        <Route index element={<HomeRedirect />} />
+        <Route path="dashboard" element={<Dashboard />} handle={{ crumb: "Dashboard" }} />
+
+        {/* Customers */}
+        <Route path="customers" handle={{ crumb: "Contacts" }}>
+          <Route index element={<Protected permission="contacts:view"><Customers /></Protected>} />
+          <Route path="add" element={<Protected permission="contacts:create"><AddCustomer /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="contacts:view"><ViewCustomer /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="contacts:edit"><EditCustomer /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Users */}
+        <Route path="users" handle={{ crumb: "Users" }}>
+          <Route index element={<Protected permission="users:view"><Users /></Protected>} />
+          <Route path="add" element={<Protected permission="users:create"><AddUser /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id/edit" element={<Protected permission="users:edit"><EditUser /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Deals */}
+        <Route path="deals" handle={{ crumb: "Deals" }}>
+          <Route index element={<Protected permission="deals:view"><Deals /></Protected>} />
+          <Route path="add" element={<Protected permission="deals:create"><AddDeal /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="deals:view"><ViewDeal /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="deals:edit"><EditDeal /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Products */}
+        <Route path="products" handle={{ crumb: "Products" }}>
+          <Route index element={<Protected permission="products:view"><Products /></Protected>} />
+          <Route path="add" element={<Protected permission="products:create"><AddProduct /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="products:view"><ViewProduct /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="products:edit"><EditProduct /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Inventory */}
+        <Route path="inventory" handle={{ crumb: "Inventory" }}>
+          <Route index element={<Protected permission="products:view"><Inventory /></Protected>} />
+          <Route path="warehouses" element={<Protected permission="warehouses:view"><Warehouses /></Protected>} handle={{ crumb: "Warehouses" }} />
+          <Route path="transfers" element={<Protected permission="products:edit"><StockTransfer /></Protected>} handle={{ crumb: "Transfers" }} />
+          <Route path="valuation" element={<Protected permission="products:view"><Valuation /></Protected>} handle={{ crumb: "Valuation" }} />
+        </Route>
+
+        {/* Expenses */}
+        <Route path="expenses" handle={{ crumb: "Expenses" }}>
+          <Route index element={<Protected permission="expenses:view"><Expenses /></Protected>} />
+          <Route path="add" element={<Protected permission="expenses:create"><AddExpenseReport /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="expenses:view"><ViewExpense /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="expenses:edit"><EditExpenseReport /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        <Route path="reports" element={<Protected permission="reports:view"><Reports /></Protected>} handle={{ crumb: "Reports" }} />
+        <Route path="pipeline" element={<Protected permission="deals:view"><Pipeline /></Protected>} handle={{ crumb: "Pipeline" }} />
+        <Route path="calendar" element={<Protected permission="activities:view"><ActivityCalendar /></Protected>} handle={{ crumb: "Calendar" }} />
+        <Route path="activities" element={<Protected permission="activities:view"><ActivitiesPage /></Protected>} handle={{ crumb: "Activities" }} />
+        <Route path="tasks" element={<Protected permission="tasks:view"><Tasks /></Protected>} handle={{ crumb: "Tasks" }} />
+        <Route path="logs" element={<Protected permission="logs:view"><Logs /></Protected>} handle={{ crumb: "Logs" }} />
+        <Route path="roles" element={<Protected permission="roles:view"><Roles /></Protected>} handle={{ crumb: "Roles" }} />
+        <Route path="settings/*" element={<Settings />} handle={{ crumb: "Settings" }} />
+
+        {/* Leads */}
+        <Route path="leads" handle={{ crumb: "Leads" }}>
+          <Route index element={<Protected permission="leads:view"><LeadsPage /></Protected>} />
+          <Route path="add" element={<Protected permission="leads:create"><AddLead /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="leads:view"><ViewLead /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="leads:edit"><EditLead /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Finance */}
+        <Route path="finance" handle={{ crumb: "Finance" }}>
+          <Route index element={<Navigate to="invoices" replace />} />
+          <Route path="quotes" handle={{ crumb: "Quotes" }}>
+            <Route index element={<Protected permission="quotes:view"><QuotesPage /></Protected>} />
+            <Route path="new" element={<Protected permission="quotes:create"><QuoteForm /></Protected>} handle={{ crumb: "New" }} />
+            <Route path=":id" element={<Protected permission="quotes:view"><QuoteDetail /></Protected>} handle={{ crumb: "Details" }} />
+            <Route path=":id/edit" element={<Protected permission="quotes:edit"><QuoteForm /></Protected>} handle={{ crumb: "Edit" }} />
+          </Route>
+          <Route path="invoices" handle={{ crumb: "Invoices" }}>
+            <Route index element={<Protected permission="invoices:view"><InvoicesPage /></Protected>} />
+            <Route path="new" element={<Protected permission="invoices:create"><InvoiceForm /></Protected>} handle={{ crumb: "New" }} />
+            <Route path=":id" element={<Protected permission="invoices:view"><InvoiceDetail /></Protected>} handle={{ crumb: "Details" }} />
+            <Route path=":id/edit" element={<Protected permission="invoices:edit"><InvoiceForm /></Protected>} handle={{ crumb: "Edit" }} />
+          </Route>
+          <Route path="payments" element={<Protected permission="invoices:view"><Payments /></Protected>} handle={{ crumb: "Payments" }} />
+        </Route>
+
+        {/* Procurement */}
+        <Route path="procurement" handle={{ crumb: "Procurement" }}>
+          <Route index element={<Navigate to="purchase-orders" replace />} />
+          <Route path="suppliers" handle={{ crumb: "Suppliers" }}>
+            <Route index element={<Protected permission="suppliers:view"><SuppliersPage /></Protected>} />
+            <Route path="add" element={<Protected permission="suppliers:create"><AddSupplier /></Protected>} handle={{ crumb: "New" }} />
+            <Route path=":id" element={<Protected permission="suppliers:view"><ViewSupplier /></Protected>} handle={{ crumb: "Details" }} />
+            <Route path=":id/edit" element={<Protected permission="suppliers:edit"><EditSupplier /></Protected>} handle={{ crumb: "Edit" }} />
+          </Route>
+          <Route path="purchase-orders" handle={{ crumb: "Purchase Orders" }}>
+            <Route index element={<Protected permission="purchase-orders:view"><PurchaseOrdersPage /></Protected>} />
+            <Route path="new" element={<Protected permission="purchase-orders:create"><AddPurchaseOrder /></Protected>} handle={{ crumb: "New" }} />
+            <Route path=":id" element={<Protected permission="purchase-orders:view"><ViewPurchaseOrder /></Protected>} handle={{ crumb: "Details" }} />
+            <Route path=":id/edit" element={<Protected permission="purchase-orders:edit"><EditPurchaseOrder /></Protected>} handle={{ crumb: "Edit" }} />
+          </Route>
+          <Route path="bills" handle={{ crumb: "Vendor Bills" }}>
+            <Route index element={<Protected permission="vendor-bills:view"><VendorBillsPage /></Protected>} />
+            <Route path="new" element={<Protected permission="vendor-bills:create"><AddVendorBill /></Protected>} handle={{ crumb: "New" }} />
+            <Route path=":id" element={<Protected permission="vendor-bills:view"><ViewVendorBill /></Protected>} handle={{ crumb: "Details" }} />
+            <Route path=":id/edit" element={<Protected permission="vendor-bills:edit"><EditVendorBill /></Protected>} handle={{ crumb: "Edit" }} />
+          </Route>
+          <Route path="vendor-payments" element={<Protected permission="vendor-bills:view"><VendorPaymentsPage /></Protected>} handle={{ crumb: "Vendor Payments" }} />
+        </Route>
+
+        {/* Sales Orders */}
+        <Route path="sales-orders" handle={{ crumb: "Sales Orders" }}>
+          <Route index element={<Protected permission="sales-orders:view"><SalesOrdersPage /></Protected>} />
+          <Route path="new" element={<Protected permission="sales-orders:create"><SalesOrderForm mode="add" /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="sales-orders:view"><ViewSalesOrder /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="sales-orders:edit"><SalesOrderForm mode="edit" /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        {/* Accounting (GL) */}
+        <Route path="accounting" handle={{ crumb: "Accounting" }}>
+          <Route index element={<Navigate to="chart-of-accounts" replace />} />
+          <Route path="chart-of-accounts" handle={{ crumb: "Chart of Accounts" }}>
+            <Route index element={<Protected permission="accounting:view"><ChartOfAccounts /></Protected>} />
+            <Route path=":id" element={<Protected permission="accounting:view"><AccountLedger /></Protected>} handle={{ crumb: "Ledger" }} />
+          </Route>
+          <Route path="journal" handle={{ crumb: "Journal" }}>
+            <Route index element={<Protected permission="accounting:view"><JournalEntries /></Protected>} />
+            <Route path=":id" element={<Protected permission="accounting:view"><JournalEntryDetail /></Protected>} handle={{ crumb: "Entry" }} />
+          </Route>
+          <Route path="trial-balance" element={<Protected permission="accounting:view"><TrialBalance /></Protected>} handle={{ crumb: "Trial Balance" }} />
+          <Route path="profit-loss" element={<Protected permission="accounting:view"><ProfitLoss /></Protected>} handle={{ crumb: "Profit & Loss" }} />
+          <Route path="balance-sheet" element={<Protected permission="accounting:view"><BalanceSheet /></Protected>} handle={{ crumb: "Balance Sheet" }} />
+          <Route path="cash-flow" element={<Protected permission="accounting:view"><CashFlow /></Protected>} handle={{ crumb: "Cash Flow" }} />
+          <Route path="periods" element={<Protected permission="accounting:manage"><AccountingPeriods /></Protected>} handle={{ crumb: "Periods" }} />
+          <Route path="audit" element={<Protected permission="accounting:view"><AccountingAudit /></Protected>} handle={{ crumb: "Audit" }} />
+        </Route>
+
+        {/* Projects */}
+        <Route path="projects" handle={{ crumb: "Projects" }}>
+          <Route index element={<Protected permission="projects:view"><ProjectsPage /></Protected>} />
+          <Route path="board" element={<Protected permission="projects:view"><ProjectsBoard /></Protected>} handle={{ crumb: "Board" }} />
+          <Route path="new" element={<Protected permission="projects:create"><AddProject /></Protected>} handle={{ crumb: "New" }} />
+          <Route path=":id" element={<Protected permission="projects:view"><ViewProject /></Protected>} handle={{ crumb: "Details" }} />
+          <Route path=":id/edit" element={<Protected permission="projects:edit"><EditProject /></Protected>} handle={{ crumb: "Edit" }} />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+        </Route>
+      </Route>
+    </Route>
+  )
+);

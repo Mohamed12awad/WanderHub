@@ -82,8 +82,9 @@ export default function ViewProject() {
   const users      = usersData?.data?.data ?? usersData?.data ?? [];
 
   const [newMilestone, setNewMilestone]     = useState("");
+  const [newMilestoneCost, setNewMilestoneCost] = useState("");
   const [newMember, setNewMember]           = useState("");
-  const [editingMs, setEditingMs]           = useState<{ id: string; title: string; description?: string; dueDate?: string } | null>(null);
+  const [editingMs, setEditingMs]           = useState<{ id: string; title: string; description?: string; dueDate?: string; estimatedCost?: string } | null>(null);
   const [deleteMsId, setDeleteMsId]         = useState<string | null>(null);
   const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
   const [taskPanelOpen, setTaskPanelOpen]   = useState(false);
@@ -93,11 +94,22 @@ export default function ViewProject() {
 
   const refresh = (key: string) => queryClient.invalidateQueries({ queryKey: [key, id] });
 
-  const addMsMutation    = useMutation({ mutationFn: () => createMilestone(id!, { title: newMilestone }), onSuccess: () => { setNewMilestone(""); refresh("project-milestones"); } });
+  const addMsMutation    = useMutation({
+    mutationFn: () => createMilestone(id!, {
+      title: newMilestone,
+      ...(newMilestoneCost.trim() !== "" ? { estimatedCost: Number(newMilestoneCost) } : {}),
+    }),
+    onSuccess: () => { setNewMilestone(""); setNewMilestoneCost(""); refresh("project-milestones"); },
+  });
   const toggleMsMutation = useMutation({ mutationFn: ({ msId, status }: { msId: string; status: string }) => updateMilestone(id!, msId, { status }), onSuccess: () => refresh("project-milestones") });
   const saveMsMutation   = useMutation({
-    mutationFn: (ms: { id: string; title: string; description?: string; dueDate?: string }) =>
-      updateMilestone(id!, ms.id, { title: ms.title, description: ms.description || undefined, dueDate: ms.dueDate || undefined }),
+    mutationFn: (ms: { id: string; title: string; description?: string; dueDate?: string; estimatedCost?: string }) =>
+      updateMilestone(id!, ms.id, {
+        title: ms.title,
+        description: ms.description || undefined,
+        dueDate: ms.dueDate || undefined,
+        estimatedCost: ms.estimatedCost && ms.estimatedCost.trim() !== "" ? Number(ms.estimatedCost) : null,
+      }),
     onSuccess: () => { setEditingMs(null); refresh("project-milestones"); },
   });
   const delMsMutation = useMutation({ mutationFn: (msId: string) => deleteMilestone(id!, msId), onSuccess: () => { setDeleteMsId(null); refresh("project-milestones"); } });
@@ -306,6 +318,15 @@ export default function ViewProject() {
                         onChange={(e) => setEditingMs((prev) => prev ? { ...prev, dueDate: e.target.value } : prev)}
                         className="h-7 text-sm"
                       />
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={ms.estimatedCost ?? ""}
+                        onChange={(e) => setEditingMs((prev) => prev ? { ...prev, estimatedCost: e.target.value } : prev)}
+                        placeholder="Estimated cost (optional)"
+                        className="h-7 text-sm"
+                      />
                       <div className="flex gap-1.5">
                         <Button size="sm" className="h-6 text-xs" onClick={() => saveMsMutation.mutate(ms)} disabled={!ms.title.trim()}>Save</Button>
                         <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setEditingMs(null)}>Cancel</Button>
@@ -329,6 +350,12 @@ export default function ViewProject() {
                         <span className="flex-1 min-w-0">
                           <span className={`text-sm ${m.status === "completed" ? "line-through text-muted-foreground" : ""}`}>{m.title}</span>
                           {m.description && <p className="text-xs text-muted-foreground truncate">{m.description}</p>}
+                          {(m.estimatedCost != null || m.actualCost != null) && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {m.actualCost != null && <>Actual {Number(m.actualCost).toLocaleString(undefined, { maximumFractionDigits: 2 })}</>}
+                              {m.estimatedCost != null && <> / Est. {Number(m.estimatedCost).toLocaleString(undefined, { maximumFractionDigits: 2 })}</>}
+                            </p>
+                          )}
                         </span>
                         {msTasks.length > 0 && (
                           <span className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground shrink-0">
@@ -343,7 +370,7 @@ export default function ViewProject() {
                       )}
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <button
-                          onClick={() => setEditingMs({ id: m._id, title: m.title, description: m.description ?? "", dueDate: m.dueDate ? m.dueDate.substring(0, 10) : "" })}
+                          onClick={() => setEditingMs({ id: m._id, title: m.title, description: m.description ?? "", dueDate: m.dueDate ? m.dueDate.substring(0, 10) : "", estimatedCost: m.estimatedCost != null ? String(m.estimatedCost) : "" })}
                           className="p-1 rounded hover:bg-muted"
                         >
                           <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -380,7 +407,16 @@ export default function ViewProject() {
                 );
               })}
               <form className="flex gap-2 pt-1" onSubmit={(e) => { e.preventDefault(); if (newMilestone.trim()) addMsMutation.mutate(); }}>
-                <Input value={newMilestone} onChange={(e) => setNewMilestone(e.target.value)} placeholder="New milestone…" className="h-8" />
+                <Input value={newMilestone} onChange={(e) => setNewMilestone(e.target.value)} placeholder="New milestone…" className="h-8 flex-1" />
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={newMilestoneCost}
+                  onChange={(e) => setNewMilestoneCost(e.target.value)}
+                  placeholder="Est. cost"
+                  className="h-8 w-28"
+                />
                 <Button type="submit" size="sm" className="h-8 gap-1"><Plus className="h-3.5 w-3.5" />Add</Button>
               </form>
             </CardContent>

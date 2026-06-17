@@ -77,14 +77,14 @@ export default function EmailConfigSettings() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-2xl mx-auto space-y-5">
+      <div className="page-w-narrow page-pad page-gap">
         <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="page-w-narrow page-pad page-gap">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Email Configuration</h2>

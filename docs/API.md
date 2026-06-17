@@ -165,10 +165,10 @@ permission. Responses are JSON; list endpoints return either an array or a
 `/reports/outstanding`, `/reports/customer-acquisition`, `/reports/bookings`,
 `/reports/leads` — most accept `startDate`/`endDate`.
 
-### Summary — `/api/summery` · Search — `/api/search` · Logs — `/api/logs`
+### Summary — `/api/summary` · Search — `/api/search` · Logs — `/api/logs`
 | Method | Path | Permission |
 |--------|------|-----------|
-| GET | `/summery?timePeriod=` · `/summery/pending-approvals` | authenticated |
+| GET | `/summary?timePeriod=` · `/summary/pending-approvals` | authenticated |
 | GET | `/search?q=` | authenticated (scope-filtered) |
 | GET | `/logs` (filters: action, dates, user) | logs:view |
 
