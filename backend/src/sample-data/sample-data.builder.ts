@@ -67,6 +67,9 @@ const ALL_PERMISSIONS = [
   'projects:view', 'projects:create', 'projects:edit', 'projects:delete',
   'tasks:view', 'tasks:create', 'tasks:edit', 'tasks:delete',
   'reports:view', 'reports:export', 'logs:view',
+  'accounting:view', 'accounting:manage',
+  'warehouses:view', 'warehouses:manage',
+  'product-categories:view', 'product-categories:manage',
   'users:view', 'users:create', 'users:edit', 'users:delete',
   'roles:view', 'roles:manage', 'settings:view', 'settings:manage',
 ];
@@ -86,6 +89,8 @@ const MANAGER_PERMISSIONS = [
   'projects:view', 'projects:create', 'projects:edit',
   'tasks:view', 'tasks:create', 'tasks:edit',
   'reports:view', 'users:view',
+  'accounting:view', 'accounting:manage',
+  'warehouses:view', 'warehouses:manage', 'product-categories:view',
 ];
 
 const SALES_PERMISSIONS = [
@@ -268,6 +273,11 @@ export async function seedSampleData(prisma: PrismaClient, log: Log = noop) {
     { name: 'Digital Streaming', type: 'digital', description: 'Live-stream the event online' },
   ];
   const products = [];
+  const defaultWarehouse = await prisma.warehouse.upsert({
+    where: { code: 'MAIN' },
+    update: {},
+    create: { code: 'MAIN', name: 'Main Warehouse', isDefault: true },
+  });
   for (let i = 0; i < productDefs.length; i++) {
     const p = productDefs[i];
     const product = await prisma.product.upsert({
@@ -275,12 +285,12 @@ export async function seedSampleData(prisma: PrismaClient, log: Log = noop) {
       create: { id: id(`prod-${i + 1}`), name: p.name, type: p.type, capacity: p.capacity, location: p.location, description: p.description, updatedById: admin.id },
     });
     await prisma.stockItem.upsert({
-      where: { productId: product.id }, update: {},
-      create: { productId: product.id, quantityOnHand: 20 + i * 5, reorderLevel: 5, location: at(['Warehouse A', 'Warehouse B'], i) },
+      where: { productId_warehouseId: { productId: product.id, warehouseId: defaultWarehouse.id } }, update: {},
+      create: { productId: product.id, warehouseId: defaultWarehouse.id, quantityOnHand: 20 + i * 5, reorderLevel: 5, location: at(['Warehouse A', 'Warehouse B'], i) },
     });
     await prisma.stockMovement.upsert({
       where: { id: id(`mv-${i + 1}`) }, update: {},
-      create: { id: id(`mv-${i + 1}`), productId: product.id, qty: 50 + i * 10, type: 'in', note: 'Opening stock', createdById: admin.id },
+      create: { id: id(`mv-${i + 1}`), productId: product.id, warehouseId: defaultWarehouse.id, qty: 50 + i * 10, type: 'in', note: 'Opening stock', createdById: admin.id },
     });
     products.push(product);
   }

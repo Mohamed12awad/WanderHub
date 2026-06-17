@@ -7,7 +7,8 @@ import {
   User, Palette, LayoutGrid, TableProperties, Users, ShieldCheck,
   LogsIcon, ClipboardCheck, Landmark, ChevronLeft, Settings2, Building2, Coins,
   KeyRound, Bell, GitBranch, ListOrdered, FileText, Percent, Mail,
-  Lock, Download, AlertTriangle, Tag, Plug, Sparkles,
+  Lock, Download, AlertTriangle, Tag, Plug, Sparkles, BookText, Boxes,
+  Network,
 } from "lucide-react";
 import ProfileSettings from "./settings/ProfileSettings";
 import AppearanceSettings from "./settings/AppearanceSettings";
@@ -22,8 +23,11 @@ import SecuritySettings from "./settings/SecuritySettings";
 import NotificationsSettings from "./settings/NotificationsSettings";
 import PipelineStagesSettings from "./settings/PipelineStagesSettings";
 import CategoriesSettings from "./settings/CategoriesSettings";
+import ProductCategoriesSettings from "./settings/ProductCategoriesSettings";
 import NumberSequencesSettings from "./settings/NumberSequencesSettings";
 import TaxRatesSettings from "./settings/TaxRatesSettings";
+import CostCentersSettings from "./settings/CostCentersSettings";
+import GlMappingSettings from "./settings/GlMappingSettings";
 import InvoiceDefaultsSettings from "./settings/InvoiceDefaultsSettings";
 import EmailConfigSettings from "./settings/EmailConfigSettings";
 import PasswordPolicySettings from "./settings/PasswordPolicySettings";
@@ -64,11 +68,14 @@ export default function Settings() {
     { to: "/settings/fields",           icon: TableProperties, label: s.fields },
     { to: "/settings/pipeline-stages",  icon: GitBranch,       label: "Pipeline Stages" },
     { to: "/settings/categories",       icon: Tag,             label: "Categories" },
+    { to: "/settings/product-categories", icon: Boxes,         label: "Product Categories" },
     { to: "/settings/number-sequences", icon: ListOrdered,     label: "Number Sequences" },
   ];
 
   const financeItems: NavItem[] = [
     { to: "/settings/accounts",         icon: Landmark,       label: "Accounts" },
+    { to: "/settings/cost-centers",     icon: Network,        label: "Cost Centers" },
+    { to: "/settings/gl-mapping",       icon: BookText,       label: "GL / Account Mapping" },
     { to: "/settings/tax-rates",        icon: Percent,        label: "Tax Rates" },
     { to: "/settings/invoice-defaults", icon: FileText,       label: "Invoice Defaults" },
     { to: "/settings/approvals",        icon: ClipboardCheck, label: "Approvals" },
@@ -194,7 +201,7 @@ export default function Settings() {
         </div>
 
         {/* ── Content area ── */}
-        <main className="flex-1 overflow-auto bg-muted/40 dark:bg-background">
+        <main className="flex-1 overflow-auto bg-background">
           <Routes>
             <Route index element={<Navigate to="/settings/profile" replace />} />
             {/* Personal */}
@@ -209,10 +216,13 @@ export default function Settings() {
             {/* Data */}
             <Route path="pipeline-stages"  element={<PipelineStagesSettings />} />
             <Route path="categories"       element={<CategoriesSettings />} />
+            <Route path="product-categories" element={<Protected permission="product-categories:view"><ProductCategoriesSettings /></Protected>} />
             <Route path="number-sequences" element={<NumberSequencesSettings />} />
             {/* Finance */}
             <Route path="accounts"         element={<AccountsSettings />} />
             <Route path="accounts/:id"     element={<AccountStatement />} />
+            <Route path="cost-centers"     element={<Protected permission="accounting:manage"><CostCentersSettings /></Protected>} />
+            <Route path="gl-mapping"       element={<Protected permission="settings:manage"><GlMappingSettings /></Protected>} />
             <Route path="tax-rates"        element={<TaxRatesSettings />} />
             <Route path="invoice-defaults" element={<InvoiceDefaultsSettings />} />
             <Route path="approvals"        element={<ApprovalsSettings />} />
@@ -238,10 +248,10 @@ export default function Settings() {
 
 // Returns the group index (0=personal,1=workspace,2=data,3=finance) for a given flat index
 function getGroupIndex(idx: number): number {
-  // personal:4, workspace:3, data:4, finance:4
+  // personal:4, workspace:3, data:5, finance:5
   if (idx < 4) return 0;
   if (idx < 7) return 1;
-  if (idx < 11) return 2;
+  if (idx < 12) return 2;
   return 3;
 }
 

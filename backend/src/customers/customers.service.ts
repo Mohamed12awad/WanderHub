@@ -106,16 +106,11 @@ export class CustomersService {
       data: cleaned as Prisma.CustomerUncheckedUpdateInput,
     });
 
-    const TRACKED_FIELDS = ['name', 'email', 'phone', 'mobile', 'location', 'status', 'gender', 'source', 'notes'];
-    const changes: Record<string, { from: unknown; to: unknown }> = {};
-    for (const field of TRACKED_FIELDS) {
-      if (cleaned[field] === undefined) continue;
-      const oldVal = (existing as Record<string, unknown>)[field];
-      const newVal = cleaned[field];
-      if (String(oldVal ?? '') !== String(newVal ?? '')) changes[field] = { from: oldVal, to: newVal };
-    }
-    if (Object.keys(changes).length > 0 && userId) {
-      await this.timeline.log('contact.updated', 'Contact updated', id, 'Customer', { changes }, userId);
+    if (userId) {
+      await this.timeline.logUpdate({
+        eventType: 'contact.updated', title: 'Contact updated', linkedModel: 'Customer',
+        id, before: existing as Record<string, unknown>, changed: cleaned, userId,
+      });
     }
 
     return toClient(customer);

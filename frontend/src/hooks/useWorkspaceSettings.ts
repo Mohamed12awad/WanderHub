@@ -24,6 +24,7 @@ export interface FieldDef {
   label: string;     // display label (user-editable)
   type: FieldType;
   required: boolean;
+  hidden?: boolean;  // when true, the field is omitted from create/edit forms
   options?: string;  // comma-separated for select type
   isSystem?: boolean;
   filterable?: boolean;
@@ -43,12 +44,40 @@ export interface FieldDef {
 export interface WorkspaceSettings {
   fieldGroups: { module: string; fields: FieldDef[]; sections?: SectionDef[] }[];
   moduleSettings: { module: string; enabled: boolean }[];
+  pipelineStages: unknown[];
+}
+
+type LegacyId = { id?: string; _id?: string };
+
+export function normalizeWorkspaceSettings(data: any): WorkspaceSettings {
+  return {
+    ...data,
+    fieldGroups: Array.isArray(data?.fieldGroups)
+      ? data.fieldGroups.map((group: any) => ({
+          ...group,
+          fields: Array.isArray(group.fields)
+            ? group.fields.map((field: FieldDef & LegacyId) => ({
+                ...field,
+                id: field.id ?? field._id,
+              }))
+            : [],
+          sections: Array.isArray(group.sections)
+            ? group.sections.map((section: SectionDef & LegacyId) => ({
+                ...section,
+                id: section.id ?? section._id,
+              }))
+            : undefined,
+        }))
+      : [],
+    moduleSettings: Array.isArray(data?.moduleSettings) ? data.moduleSettings : [],
+    pipelineStages: Array.isArray(data?.pipelineStages) ? data.pipelineStages : [],
+  };
 }
 
 export function useWorkspaceSettings() {
   const { data, isPending } = useQuery({
     queryKey: ["workspaceSettings"],
-    queryFn: async () => (await getWorkspaceSettings()).data,
+    queryFn: async () => normalizeWorkspaceSettings((await getWorkspaceSettings()).data),
     staleTime: 5 * 60 * 1000
   });
 

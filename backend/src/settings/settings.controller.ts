@@ -100,7 +100,7 @@ export class SettingsController {
   @Put('invoice-defaults')
   @RequirePermission('settings:manage')
   updateInvoiceDefaults(
-    @Body() body: { paymentTermsDays?: number; notes?: string; terms?: string; quotesValidDays?: number },
+    @Body() body: { paymentTermsDays?: number; notes?: string; terms?: string; quotesValidDays?: number; taxInclusive?: boolean },
   ) {
     return this.settings.updateInvoiceDefaults(body);
   }
@@ -114,7 +114,16 @@ export class SettingsController {
 
   @Post('tax-rates')
   @RequirePermission('settings:manage')
-  createTaxRate(@Body() body: { name: string; rate: number; isDefault?: boolean }) {
+  createTaxRate(
+    @Body()
+    body: {
+      name: string;
+      rate: number;
+      isDefault?: boolean;
+      liabilityAccountCode?: string | null;
+      inputAccountCode?: string | null;
+    },
+  ) {
     return this.settings.createTaxRate(body);
   }
 
@@ -122,9 +131,31 @@ export class SettingsController {
   @RequirePermission('settings:manage')
   updateTaxRate(
     @Param('id') id: string,
-    @Body() body: { name?: string; rate?: number; isDefault?: boolean },
+    @Body()
+    body: {
+      name?: string;
+      rate?: number;
+      isDefault?: boolean;
+      liabilityAccountCode?: string | null;
+      inputAccountCode?: string | null;
+    },
   ) {
     return this.settings.updateTaxRate(id, body);
+  }
+
+  // ── GL / Accounting config ──────────────────────────────────────────────────
+
+  // Readable by any authenticated user (currency/posting UI needs the cost
+  // method + cutover flags); writes require settings:manage.
+  @Get('gl-config')
+  getGlConfig() {
+    return this.settings.getGlConfig();
+  }
+
+  @Put('gl-config')
+  @RequirePermission('settings:manage')
+  updateGlConfig(@Body() body: Record<string, unknown>) {
+    return this.settings.updateGlConfig(body);
   }
 
   @Delete('tax-rates/:id')

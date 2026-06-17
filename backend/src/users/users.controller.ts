@@ -54,6 +54,19 @@ export class UsersController {
     return this.users.updateNotificationPreferences(user.id, body);
   }
 
+  @Put('me/landing-page')
+  updateLandingPage(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { defaultLandingPage: string | null },
+  ) {
+    return this.users.updateLandingPage(user.id, body?.defaultLandingPage ?? null);
+  }
+
+  @Put('me/onboarded')
+  markOnboarded(@CurrentUser() user: AuthUser) {
+    return this.users.markOnboarded(user.id);
+  }
+
   // ── Admin CRUD ────────────────────────────────────────────────────────────────
 
   @Get()

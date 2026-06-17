@@ -23,6 +23,17 @@ import {
   ListChecks,
   Boxes,
   ClipboardCheck,
+  BookOpen,
+  NotebookPen,
+  Scale,
+  TrendingUp,
+  Landmark as LandmarkIcon,
+  Waves,
+  Lock,
+  Warehouse as WarehouseNav,
+  ArrowLeftRight,
+  Coins,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -73,6 +84,8 @@ function NavLinks() {
   const showCalendar = modules.calendar && can("activities:view");
   const showProducts = modules.products && can("products:view");
   const showReports = modules.reports && can("reports:view");
+  const showAccounting = can("accounting:view");
+  const showWarehouses = can("warehouses:view");
 
   const hasCRM = showLeads || showContacts || showDeals || showPipeline;
   const hasSales = showQuotes || showInvoices || showSalesOrders; // money IN: quotes → sales orders → invoices → payments
@@ -243,7 +256,7 @@ function NavLinks() {
         <NavItem
           href="/activities"
           icon={ListChecks}
-          label="Activities"
+          label={tr.nav.activities}
           active={isActive("/activities")}
         />
       )}
@@ -264,9 +277,90 @@ function NavLinks() {
         <NavItem
           href="/inventory"
           icon={Boxes}
-          label="Inventory"
+          label={tr.nav.inventory}
           active={isActive("/inventory")}
         />
+      )}
+      {showWarehouses && (
+        <NavItem
+          href="/inventory/warehouses"
+          icon={WarehouseNav}
+          label={lang === "ar" ? "المخازن" : "Warehouses"}
+          active={isActive("/inventory/warehouses")}
+        />
+      )}
+      {showProducts && can("products:edit") && (
+        <NavItem
+          href="/inventory/transfers"
+          icon={ArrowLeftRight}
+          label={lang === "ar" ? "تحويلات المخزون" : "Stock Transfers"}
+          active={isActive("/inventory/transfers")}
+        />
+      )}
+      {showProducts && (
+        <NavItem
+          href="/inventory/valuation"
+          icon={Coins}
+          label={lang === "ar" ? "تقييم المخزون" : "Inventory Valuation"}
+          active={isActive("/inventory/valuation")}
+        />
+      )}
+
+      {/* ── Accounting (GL): chart of accounts → journal ── */}
+      {showAccounting && <NavSection label={lang === "ar" ? "المحاسبة" : "Accounting"} />}
+      {showAccounting && (
+        <>
+          <NavItem
+            href="/accounting/chart-of-accounts"
+            icon={BookOpen}
+            label={lang === "ar" ? "دليل الحسابات" : "Chart of Accounts"}
+            active={isActive("/accounting/chart-of-accounts")}
+          />
+          <NavItem
+            href="/accounting/journal"
+            icon={NotebookPen}
+            label={lang === "ar" ? "القيود" : "Journal"}
+            active={isActive("/accounting/journal")}
+          />
+          <NavItem
+            href="/accounting/trial-balance"
+            icon={Scale}
+            label={lang === "ar" ? "ميزان المراجعة" : "Trial Balance"}
+            active={isActive("/accounting/trial-balance")}
+          />
+          <NavItem
+            href="/accounting/profit-loss"
+            icon={TrendingUp}
+            label={lang === "ar" ? "الأرباح والخسائر" : "Profit & Loss"}
+            active={isActive("/accounting/profit-loss")}
+          />
+          <NavItem
+            href="/accounting/balance-sheet"
+            icon={LandmarkIcon}
+            label={lang === "ar" ? "الميزانية العمومية" : "Balance Sheet"}
+            active={isActive("/accounting/balance-sheet")}
+          />
+          <NavItem
+            href="/accounting/cash-flow"
+            icon={Waves}
+            label={lang === "ar" ? "التدفق النقدي" : "Cash Flow"}
+            active={isActive("/accounting/cash-flow")}
+          />
+          <NavItem
+            href="/accounting/audit"
+            icon={ShieldCheck}
+            label={lang === "ar" ? "التدقيق" : "Audit"}
+            active={isActive("/accounting/audit")}
+          />
+          {can("accounting:manage") && (
+            <NavItem
+              href="/accounting/periods"
+              icon={Lock}
+              label={lang === "ar" ? "إغلاق الفترة" : "Period Close"}
+              active={isActive("/accounting/periods")}
+            />
+          )}
+        </>
       )}
     </div>
   );

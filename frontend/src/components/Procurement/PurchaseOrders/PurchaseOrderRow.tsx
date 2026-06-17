@@ -3,6 +3,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { RowActions } from "@/components/common/RowActions";
 import { PurchaseOrder } from "@/types/types";
 import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   po: PurchaseOrder;
@@ -18,6 +19,7 @@ function fmtDate(value?: string | Date | null) {
 
 export default function PurchaseOrderRow({ po, handleDelete }: Props) {
   const navigate = useNavigate();
+  const { tr } = useLanguage();
   const expected = (po as any).expectedDeliveryDate ?? (po as any).expectedDate;
   const orderDate = (po as any).issueDate ?? (po as any).createdAt;
 
@@ -38,7 +40,7 @@ export default function PurchaseOrderRow({ po, handleDelete }: Props) {
       <TableCell>{po.supplier?.name || "-"}</TableCell>
       <TableCell>
         <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(po.status)}`}>
-          {po.status}
+          {tr.purchaseOrders.statuses[po.status] ?? po.status}
         </span>
       </TableCell>
       <TableCell className="font-medium">

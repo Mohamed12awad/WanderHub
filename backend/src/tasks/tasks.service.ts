@@ -30,9 +30,15 @@ export class TasksService {
   }
 
   async findAll(query: Record<string, string>, user: AuthUser) {
-    const { status, priority, assignedTo, linkedTo, overdue, mine, projectId, page = '1' } = query;
+    const { status, priority, assignedTo, linkedTo, overdue, mine, projectId, q, page = '1' } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId');
     const where: Prisma.TaskWhereInput = { deletedAt: null, ...scopeWhere };
+    if (q?.trim()) {
+      where.OR = [
+        { title: { contains: q.trim(), mode: 'insensitive' } },
+        { description: { contains: q.trim(), mode: 'insensitive' } },
+      ];
+    }
     if (status) where.status = status as Prisma.TaskWhereInput['status'];
     if (priority) where.priority = priority as Prisma.TaskWhereInput['priority'];
     if (assignedTo) where.assignedToId = assignedTo;
@@ -43,7 +49,7 @@ export class TasksService {
       where.dueDate = { lt: new Date() };
       where.status = { notIn: ['done', 'cancelled'] };
     }
-    const limit = 50;
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit ?? '25', 10) || 25));
     const skip = (parseInt(page, 10) - 1) * limit;
     const TASK_INCLUDE = {
       assignedTo: { select: { id: true, name: true, email: true } },
@@ -86,7 +92,14 @@ export class TasksService {
         updatedBy: { select: { id: true, name: true } },
       },
     });
-    return task ? toClient(task) : null;
+    if (!task) return null;
+    // actualCost is computed (never stored) by summing attributed expense items,
+    // so it can't drift from the underlying expenses. See schema note on Task.
+    const agg = await this.prisma.expenseItem.aggregate({
+      where: { taskId: id },
+      _sum: { amount: true },
+    });
+    return toClient({ ...task, actualCost: agg._sum.amount ?? 0 });
   }
 
   async create(body: CreateTaskDto, userId: string) {
@@ -173,6 +186,11 @@ export class TasksService {
         link: task.linkedToId ? `/${task.linkedModel?.toLowerCase()}s/${task.linkedToId}` : undefined,
       });
     }
+
+    await this.timeline.logUpdate({
+      eventType: 'task.updated', title: 'Task updated', linkedModel: 'Task',
+      id, before: existing as Record<string, unknown>, changed: data, userId,
+    });
 
     return toClient(task);
   }

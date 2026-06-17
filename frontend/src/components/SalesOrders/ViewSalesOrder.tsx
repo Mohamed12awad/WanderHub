@@ -303,7 +303,7 @@ export default function ViewSalesOrder() {
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Disc %</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>
               {(so.items ?? []).map((it: any, i: number) => (
-                <TableRow key={i}>
+                <TableRow key={it.id ?? it._id ?? i}>
                   <TableCell>{it.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell>

@@ -1,7 +1,8 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class RecordBillPaymentDto {
-  @IsNumber() amount: number;
+  // Must be > 0: a negative or zero payment would corrupt the bill's paid status.
+  @IsNumber() @IsPositive() amount: number;
   @IsString() date: string;
   @IsOptional() @IsString() currency?: string;
   @IsOptional() @IsString() method?: string;

@@ -17,7 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Landmark, Wallet, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAccounts, createAccount, updateAccount, deleteAccount } from "@/utils/api";
+import { getAccounts, createAccount, updateAccount, deleteAccount, getChartOfAccounts } from "@/utils/api";
+import { queryKeys } from "@/lib/queryKeys";
+import { CURRENCIES } from "@/utils/constants";
 import { useToast } from "@/components/ui/use-toast";
 import { Account, AccountType } from "@/types/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -40,6 +42,7 @@ interface FormState {
   currency: string;
   balance: string;
   notes: string;
+  glAccountId: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -48,6 +51,7 @@ const emptyForm = (): FormState => ({
   currency: "USD",
   balance: "0",
   notes: "",
+  glAccountId: "",
 });
 
 export default function AccountsSettings() {
@@ -68,6 +72,10 @@ export default function AccountsSettings() {
   });
   const accounts: Account[] = data?.data ?? [];
 
+  const { data: coaData } = useQuery({ queryKey: queryKeys.accounting.chartOfAccounts, queryFn: () => getChartOfAccounts(), staleTime: 60000 });
+  const assetAccounts: { _id: string; code: string; name: string; cashAccount?: { _id: string } | null }[] =
+    (coaData?.data ?? []).filter((c: any) => c.type === "asset");
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm());
@@ -82,6 +90,7 @@ export default function AccountsSettings() {
       currency: acc.currency,
       balance: String(acc.balance),
       notes: acc.notes ?? "",
+      glAccountId: (acc as any).chartOfAccount?._id ?? "",
     });
     setDialogOpen(true);
   };
@@ -96,6 +105,7 @@ export default function AccountsSettings() {
       currency: form.currency.trim() || "USD",
       balance: parseFloat(form.balance) || 0,
       notes: form.notes.trim() || undefined,
+      chartOfAccountId: form.glAccountId || undefined,
     };
     try {
       if (editing) {
@@ -125,7 +135,7 @@ export default function AccountsSettings() {
   };
 
   return (
-    <div className="p-6 max-w-3xl space-y-4">
+    <div className="page-w-narrow page-pad page-gap">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Accounts</h2>
@@ -149,6 +159,7 @@ export default function AccountsSettings() {
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Currency</TableHead>
+                  <TableHead>GL Account</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
                   <TableHead className="w-20"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
@@ -171,6 +182,11 @@ export default function AccountsSettings() {
                         <Badge variant="outline" className="capitalize">{TYPE_LABELS[acc.type]}</Badge>
                       </TableCell>
                       <TableCell>{acc.currency}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        {(acc as any).chartOfAccount
+                          ? `${(acc as any).chartOfAccount.code} — ${(acc as any).chartOfAccount.name}`
+                          : "—"}
+                      </TableCell>
                       <TableCell className="text-right font-mono">{acc.balance.toLocaleString()}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -220,12 +236,14 @@ export default function AccountsSettings() {
               </div>
               <div className="space-y-2">
                 <Label>Currency</Label>
-                <Input
-                  value={form.currency}
-                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                  placeholder="USD"
-                  maxLength={3}
-                />
+                <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
@@ -245,6 +263,27 @@ export default function AccountsSettings() {
                 rows={2}
                 placeholder="Optional notes"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>GL Account</Label>
+              <Select value={form.glAccountId || "auto"} onValueChange={(v) => setForm({ ...form, glAccountId: v === "auto" ? "" : v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-create under 1100 Cash &amp; Bank</SelectItem>
+                  {assetAccounts.map((a) => (
+                    <SelectItem
+                      key={a._id}
+                      value={a._id}
+                      disabled={!!a.cashAccount && a.cashAccount._id !== editing?._id}
+                    >
+                      {a.code} — {a.name}{a.cashAccount && a.cashAccount._id !== editing?._id ? " (linked)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pick an existing GL account, or leave on auto to create one automatically.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

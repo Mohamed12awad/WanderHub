@@ -69,6 +69,7 @@ export function Customers() {
         statusOptions: Object.entries(c.statuses).map(([value, label]) => ({ value, label })),
       }}
       exportConfig={{
+        entity: "customers",
         filename: "contacts",
         getRow: (c) => ({
           Name: c.name,

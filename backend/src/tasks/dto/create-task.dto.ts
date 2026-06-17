@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -57,6 +58,11 @@ export class CreateTaskDto {
   @IsOptional()
   @IsString()
   milestone?: string;
+
+  // Planning figure. Actual cost is computed (not stored) from attributed expenses.
+  @IsOptional()
+  @IsNumber()
+  estimatedCost?: number;
 
   @IsOptional()
   @IsArray()

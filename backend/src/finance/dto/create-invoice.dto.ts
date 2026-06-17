@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -55,9 +56,20 @@ export class CreateInvoiceDto {
   @IsString()
   terms?: string;
 
+  // Optional analytic cost center.
+  @IsOptional()
+  @IsString()
+  costCenterId?: string;
+
   @IsOptional()
   @IsNumber()
   taxRate?: number;
+
+  // When true, line unit prices already include tax (tax is back-calculated out).
+  // Omitted → the org default from WorkspaceConfig.invoiceDefaults.taxInclusive.
+  @IsOptional()
+  @IsBoolean()
+  taxInclusive?: boolean;
 
   @IsOptional()
   @IsObject()

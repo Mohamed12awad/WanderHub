@@ -33,7 +33,20 @@ function makeService(prisma: any) {
   };
   const customFields: any = { validateAndClean: jest.fn() };
   const visibility: any = { ownershipWhere: jest.fn().mockResolvedValue({}) };
-  return new InvoicesService(prisma, numberSequence, timeline, inventory, approvals, customFields, visibility);
+  const posting: any = {
+    postInvoiceIssued: jest.fn().mockResolvedValue(undefined),
+    postInvoicePayment: jest.fn().mockResolvedValue(undefined),
+    reverseLive: jest.fn().mockResolvedValue(undefined),
+  };
+  // Same-currency conversions return the amount unchanged (mirrors the real
+  // CurrencyService short-circuit on from === to).
+  const currency: any = {
+    convert: jest.fn(async (amount: number) => amount),
+    toBase: jest.fn(async (amount: number) => amount),
+    getBaseCurrency: jest.fn().mockResolvedValue('EGP'),
+  };
+  const workspaceConfig: any = { get: jest.fn().mockResolvedValue({ invoiceDefaults: {} }) };
+  return new InvoicesService(prisma, numberSequence, timeline, inventory, approvals, customFields, visibility, posting, currency, workspaceConfig);
 }
 
 const mockUser: any = { id: 'user1', role: 'admin', roleId: 'role-admin', permissions: ['*'] };
@@ -74,6 +87,23 @@ describe('InvoicesService — approval separation of duties', () => {
       approvedById: 'approver1',
     });
     expect(res._id).toBe('inv1');
+  });
+
+  it('clears approvedBy/approvedAt when rejecting a previously-approved invoice', async () => {
+    const { prisma } = buildMocks();
+    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'other', approvalStatus: 'approved', approvedById: 'approver1', deletedAt: null });
+    prisma.workspaceConfig.findFirst.mockResolvedValue({ approvals: [{ module: 'invoices', enabled: true, approverRoles: ['admin'] }] });
+    prisma.invoice.update.mockResolvedValue({ id: 'inv1', approvalStatus: 'rejected' });
+    const svc = makeService(prisma);
+
+    await svc.rejectInvoice('inv1', 'approver1', 'bad numbers', 'admin', ['*']);
+
+    expect(prisma.invoice.update.mock.calls[0][0].data).toMatchObject({
+      approvalStatus: 'rejected',
+      approvedById: null,
+      approvedAt: null,
+      rejectionReason: 'bad numbers',
+    });
   });
 });
 

@@ -10,6 +10,7 @@ import { TextField, SelectField, TextareaField, FormActions } from "@/components
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { createDeal, updateDeal, getDealById, getCustomers, getUsers } from "@/utils/api";
 import { CURRENCIES } from "@/utils/constants";
@@ -98,17 +99,12 @@ export function DealForm({ mode, id, defaultValues }: DealFormProps) {
     });
   }, [id, mode, form]);
 
-  // Unsaved-changes guard
+  // Unsaved-changes guard — blocks SPA navigation + hard unload while dirty.
   useEffect(() => {
     const sub = form.watch(() => setIsDirty(true));
     return () => sub.unsubscribe();
   }, [form]);
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
+  const { allowNavigation } = useUnsavedChangesGuard(isDirty);
 
   const backTo = mode === "create" ? "/deals" : `/deals/${id}`;
 
@@ -117,7 +113,11 @@ export function DealForm({ mode, id, defaultValues }: DealFormProps) {
     invalidate: [queryKeys.deals.all],
     successMessage: mode === "create" ? "Deal created" : "Deal updated",
     errorMessage:   mode === "create" ? "Failed to create deal" : "Failed to update deal",
-    onSuccess: () => navigate(mode === "create" ? "/deals" : `/deals/${id}`),
+    onSuccess: () => {
+      allowNavigation();
+      setIsDirty(false);
+      navigate(mode === "create" ? "/deals" : `/deals/${id}`);
+    },
   });
 
   const fetchCustomers = useCallback(

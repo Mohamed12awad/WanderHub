@@ -102,6 +102,81 @@ export const IMPORT_ENTITIES: Record<string, ImportEntityConfig> = {
       { key: 'notes', label: 'Notes' },
     ],
   },
+  products: {
+    permission: 'products:create',
+    customFieldsModule: 'products',
+    fields: [
+      { key: 'name', label: 'Name', required: true },
+      { key: 'type', label: 'Type', type: 'enum', enumValues: ['service', 'physical', 'digital', 'subscription'] },
+      { key: 'capacity', label: 'Capacity', type: 'number' },
+      { key: 'location', label: 'Location' },
+      { key: 'description', label: 'Description' },
+      { key: 'notes', label: 'Notes' },
+    ],
+  },
+  suppliers: {
+    permission: 'suppliers:create',
+    customFieldsModule: 'suppliers',
+    fields: [
+      { key: 'name', label: 'Name', required: true },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'taxId', label: 'Tax ID' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'status', label: 'Status', type: 'enum', enumValues: ['active', 'inactive'] },
+      { key: 'notes', label: 'Notes' },
+    ],
+  },
+  projects: {
+    permission: 'projects:create',
+    customFieldsModule: 'projects',
+    fields: [
+      { key: 'name', label: 'Name', required: true },
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'enum',
+        enumValues: ['planning', 'active', 'on_hold', 'completed', 'cancelled'],
+      },
+      { key: 'priority', label: 'Priority', type: 'enum', enumValues: ['low', 'medium', 'high', 'urgent'] },
+      { key: 'budget', label: 'Budget', type: 'number' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'startDate', label: 'Start Date', type: 'date' },
+      { key: 'endDate', label: 'End Date', type: 'date' },
+      { key: 'description', label: 'Description' },
+    ],
+  },
+  tasks: {
+    permission: 'tasks:create',
+    customFieldsModule: 'tasks',
+    fields: [
+      { key: 'title', label: 'Title', required: true },
+      { key: 'status', label: 'Status', type: 'enum', enumValues: ['todo', 'in_progress', 'done', 'cancelled'] },
+      { key: 'priority', label: 'Priority', type: 'enum', enumValues: ['low', 'medium', 'high', 'urgent'] },
+      { key: 'dueDate', label: 'Due Date', type: 'date' },
+      { key: 'estimatedCost', label: 'Estimated Cost', type: 'number' },
+      { key: 'description', label: 'Description' },
+    ],
+  },
+  // Chart of Accounts. `normalBalance` is derived from `type` by the service, so
+  // it isn't an importable column. `parentCode` is resolved to a parent id.
+  'chart-of-accounts': {
+    permission: 'accounting:edit',
+    fields: [
+      { key: 'code', label: 'Code', required: true, hint: 'Must be unique' },
+      { key: 'name', label: 'Name', required: true },
+      {
+        key: 'type',
+        label: 'Type',
+        required: true,
+        type: 'enum',
+        enumValues: ['asset', 'liability', 'equity', 'income', 'expense'],
+      },
+      { key: 'currency', label: 'Currency' },
+      { key: 'parentCode', label: 'Parent Code', hint: 'Code of an existing parent account' },
+      { key: 'isActive', label: 'Active', type: 'enum', enumValues: ['true', 'false'] },
+    ],
+  },
 };
 
 export type ImportEntity = keyof typeof IMPORT_ENTITIES;

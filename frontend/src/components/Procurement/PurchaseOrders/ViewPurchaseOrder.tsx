@@ -4,7 +4,7 @@ import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPurchaseOrderById, approvePurchaseOrder, rejectPurchaseOrder,
-  updatePurchaseOrderStatus, deletePurchaseOrder, createBillFromPO,
+  updatePurchaseOrderStatus, deletePurchaseOrder, createBillFromPO, receivePurchaseOrder,
 } from "@/utils/api";
 import { DetailPageLayout } from "@/components/common/DetailPageLayout";
 import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
@@ -14,7 +14,7 @@ import { RecordContextPanel } from "@/components/common/RecordContextPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, CheckCircle, XCircle, Clock, Receipt, Copy, Trash2 } from "lucide-react";
+import { Edit, CheckCircle, XCircle, Clock, Receipt, Copy, Trash2, PackageCheck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -76,6 +76,17 @@ export default function ViewPurchaseOrder() {
     finally { setBusy(false); }
   };
 
+  const handleReceive = async () => {
+    setBusy(true);
+    try {
+      await receivePurchaseOrder(id!);
+      refresh();
+      toast({ title: "Received into stock — inventory and GRNI posted." });
+    } catch (e: any) {
+      toast({ title: e?.response?.data?.message ?? "Failed to receive purchase order.", variant: "destructive" });
+    } finally { setBusy(false); }
+  };
+
   const handleCreateBill = async () => {
     setBusy(true);
     try {
@@ -116,8 +127,13 @@ export default function ViewPurchaseOrder() {
   const supplierName = typeof po.supplier === "object" ? po.supplier?.name : po.supplier;
   const transition = NEXT_STATUS[po.status];
   const canBill = po.status === "received" && po.approvalStatus === "approved";
+  const canReceive = po.approvalStatus === "approved" && po.status !== "received";
 
-  const primaryAction: React.ReactNode = transition ? (
+  const primaryAction: React.ReactNode = canReceive ? (
+      <Button size="sm" className="gap-1" disabled={busy} onClick={handleReceive}>
+        <PackageCheck className="h-3.5 w-3.5" />Receive
+      </Button>
+    ) : transition ? (
       <Button size="sm" onClick={() => statusMutation.mutate(transition.next)} disabled={statusMutation.isPending}>
         {transition.label}
       </Button>
@@ -132,8 +148,12 @@ export default function ViewPurchaseOrder() {
     );
 
   const menuItems: DetailMenuItem[] = [];
-  if (transition || canBill) {
+  if (transition || canBill || canReceive) {
     menuItems.push({ label: tr.common.edit, icon: <Edit className="h-3.5 w-3.5 me-2" />, onClick: () => navigate(`/procurement/purchase-orders/${id}/edit`) });
+  }
+  // When Receive takes the primary slot, keep the status transition reachable.
+  if (canReceive && transition) {
+    menuItems.push({ label: transition.label, icon: <Clock className="h-3.5 w-3.5 me-2" />, onClick: () => statusMutation.mutate(transition.next) });
   }
   if (canBill && transition) {
     menuItems.push({ label: "Create Bill", icon: <Receipt className="h-3.5 w-3.5 me-2" />, onClick: handleCreateBill });
@@ -217,7 +237,7 @@ export default function ViewPurchaseOrder() {
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Disc %</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>
               {(po.items ?? []).map((it: any, i: number) => (
-                <TableRow key={i}>
+                <TableRow key={it.id ?? it._id ?? i}>
                   <TableCell>{it.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell>

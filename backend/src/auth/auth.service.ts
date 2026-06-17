@@ -15,6 +15,8 @@ type PublicUserInput = {
   id: string;
   email: string;
   name: string;
+  defaultLandingPage?: string | null;
+  hasOnboarded?: boolean;
   role: { name: string; permissions: string[] };
 };
 
@@ -62,6 +64,8 @@ export class AuthService {
       name: user.name,
       role: user.role.name,
       permissions: user.role.permissions ?? [],
+      defaultLandingPage: user.defaultLandingPage ?? null,
+      hasOnboarded: user.hasOnboarded ?? false,
     };
   }
 

@@ -51,7 +51,7 @@ export default function AccountStatement() {
   const Icon = account ? TYPE_ICONS[account.type] ?? Wallet : Wallet;
 
   return (
-    <div className="p-6 max-w-4xl space-y-4">
+    <div className="page-w-narrow page-pad page-gap">
       <Link to="/settings/accounts" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
         <ChevronLeft className="h-3.5 w-3.5" />
         Back to accounts

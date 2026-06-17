@@ -21,6 +21,7 @@ import { AppBreadcrumb } from "@/components/common/AppBreadcrumb";
 import { CircleArrowLeft } from "lucide-react";
 import { AxiosResponse } from "axios";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 
 interface Role { _id: string; name: string }
@@ -49,6 +50,7 @@ const EditUser: React.FC = () => {
     resolver: zodResolver(schema),
     defaultValues: { name: "", phone: "", email: "", password: "", role: "" },
   });
+  const values = form.watch();
 
   const { data: rolesData, isPending: rolesLoading } = useQuery({ queryKey: queryKeys.roles.all, queryFn: getRoles });
   const { data: userData, isPending: userLoading } = useQuery({
@@ -75,12 +77,22 @@ const EditUser: React.FC = () => {
     [userId],
   );
 
+  const isPending = rolesLoading || userLoading;
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { values, reportsTo },
+    { enabled: !isPending && !!userData },
+  );
+
   const mutation = useSaveMutation<Record<string, unknown>>({
     save: (payload) => updateUser(userId!, payload as any),
     invalidate: [queryKeys.users.all, queryKeys.users.detail(userId!)],
     successMessage: "User updated",
     errorMessage:   "Failed to update user",
-    onSuccess: () => navigate("/settings/users"),
+    onSuccess: () => {
+      allowNavigation();
+      resetSnapshot();
+      navigate("/settings/users");
+    },
   });
 
   const onSubmit = (values: FormValues) => {
@@ -95,7 +107,6 @@ const EditUser: React.FC = () => {
     return <p className="p-8 text-center font-semibold">You do not have permission to edit users.</p>;
   }
 
-  const isPending = rolesLoading || userLoading;
   const userDetail = userData ? (userData as AxiosResponse<UserDetail>).data : null;
   const name = form.watch("name");
 

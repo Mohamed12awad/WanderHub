@@ -8,6 +8,8 @@ import {
 } from "@/utils/api";
 import { DetailPageLayout } from "@/components/common/DetailPageLayout";
 import { DetailHeader, DetailMenuItem } from "@/components/common/DetailHeader";
+import { RecordContextPanel } from "@/components/common/RecordContextPanel";
+import { DocumentJournalEntries } from "@/components/common/DocumentJournalEntries";
 import { MetaGrid, MetaField } from "@/components/common/MetaGrid";
 import { AuditRows } from "@/components/common/AuditRows";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,6 +132,8 @@ export default function ViewVendorBill() {
         clone: {
           title: `Copy of ${bill.title ?? bill.billNumber}`,
           supplier: typeof bill.supplier === "object" ? bill.supplier?._id : bill.supplier,
+          costCenterId: bill.costCenter?._id ?? "",
+          costCenterLabel: bill.costCenter ? `${bill.costCenter.code} — ${bill.costCenter.name}` : "",
           currency: bill.currency,
           taxRate: bill.taxRate,
           notes: bill.notes ?? "",
@@ -183,8 +187,16 @@ export default function ViewVendorBill() {
     />
   );
 
+  const contextPanel = (
+    <RecordContextPanel
+      linkedTo={id!}
+      linkedModel="VendorBill"
+      approvalsContent={<ApprovalStepsTimeline entityType="VendorBill" entityId={id!} embedded />}
+    />
+  );
+
   return (
-    <DetailPageLayout header={header}>
+    <DetailPageLayout header={header} contextPanel={contextPanel}>
       <RejectDialog open={rejectOpen} onConfirm={handleReject} onCancel={() => setRejectOpen(false)} loading={busy} />
       <ConfirmDialog
         open={deleteOpen}
@@ -222,6 +234,7 @@ export default function ViewVendorBill() {
           <MetaGrid>
             <MetaField label="Supplier" value={supplierName} />
             {bill.purchaseOrder && <MetaField label="PO" value={bill.purchaseOrder.poNumber} />}
+            <MetaField label="Cost Center" value={bill.costCenter ? `${bill.costCenter.code} — ${bill.costCenter.name}` : "—"} />
             <MetaField label="Total" value={`${bill.total?.toLocaleString()} ${bill.currency}`} />
             <MetaField label="Outstanding">
               <span className={outstanding > 0 ? "text-destructive font-medium" : "text-emerald-600"}>
@@ -240,7 +253,7 @@ export default function ViewVendorBill() {
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>
               {(bill.items ?? []).map((it: any, i: number) => (
-                <TableRow key={i}><TableCell>{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell><TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell></TableRow>
+                <TableRow key={it.id ?? it._id ?? i}><TableCell>{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell><TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
@@ -287,7 +300,7 @@ export default function ViewVendorBill() {
         </CardContent>
       </Card>
 
-      <ApprovalStepsTimeline entityType="VendorBill" entityId={id!} />
+      <DocumentJournalEntries model="VendorBill" id={id!} />
     </DetailPageLayout>
   );
 }

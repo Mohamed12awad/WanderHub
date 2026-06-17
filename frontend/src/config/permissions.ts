@@ -11,6 +11,7 @@ export const PERMISSION_REGISTRY = {
   users:    ["view", "create", "edit", "delete"],
   roles:    ["view", "manage"],
   settings: ["view", "manage"],
+  accounting: ["manage"],
   logs:     ["view"],
   suppliers: ["view", "create", "edit", "delete"],
   "purchase-orders": ["view", "create", "edit", "delete", "approve"],

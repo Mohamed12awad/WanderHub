@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AppBreadcrumb, Crumb } from "@/components/common/AppBreadcrumb";
+import { useBreadcrumbs } from "@/hooks/useBreadcrumbs";
 
 export interface DetailMenuItem {
   label: string;
@@ -19,7 +20,12 @@ export interface DetailMenuItem {
 }
 
 interface DetailHeaderProps {
-  crumbs: Crumb[];
+  /**
+   * Explicit trail — pass when the leaf is a dynamic entity name only known
+   * after a client fetch (e.g. "Customers › Acme Corp"). Omit to derive the
+   * trail automatically from the route `handle.crumb` chain.
+   */
+  crumbs?: Crumb[];
   title: ReactNode;
   /** Status / approval badges shown next to the title. */
   badges?: ReactNode;
@@ -41,9 +47,11 @@ export function DetailHeader({
   primaryAction,
   menuItems = [],
 }: DetailHeaderProps) {
+  const auto = useBreadcrumbs();
+  const trail = crumbs ?? auto;
   return (
     <div className="space-y-2">
-      <AppBreadcrumb crumbs={crumbs} />
+      {trail.length > 0 && <AppBreadcrumb crumbs={trail} />}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h1 className="truncate text-xl font-semibold tracking-tight">

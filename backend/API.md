@@ -283,8 +283,8 @@ architecture see **[README.md](./README.md)**.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/search` | Global cross-module search (`q`). |
-| GET | `/summery` | Dashboard summary metrics. |
-| GET | `/summery/pending-approvals` | Items awaiting the user's approval. |
+| GET | `/summary` | Dashboard summary metrics. |
+| GET | `/summary/pending-approvals` | Items awaiting the user's approval. |
 
 ## Reports — `/reports`  ·  permissions `reports:*`
 | Method | Path | Description |
@@ -320,14 +320,34 @@ architecture see **[README.md](./README.md)**.
 | GET | `/attachments/:id/download` | Download a file. |
 | DELETE | `/attachments/:id` | Delete an attachment. |
 
-## Import / Bulk / Dedup
+## Import / Export / Bulk / Dedup
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/import/:entity/fields` | Importable fields for an entity. |
-| POST | `/import/:entity` | Import records from CSV. |
-| POST | `/bulk/:entity` | Bulk update/delete operations. |
+| GET | `/import/:entity/fields` | Importable fields for an entity (for the mapping UI). |
+| POST | `/import/:entity` | Import records from CSV. Enforces the entity's `:create` permission. |
+| GET | `/export/:entity` | Stream the **entire** module dataset as CSV (`text/csv` attachment). Enforces the entity's `:view` permission and the caller's ownership scope. |
+| POST | `/bulk/:entity` | Bulk `delete` / `assignOwner` / `setStatus`. Body: `{ ids: string[], action, value? }`. |
 | GET | `/dedup/:entity/duplicates` | Find potential duplicates. |
 | POST | `/dedup/:entity/merge` | Merge duplicate records. |
+
+**Entity coverage**
+
+| Capability | Supported `:entity` keys |
+|-----------|--------------------------|
+| **Export** (full dataset, streamed) | `customers`, `leads`, `deals`, `products`, `suppliers`, `quotes`, `invoices`, `sales-orders`, `purchase-orders`, `vendor-bills`, `expenses`, `projects`, `tasks`, `chart-of-accounts` |
+| **Import** (flat / header-only) | `customers`, `leads`, `deals`, `products`, `suppliers`, `projects`, `tasks`, `chart-of-accounts` |
+| **Bulk** | `customers`, `leads`, `deals`, `products`, `suppliers`, `projects`, `tasks` |
+
+Notes:
+- **Export** never materialises the whole table in memory — it walks rows with a
+  stable id-cursor in 500-row pages and pipes each page through a CSV stream.
+- **Import** of line-item documents (invoices/quotes/orders/bills) is intentionally
+  not supported via flat CSV; use the per-document endpoints. For
+  `chart-of-accounts`, `parentCode` resolves to the parent account by code and
+  `normalBalance` is derived from `type`.
+- **Bulk** `assignOwner` applies only to owner-scoped entities (`customers`,
+  `leads`, `deals`); `setStatus` is unavailable for `products` (no status field).
+  `delete` routes through each domain's `remove()` so guards and cascades apply.
 
 ## Emails — `/emails` & tracking — `/track`
 | Method | Path | Description |

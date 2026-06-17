@@ -218,6 +218,19 @@ body {
   }
 }
 
+/* ══════════════════════════════════════════════════════════
+   PAGE SHELL — unified container tokens (consumed by PageShell)
+   Single source of truth for page width, padding, and rhythm so
+   every page stops hand-rolling its own max-w / p-* values.
+   ══════════════════════════════════════════════════════════ */
+@layer components {
+  .page-pad      { @apply px-4 md:px-6 py-5; }
+  .page-gap      { @apply space-y-6; }
+  .page-w-narrow  { @apply mx-auto w-full max-w-3xl; }
+  .page-w-default { @apply mx-auto w-full max-w-7xl; }
+  .page-w-wide    { @apply w-full max-w-none; }
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar          { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track    { background: transparent; }

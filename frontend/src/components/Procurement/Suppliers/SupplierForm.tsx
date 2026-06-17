@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,15 +11,16 @@ import { EntityFormPage } from "@/components/common/EntityFormPage";
 import { TextField, TextareaField, FormActions } from "@/components/common/form";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { createSupplier, updateSupplier, getSupplierById } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const schema = z.object({
-  name:        z.string().min(1, "Supplier name is required"),
+const makeSchema = (validation: { nameRequired: string; invalidEmail: string }) => z.object({
+  name:        z.string().min(1, validation.nameRequired),
   contactName: z.string().optional(),
-  email:       z.string().email("Invalid email").optional().or(z.literal("")),
+  email:       z.string().email(validation.invalidEmail).optional().or(z.literal("")),
   phone:       z.string().optional(),
   status:      z.string().min(1),
   taxId:       z.string().optional(),
@@ -31,13 +32,14 @@ const schema = z.object({
   notes:       z.string().optional(),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof makeSchema>>;
 
 export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
   const navigate = useNavigate();
   const { id }   = useParams();
   const { tr }   = useLanguage();
-  const s        = (tr as any).suppliers || {};
+  const s        = tr.suppliers;
+  const schema   = useMemo(() => makeSchema(s.validation), [s.validation]);
 
   const [customFields, setCustomFields] = useState<Record<string, string>>({});
 
@@ -48,6 +50,7 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
       taxId: "", street: "", city: "", state: "", zip: "", country: "", notes: "",
     },
   });
+  const values = form.watch();
 
   const { data: supplierData, isPending: isFetching } = useQuery({
     queryKey: queryKeys.suppliers.detail(id!),
@@ -68,13 +71,19 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
   }, [supplierData, form]);
 
   const backHref = "/procurement/suppliers";
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { values, customFields },
+    { enabled: mode === "add" || !!supplierData?.data },
+  );
 
   const mutation = useSaveMutation<Record<string, unknown>>({
     save: (payload) => mode === "add" ? createSupplier(payload as any) : updateSupplier(id!, payload as any),
     invalidate: [queryKeys.suppliers.all],
-    successMessage: "Supplier saved",
-    errorMessage:   "Failed to save supplier",
+    successMessage: s.saved,
+    errorMessage:   s.saveFailed,
     onSuccess: (res: any) => {
+      allowNavigation();
+      resetSnapshot();
       const newId = res?.data?._id ?? id;
       navigate(newId ? `/procurement/suppliers/${newId}` : backHref);
     },
@@ -89,30 +98,30 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
     });
   };
 
-  if (isFetching) return <div className="p-6">Loading…</div>;
+  if (isFetching) return <div className="p-6">{tr.common.loading}</div>;
 
-  const title = mode === "add" ? (s.add ?? "Add Supplier") : "Edit Supplier";
+  const title = mode === "add" ? s.add : s.edit;
 
   return (
-    <EntityFormPage title={title} backHref={backHref} breadcrumb={[{ label: "Suppliers", href: "/procurement/suppliers" }, { label: mode === "add" ? "New" : "Edit" }]}>
+    <EntityFormPage title={title} backHref={backHref} breadcrumb={[{ label: s.title, href: "/procurement/suppliers" }, { label: mode === "add" ? tr.common.new : tr.common.edit }]}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TextField<FormValues> name="name"        label="Supplier Name" required />
-            <TextField<FormValues> name="contactName" label="Contact Name" />
-            <TextField<FormValues> name="email"       label="Email" type="email" />
-            <TextField<FormValues> name="phone"       label="Phone" />
-            <TextField<FormValues> name="taxId"       label="Tax ID" />
+            <TextField<FormValues> name="name"        label={s.fields.supplierName} required />
+            <TextField<FormValues> name="contactName" label={s.fields.contactName} />
+            <TextField<FormValues> name="email"       label={tr.common.email} type="email" />
+            <TextField<FormValues> name="phone"       label={tr.common.phone} />
+            <TextField<FormValues> name="taxId"       label={s.fields.taxId} />
 
             <FormField control={form.control} name="status" render={({ field }) => (
               <FormItem>
-                <FormLabel>Status</FormLabel>
+                <FormLabel>{tr.common.status}</FormLabel>
                 <FormControl>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="active">{s.active}</SelectItem>
+                      <SelectItem value="inactive">{s.inactive}</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>
@@ -121,20 +130,20 @@ export default function SupplierForm({ mode }: { mode: "add" | "edit" }) {
           </div>
 
           <div className="pt-4 border-t">
-            <h3 className="text-base font-medium mb-4">Address</h3>
+            <h3 className="text-base font-medium mb-4">{tr.common.address}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <TextField<FormValues> name="street" label="Street" />
+                <TextField<FormValues> name="street" label={s.fields.street} />
               </div>
-              <TextField<FormValues> name="city"    label="City" />
-              <TextField<FormValues> name="state"   label="State / Province" />
-              <TextField<FormValues> name="zip"     label="ZIP / Postal Code" />
-              <TextField<FormValues> name="country" label="Country" />
+              <TextField<FormValues> name="city"    label={s.fields.city} />
+              <TextField<FormValues> name="state"   label={s.fields.state} />
+              <TextField<FormValues> name="zip"     label={s.fields.zip} />
+              <TextField<FormValues> name="country" label={s.fields.country} />
             </div>
           </div>
 
           <div className="pt-4 border-t">
-            <TextareaField<FormValues> name="notes" label="Notes" rows={4} />
+            <TextareaField<FormValues> name="notes" label={tr.finance.notes} rows={4} />
           </div>
 
           <div className="pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-4">

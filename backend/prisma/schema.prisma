@@ -40,6 +40,14 @@ enum NotificationType {
   bill_overdue
 }
 
+// Distinguishes a person from an organisation on a Customer record. The DB keeps
+// the type-specific columns (firstName/lastName vs companyName/taxId) nullable;
+// the NestJS DTO layer enforces which are required based on the selected `type`.
+enum ContactType {
+  individual
+  company
+}
+
 // ─── Auth & Config ────────────────────────────────────────────────────────────
 
 model Role {
@@ -60,6 +68,8 @@ model User {
   password                String
   active                  Boolean  @default(true)
   notificationPreferences Json?
+  defaultLandingPage      String?
+  hasOnboarded            Boolean  @default(false)
   roleId                  String
   role                    Role     @relation(fields: [roleId], references: [id])
   reportsToId             String?
@@ -101,6 +111,7 @@ model User {
   savedViews             SavedView[]
   apiKeys                ApiKey[]            @relation("ApiKeyUser")
   createdApiKeys         ApiKey[]            @relation("ApiKeyCreatedBy")
+  journalEntries         JournalEntry[]      @relation("JournalCreatedBy")
 
   // `updatedBy` back-relations — last user to edit each record (auto-stamped).
   updatedCustomers      Customer[]      @relation("CustomerUpdatedBy")
@@ -122,11 +133,23 @@ model User {
 // ─── CRM ─────────────────────────────────────────────────────────────────────
 
 model Customer {
-  id                     String    @id @default(cuid())
+  id                     String      @id @default(cuid())
+  // Individual vs company. Type-specific fields below are nullable in the DB and
+  // validated by `type` in the customer DTO (the single source of required-by-type
+  // rules). `name` remains the canonical display name (derived from first/last name
+  // for individuals, or companyName for companies).
+  type                   ContactType @default(individual)
   name                   String
-  phone                  String    @unique
+  // Individual-only (required-by-type in DTO)
+  firstName              String?
+  lastName               String?
+  phone                  String      @unique
   mobile                 String?
-  email                  String?   @unique
+  email                  String?     @unique
+  // `companyName` supersedes the legacy `company` string for company-type contacts;
+  // `company` is retained for back-compat until callers migrate.
+  companyName            String?
+  taxId                  String?
   company                String?
   jobTitle               String?
   website                String?
@@ -141,15 +164,15 @@ model Customer {
   emergencyContact       Json?
   location               String?
   ownerId                String?
-  owner                  User?     @relation("CustomerOwner", fields: [ownerId], references: [id])
+  owner                  User?       @relation("CustomerOwner", fields: [ownerId], references: [id])
   updatedById            String?
-  updatedBy              User?     @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedBy              User?       @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   source                 String?
   status                 String?
   notes                  String?
   customFields           Json?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
   deletedAt              DateTime?
 
   deals         Deal[]
@@ -264,53 +287,131 @@ model Notification {
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
 
+// Product category. `costMethod` (nullable) sets the inventory cost-flow policy
+// for its products, overriding the org default in glConfig.
+model ProductCategory {
+  id         String            @id @default(cuid())
+  name       String
+  code       String?           @unique
+  costMethod String? // weighted_average | fifo | null = inherit org default
+  parentId   String?
+  parent     ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children   ProductCategory[] @relation("CategoryTree")
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  deletedAt  DateTime?
+
+  products Product[]
+
+  @@index([deletedAt])
+}
+
 model Product {
-  id           String    @id @default(cuid())
-  name         String
-  type         String?
-  capacity     Float?
-  location     String?
-  description  String?
-  notes        String?
-  customFields Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+  id              String           @id @default(cuid())
+  name            String
+  type            String?
+  capacity        Float?
+  location        String?
+  description     String?
+  notes           String?
+  customFields    Json?
+  // Service-type products (false) are skipped by the inventory/costing hooks.
+  tracksInventory Boolean          @default(true)
+  categoryId      String?
+  category        ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
 
   updatedById    String?
   updatedBy      User?           @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   productNotes   Note[]
-  stockItem      StockItem?
+  stockItems     StockItem[]
   stockMovements StockMovement[]
+
+  @@index([categoryId])
 }
 
-// Current on-hand stock per product (one row per product).
+// A physical stock location. Stock is held per (product, warehouse).
+model Warehouse {
+  id        String    @id @default(cuid())
+  name      String
+  code      String    @unique
+  address   Json?
+  isDefault Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  stockItems     StockItem[]
+  stockMovements StockMovement[]
+
+  @@index([isDefault])
+  @@index([deletedAt])
+}
+
+// Current on-hand stock per (product, warehouse). `avgCost`/`totalValue` carry
+// the perpetual weighted-average valuation (maintained under a row lock).
 model StockItem {
-  id             String   @id @default(cuid())
-  productId      String   @unique
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantityOnHand Float    @default(0)
-  reorderLevel   Float    @default(0)
+  id             String     @id @default(cuid())
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId    String?
+  warehouse      Warehouse? @relation(fields: [warehouseId], references: [id])
+  quantityOnHand Float      @default(0)
+  reorderLevel   Float      @default(0)
+  avgCost        Decimal    @default(0) @db.Decimal(18, 4)
+  totalValue     Decimal    @default(0) @db.Decimal(18, 4)
   location       String?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
 }
 
 // Append-only ledger of stock changes (audit trail). `qty` is signed:
 // positive = stock in (e.g. PO receipt), negative = stock out (e.g. sale).
 model StockMovement {
-  id               String   @id @default(cuid())
+  id               String          @id @default(cuid())
   productId        String
-  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId      String?
+  warehouse        Warehouse?      @relation(fields: [warehouseId], references: [id])
   qty              Float
-  type             String // in | out | adjustment
+  type             String // in | out | adjustment | transfer
+  unitCost         Decimal?        @db.Decimal(18, 4) // per-unit cost (purchase cost inbound; COGS cost outbound)
+  costMethod       String? // snapshot of the method applied (weighted_average | fifo)
+  // Links a return/reversal to the originating move so it restores at the
+  // original cost rather than the current average.
+  sourceMovementId String?
+  sourceMovement   StockMovement?  @relation("MovementSource", fields: [sourceMovementId], references: [id])
+  reversals        StockMovement[] @relation("MovementSource")
   refType          String?
   refId            String?
   note             String?
   adjustmentReason String? // recount | damage | theft | expiry | write_off | return | correction
   createdById      String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime        @default(now())
 
   @@index([productId, createdAt])
+  @@index([warehouseId])
+}
+
+// FIFO cost layers: each inbound receipt creates a layer; outbound moves consume
+// the oldest layers first. Only used when a product's cost method is `fifo`.
+model StockCostLayer {
+  id               String   @id @default(cuid())
+  productId        String
+  warehouseId      String?
+  remainingQty     Float
+  originalQty      Float
+  unitCost         Decimal  @db.Decimal(18, 4)
+  receivedAt       DateTime @default(now())
+  sourceMovementId String?
+  createdAt        DateTime @default(now())
+
+  @@index([productId, warehouseId, receivedAt])
 }
 
 // ─── Finance — Quotes ────────────────────────────────────────────────────────
@@ -390,11 +491,18 @@ model Invoice {
   status          String         @default("draft")
   subtotal        Decimal        @default(0) @db.Decimal(18, 4)
   taxRate         Float          @default(0)
+  // When true, line `unitPrice`s already include tax (tax is back-calculated out
+  // of the subtotal); when false, tax is added on top. Default seeded from
+  // WorkspaceConfig.invoiceDefaults.taxInclusive. See finance.math.ts.
+  taxInclusive    Boolean        @default(false)
   tax             Decimal        @default(0) @db.Decimal(18, 4)
   total           Decimal        @default(0) @db.Decimal(18, 4)
   totalPaid       Decimal        @default(0) @db.Decimal(18, 4)
   currency        String         @default("EGP")
   exchangeRate    Float?
+  // Analytic cost center (optional). Detached, not deleted, if the cost center is removed.
+  costCenterId    String?
+  costCenter      CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
   issueDate       DateTime       @default(now())
   dueDate         DateTime?
   notes           String?
@@ -420,6 +528,7 @@ model Invoice {
   @@index([dealId])
   @@index([projectId])
   @@index([salesOrderId])
+  @@index([costCenterId])
   @@index([status])
   @@index([deletedAt])
 }
@@ -537,6 +646,7 @@ model Account {
   notes              String?
   invoicePayments    InvoicePayment[]
   vendorBillPayments VendorBillPayment[]
+  chartOfAccount     ChartOfAccount?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   deletedAt          DateTime?
@@ -559,6 +669,9 @@ model ExpenseReport {
   approvedAt      DateTime?
   rejectionReason String?
   customFields    Json?
+  // Analytic cost center (optional). Detached, not deleted, if the cost center is removed.
+  costCenterId    String?
+  costCenter      CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   deletedAt       DateTime?
@@ -568,19 +681,29 @@ model ExpenseReport {
 
   @@index([userId])
   @@index([projectId])
+  @@index([costCenterId])
   @@index([approvalStatus])
   @@index([deletedAt])
 }
 
 model ExpenseItem {
-  id              String        @id @default(cuid())
+  id              String            @id @default(cuid())
   expenseReportId String
-  expenseReport   ExpenseReport @relation(fields: [expenseReportId], references: [id], onDelete: Cascade)
+  expenseReport   ExpenseReport     @relation(fields: [expenseReportId], references: [id], onDelete: Cascade)
   description     String
-  amount          Decimal       @db.Decimal(18, 4)
+  amount          Decimal           @db.Decimal(18, 4)
   date            DateTime
   category        String
   beneficiary     String
+  // Optional cost attribution to a task / milestone. These are the roll-up source
+  // for the *computed* actualCost on Task/ProjectMilestone (never stored there).
+  taskId          String?
+  task            Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  milestoneId     String?
+  milestone       ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([milestoneId])
 }
 
 // ─── Activities & Notes ──────────────────────────────────────────────────────
@@ -647,32 +770,37 @@ model Note {
 // ─── Tasks ───────────────────────────────────────────────────────────────────
 
 model Task {
-  id           String            @id @default(cuid())
-  title        String
-  description  String?
-  priority     String            @default("medium")
-  status       String            @default("todo")
-  dueDate      DateTime?
-  assignedToId String?
-  assignedTo   User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  linkedToId   String?
-  linkedModel  String?
-  dealId       String?
-  deal         Deal?             @relation(fields: [dealId], references: [id])
-  projectId    String?
-  project      Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  milestoneId  String?
-  milestone    ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
-  completedAt  DateTime?
-  tags         String[]
-  customFields Json?
-  createdById  String
-  createdBy    User              @relation("TaskCreatedBy", fields: [createdById], references: [id])
-  updatedById  String?
-  updatedBy    User?             @relation("TaskUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  deletedAt    DateTime?
+  id            String            @id @default(cuid())
+  title         String
+  description   String?
+  priority      String            @default("medium")
+  status        String            @default("todo")
+  dueDate       DateTime?
+  assignedToId  String?
+  assignedTo    User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  linkedToId    String?
+  linkedModel   String?
+  dealId        String?
+  deal          Deal?             @relation(fields: [dealId], references: [id])
+  projectId     String?
+  project       Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  milestoneId   String?
+  milestone     ProjectMilestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  completedAt   DateTime?
+  tags          String[]
+  // Planning figure only. `actualCost` is NOT stored — it is computed at the
+  // service layer by summing attributed ExpenseItem amounts (see expenseItems).
+  estimatedCost Decimal?          @db.Decimal(18, 4)
+  customFields  Json?
+  createdById   String
+  createdBy     User              @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  updatedById   String?
+  updatedBy     User?             @relation("TaskUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deletedAt     DateTime?
+
+  expenseItems ExpenseItem[]
 
   @@index([assignedToId])
   @@index([status])
@@ -796,6 +924,9 @@ model WorkspaceConfig {
   passwordPolicy  Json     @default("{}")
   // Non-secret AI settings: { provider, model, enabled }. Keys live in AiKey.
   aiConfig        Json     @default("{}")
+  // GL / accounting config: default account codes, defaultCostMethod, glEnabled,
+  // glCutoverDate, defaultFxGainLossAccount, defaultTaxPayable. Resolved by PostingService.
+  glConfig        Json     @default("{}")
   baseCurrency    String   @default("EGP")
   locale          String   @default("en-US")
   createdAt       DateTime @default(now())
@@ -873,12 +1004,16 @@ model ApiKey {
 }
 
 model TaxRate {
-  id        String   @id @default(cuid())
-  name      String
-  rate      Float
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  rate                 Float
+  isDefault            Boolean  @default(false)
+  // GL mapping: output/collected liability account (sales) and input/recoverable
+  // account (purchases). Null falls back to glConfig.defaultTaxPayable.
+  liabilityAccountCode String?
+  inputAccountCode     String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model SmtpConfig {
@@ -1020,6 +1155,8 @@ model VendorBill {
   currency        String         @default("EGP")
   subtotal        Decimal        @default(0) @db.Decimal(18, 4)
   taxRate         Float          @default(0)
+  // Whether line prices already include tax (back-calculated). Mirrors Invoice. See finance.math.ts.
+  taxInclusive    Boolean        @default(false)
   tax             Decimal        @default(0) @db.Decimal(18, 4)
   total           Decimal        @default(0) @db.Decimal(18, 4)
   totalPaid       Decimal        @default(0) @db.Decimal(18, 4)
@@ -1028,6 +1165,9 @@ model VendorBill {
   notes           String?
   terms           String?
   customFields    Json?
+  // Analytic cost center (optional). Detached, not deleted, if the cost center is removed.
+  costCenterId    String?
+  costCenter      CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
   approvalStatus  ApprovalStatus @default(pending)
   approvedById    String?
   approvedBy      User?          @relation("BillApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -1046,6 +1186,7 @@ model VendorBill {
 
   @@index([supplierId])
   @@index([purchaseOrderId])
+  @@index([costCenterId])
   @@index([status])
   @@index([approvalStatus])
   @@index([deletedAt])
@@ -1133,19 +1274,23 @@ model Project {
 }
 
 model ProjectMilestone {
-  id          String    @id @default(cuid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  status      String    @default("pending")
-  dueDate     DateTime?
-  completedAt DateTime?
-  order       Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  status        String    @default("pending")
+  dueDate       DateTime?
+  completedAt   DateTime?
+  order         Int       @default(0)
+  // Planning figure only. `actualCost` is NOT stored — it is computed at the
+  // service layer by summing attributed ExpenseItem amounts (its own + its tasks').
+  estimatedCost Decimal?  @db.Decimal(18, 4)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  tasks Task[]
+  tasks        Task[]
+  expenseItems ExpenseItem[]
 
   @@index([projectId])
   @@index([status])
@@ -1163,4 +1308,161 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([projectId])
   @@index([userId])
+}
+
+// ─── Accounting — Double-Entry General Ledger ─────────────────────────────────
+// The GL is the source of financial truth from glConfig.glCutoverDate onward.
+// Operational fields (Invoice.totalPaid, Account.balance, StockItem.totalValue)
+// become caches reconciled daily against these tables. See plans/Full_ERP_Plan.md.
+
+enum AccountType {
+  asset
+  liability
+  equity
+  income
+  expense
+}
+
+enum NormalBalance {
+  debit
+  credit
+}
+
+enum JournalStatus {
+  draft
+  posted
+  reversed
+}
+
+// A General Ledger account (chart of accounts). Distinct from the cash/bank
+// `Account` model: each cash Account maps to exactly one asset-type COA row.
+model ChartOfAccount {
+  id            String           @id @default(cuid())
+  code          String           @unique // e.g. 1100
+  name          String
+  type          AccountType
+  normalBalance NormalBalance
+  parentId      String?
+  parent        ChartOfAccount?  @relation("CoaHierarchy", fields: [parentId], references: [id])
+  children      ChartOfAccount[] @relation("CoaHierarchy")
+  isActive      Boolean          @default(true)
+  currency      String           @default("EGP")
+  cashAccountId String?          @unique
+  cashAccount   Account?         @relation(fields: [cashAccountId], references: [id], onDelete: SetNull)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+
+  journalLines    JournalLine[]
+  accountBalances AccountBalance[]
+
+  @@index([type])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+// A balanced journal entry. `@@unique([sourceType, sourceId])` enforces posting
+// idempotency at the DB level. `sourceId` is the *specific posting event*
+// (e.g. an InvoicePayment id), not the parent document — supports partial
+// allocation. Corrections post a reversing mirror entry; lines are never mutated.
+model JournalEntry {
+  id              String        @id @default(cuid())
+  entryNumber     String        @unique // via NumberSequenceService, prefix JE
+  date            DateTime
+  memo            String?
+  sourceType      String // Manual | Invoice | InvoicePayment | VendorBill | VendorBillPayment | StockReceipt | ... | Reversal
+  sourceId        String
+  status          JournalStatus @default(posted)
+  reversesEntryId String?       @unique
+  reversesEntry   JournalEntry? @relation("JournalReversal", fields: [reversesEntryId], references: [id])
+  reversedBy      JournalEntry? @relation("JournalReversal")
+  createdById     String?
+  createdBy       User?         @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lines JournalLine[]
+
+  @@unique([sourceType, sourceId])
+  @@index([date, status])
+  @@index([sourceType, sourceId])
+}
+
+// One debit or credit leg. `baseAmount` is the base-currency value (via
+// CurrencyService.toBase) that all statements aggregate. Optional dimensions are
+// scalar (not FK relations) so analytics can tag entries without coupling models.
+model JournalLine {
+  id             String         @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        ChartOfAccount @relation(fields: [accountId], references: [id])
+  debit          Decimal        @default(0) @db.Decimal(18, 4)
+  credit         Decimal        @default(0) @db.Decimal(18, 4)
+  currency       String         @default("EGP")
+  baseAmount     Decimal        @default(0) @db.Decimal(18, 4)
+  memo           String?
+  // optional analytic dimensions (scalar, no referential integrity)
+  customerId     String?
+  supplierId     String?
+  projectId      String?
+  productId      String?
+  warehouseId    String?
+  // Cost center is modeled as a proper FK relation (unlike the legacy scalar dims
+  // above) so GL analytics can be sliced by cost center with referential integrity.
+  costCenterId   String?
+  costCenter     CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+
+  @@index([accountId])
+  @@index([journalEntryId])
+  @@index([costCenterId])
+}
+
+// Per-account, per-period balance snapshot for fast statements. Written only at
+// period close; the current open period is computed live from prior close +
+// open-period journal lines.
+model AccountBalance {
+  id             String         @id @default(cuid())
+  accountId      String
+  account        ChartOfAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  period         String // YYYY-MM
+  openingBalance Decimal        @default(0) @db.Decimal(18, 4)
+  periodDebit    Decimal        @default(0) @db.Decimal(18, 4)
+  periodCredit   Decimal        @default(0) @db.Decimal(18, 4)
+  closingBalance Decimal        @default(0) @db.Decimal(18, 4)
+  closedAt       DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([accountId, period])
+  @@index([accountId, period])
+}
+
+// ─── Cost Centers (Analytic Accounts) ─────────────────────────────────────────
+// A reportable analytic dimension attached to financial documents (Invoice,
+// VendorBill, ExpenseReport) and propagated onto their GL postings (JournalLine).
+// Hierarchical via parent/children. Soft-deleted like other aggregate roots.
+model CostCenter {
+  id        String       @id @default(cuid())
+  code      String       @unique
+  name      String
+  isActive  Boolean      @default(true)
+  parentId  String?
+  // Restrict: a parent cannot be deleted while children exist (forces explicit
+  // re-parenting rather than silently orphaning or cascading the subtree).
+  parent    CostCenter?  @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  CostCenter[] @relation("CostCenterHierarchy")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  invoices     Invoice[]
+  bills        VendorBill[]
+  expenses     ExpenseReport[]
+  journalLines JournalLine[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([deletedAt])
 }

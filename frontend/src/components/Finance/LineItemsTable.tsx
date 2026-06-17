@@ -53,15 +53,22 @@ export function toLineItemPayload(items: LineItemRow[]): LineItemRow[] {
   }));
 }
 
-export function computeTotals(items: LineItemRow[], docTaxRate = 0) {
+export function computeTotals(items: LineItemRow[], docTaxRate = 0, taxInclusive = false) {
   const perLine = items.some((i) => i.taxRate !== undefined && i.taxRate !== null);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
   let tax = 0;
   const subtotal = items.reduce((s, i) => {
-    const net = rowTotal(i);
-    tax += net * ((perLine ? i.taxRate ?? 0 : docTaxRate) / 100);
-    return s + net;
+    const lineAmount = round2(rowTotal(i));
+    const rate = (perLine ? i.taxRate ?? 0 : docTaxRate) / 100;
+    if (taxInclusive) {
+      // Prices already include tax — back it out so subtotal stays net.
+      const net = round2(lineAmount / (1 + rate));
+      tax += lineAmount - net;
+      return s + net;
+    }
+    tax += lineAmount * rate;
+    return s + lineAmount;
   }, 0);
-  const round2 = (n: number) => Math.round(n * 100) / 100;
   return { subtotal: round2(subtotal), tax: round2(tax), total: round2(subtotal + tax) };
 }
 

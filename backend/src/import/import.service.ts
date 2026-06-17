@@ -6,6 +6,11 @@ import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CustomersService } from '../customers/customers.service';
 import { LeadsService } from '../leads/leads.service';
 import { DealsService } from '../deals/deals.service';
+import { ProductsService } from '../products/products.service';
+import { SuppliersService } from '../procurement/suppliers.service';
+import { ProjectsService } from '../projects/projects.service';
+import { TasksService } from '../tasks/tasks.service';
+import { ChartOfAccountsService } from '../accounting/chart-of-accounts.service';
 import { IMPORT_ENTITIES, ImportEntityConfig, ImportField, ImportFieldType } from './import.config';
 import { ImportRequestDto } from './dto/import-request.dto';
 
@@ -38,6 +43,11 @@ export class ImportService {
     private readonly customers: CustomersService,
     private readonly leads: LeadsService,
     private readonly deals: DealsService,
+    private readonly products: ProductsService,
+    private readonly suppliers: SuppliersService,
+    private readonly projects: ProjectsService,
+    private readonly tasks: TasksService,
+    private readonly coa: ChartOfAccountsService,
   ) {}
 
   private config(entity: string): ImportEntityConfig {
@@ -182,9 +192,35 @@ export class ImportService {
         mapped.customer = await this.resolveCustomer(ref, user);
         return this.deals.create(mapped as unknown as Parameters<typeof this.deals.create>[0], user.id);
       }
+      case 'products':
+        return this.products.create(mapped as unknown as Parameters<typeof this.products.create>[0]);
+      case 'suppliers':
+        return this.suppliers.create(mapped as unknown as Parameters<typeof this.suppliers.create>[0]);
+      case 'projects':
+        return this.projects.create(mapped as unknown as Parameters<typeof this.projects.create>[0], user.id);
+      case 'tasks':
+        return this.tasks.create(mapped as unknown as Parameters<typeof this.tasks.create>[0], user.id);
+      case 'chart-of-accounts': {
+        const parentCode = mapped.parentCode ? String(mapped.parentCode) : undefined;
+        delete mapped.parentCode;
+        if (parentCode) mapped.parentId = await this.resolveCoaParent(parentCode);
+        // Import enum gives 'true'/'false' strings; coerce to boolean for the service.
+        if (mapped.isActive !== undefined) mapped.isActive = String(mapped.isActive) === 'true';
+        return this.coa.create(mapped as unknown as Parameters<typeof this.coa.create>[0]);
+      }
       default:
         throw new Error(`Unsupported import target: ${entity}`);
     }
+  }
+
+  /** Resolve a Chart-of-Accounts parent by its unique code. */
+  private async resolveCoaParent(code: string): Promise<string> {
+    const parent = await this.prisma.chartOfAccount.findFirst({
+      where: { code, deletedAt: null },
+      select: { id: true },
+    });
+    if (!parent) throw new Error(`No parent account found with code "${code}"`);
+    return parent.id;
   }
 
   /** Resolve a contact within the importer's visibility scope by phone, email, then name. */

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getUserById, updateUser } from "@/utils/api";
+import { getUserById, updateUser, updateLandingPage } from "@/utils/api";
 import { useAuth } from "@/contexts/authContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { permittedLandingOptions } from "@/lib/resolveHomeRoute";
+
+const AUTO_LANDING = "__auto__";
 
 export default function ProfileSettings() {
   const { user, updateCurrentUser } = useAuth();
@@ -21,9 +25,9 @@ export default function ProfileSettings() {
   const [phone, setPhone] = useState("");
 
   const { data: userData, isPending } = useQuery({
-    queryKey: ["user-profile", user?.id],
-    queryFn: () => getUserById(user!.id),
-    enabled: !!user?.id
+    queryKey: ["user-profile", user?._id],
+    queryFn: () => getUserById(user!._id),
+    enabled: !!user?._id
   });
 
   useEffect(() => {
@@ -35,7 +39,7 @@ export default function ProfileSettings() {
 
   const mutation = useMutation({
     mutationFn: (payload: { name: string; phone: string; email: string; role: string; password?: string }) =>
-      updateUser(user!.id, payload as any),
+      updateUser(user!._id, payload as any),
 
     onSuccess: () => {
       updateCurrentUser({ name });
@@ -54,12 +58,23 @@ export default function ProfileSettings() {
     mutation.mutate(payload);
   };
 
+  const landingOptions = permittedLandingOptions(user?.permissions ?? []);
+  const landingValue = user?.defaultLandingPage ?? AUTO_LANDING;
+  const landingMutation = useMutation({
+    mutationFn: (path: string | null) => updateLandingPage(path),
+    onSuccess: (_res, path) => {
+      updateCurrentUser({ defaultLandingPage: path });
+      toast({ title: s.saved });
+    },
+    onError: () => toast({ title: s.saveFailed, variant: "destructive" }),
+  });
+
   const initials = name
     ? name.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="page-w-narrow page-pad page-gap">
       {/* ── Profile hero card ── */}
       <Card className="overflow-hidden">
         <div className="h-20 bg-gradient-to-r from-primary/25 via-primary/15 to-primary/5" />
@@ -127,6 +142,36 @@ export default function ProfileSettings() {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* ── Preferences ── */}
+      {!isPending && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold">Preferences</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-1.5 max-w-sm">
+              <Label>Default landing page</Label>
+              <Select
+                value={landingValue}
+                onValueChange={(v) => landingMutation.mutate(v === AUTO_LANDING ? null : v)}
+                disabled={landingMutation.isPending}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO_LANDING}>Automatic (first available)</SelectItem>
+                  {landingOptions.map((o) => (
+                    <SelectItem key={o.path} value={o.path}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                The page you land on after signing in.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

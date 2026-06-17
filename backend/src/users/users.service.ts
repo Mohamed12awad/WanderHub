@@ -20,10 +20,14 @@ export class UsersService {
     directReports: { select: { id: true, name: true, role: { select: { name: true } } } },
   };
 
+  // Never expose the bcrypt hash to clients. Applied to every query whose result
+  // is serialized back to the frontend.
+  private readonly userOmit = { password: true } as const;
+
   async findAll(query: Record<string, string>) {
     const { page, limit: limitRaw, q, active, phone, createdAt_from, createdAt_to } = query;
     if (!page) {
-      const users = await this.prisma.user.findMany({ include: this.userInclude, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
+      const users = await this.prisma.user.findMany({ include: this.userInclude, omit: this.userOmit, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
       return toClient(users);
     }
     const p = Math.max(1, parseInt(page) || 1);
@@ -42,14 +46,14 @@ export class UsersService {
       where.createdAt = range;
     }
     const [data, total] = await Promise.all([
-      this.prisma.user.findMany({ where, include: this.userInclude, skip: (p - 1) * limit, take: limit }),
+      this.prisma.user.findMany({ where, include: this.userInclude, omit: this.userOmit, skip: (p - 1) * limit, take: limit }),
       this.prisma.user.count({ where }),
     ]);
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({ where: { id }, include: this.userInclude });
+    const user = await this.prisma.user.findUnique({ where: { id }, include: this.userInclude, omit: this.userOmit });
     return user ? toClient(user) : null;
   }
 
@@ -85,6 +89,7 @@ export class UsersService {
         ...(reportsTo ? { reportsToId: reportsTo } : {}),
       } as Prisma.UserUncheckedCreateInput,
       include: this.userInclude,
+      omit: this.userOmit,
     });
     return toClient(user);
   }
@@ -118,6 +123,7 @@ export class UsersService {
       where: { id },
       data: data as Prisma.UserUncheckedUpdateInput,
       include: this.userInclude,
+      omit: this.userOmit,
     });
     return toClient(user);
   }
@@ -125,7 +131,7 @@ export class UsersService {
   async toggleActive(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) return null;
-    const updated = await this.prisma.user.update({ where: { id }, data: { active: !user.active }, include: this.userInclude });
+    const updated = await this.prisma.user.update({ where: { id }, data: { active: !user.active }, include: this.userInclude, omit: this.userOmit });
     return toClient(updated);
   }
 
@@ -194,5 +200,25 @@ export class UsersService {
       select: { notificationPreferences: true },
     });
     return updated.notificationPreferences;
+  }
+
+  /** Sets (or clears, when null) the user's preferred post-login landing route. */
+  async updateLandingPage(id: string, defaultLandingPage: string | null) {
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { defaultLandingPage: defaultLandingPage || null },
+      select: { defaultLandingPage: true },
+    });
+    return updated;
+  }
+
+  /** Marks the authenticated user's first-run onboarding as complete. */
+  async markOnboarded(id: string) {
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { hasOnboarded: true },
+      select: { hasOnboarded: true },
+    });
+    return updated;
   }
 }

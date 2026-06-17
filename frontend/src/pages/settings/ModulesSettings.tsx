@@ -125,7 +125,7 @@ export default function ModulesSettings() {
   const moduleKeys = Object.keys(MODULE_INFO) as ModuleKey[];
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h2 className="text-lg font-semibold">{s.modules}</h2>
         <p className="text-sm text-muted-foreground mt-0.5">{s.modulesDesc}</p>

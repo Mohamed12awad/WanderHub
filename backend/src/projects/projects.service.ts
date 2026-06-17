@@ -158,7 +158,43 @@ export class ProjectsService {
 
   async getMilestones(projectId: string) {
     const milestones = await this.prisma.projectMilestone.findMany({ where: { projectId }, orderBy: { order: 'asc' } });
-    return toClient(milestones);
+    if (!milestones.length) return toClient(milestones);
+    const ids = milestones.map((m) => m.id);
+
+    // actualCost is computed (never stored): expenses attributed directly to the
+    // milestone PLUS expenses attributed to the milestone's tasks. All via a
+    // constant number of grouped queries — no per-milestone N+1.
+    const direct = await this.prisma.expenseItem.groupBy({
+      by: ['milestoneId'],
+      where: { milestoneId: { in: ids } },
+      _sum: { amount: true },
+    });
+    const directMap = new Map(direct.map((d) => [d.milestoneId, Number(d._sum.amount ?? 0)]));
+
+    const tasks = await this.prisma.task.findMany({
+      where: { milestoneId: { in: ids } },
+      select: { id: true, milestoneId: true },
+    });
+    const taskToMilestone = new Map(tasks.map((t) => [t.id, t.milestoneId]));
+    const byTask = tasks.length
+      ? await this.prisma.expenseItem.groupBy({
+          by: ['taskId'],
+          where: { taskId: { in: tasks.map((t) => t.id) } },
+          _sum: { amount: true },
+        })
+      : [];
+    const viaTaskMap = new Map<string, number>();
+    for (const row of byTask) {
+      const mId = row.taskId ? taskToMilestone.get(row.taskId) : undefined;
+      if (!mId) continue;
+      viaTaskMap.set(mId, (viaTaskMap.get(mId) ?? 0) + Number(row._sum.amount ?? 0));
+    }
+
+    const withCost = milestones.map((m) => ({
+      ...m,
+      actualCost: (directMap.get(m.id) ?? 0) + (viaTaskMap.get(m.id) ?? 0),
+    }));
+    return toClient(withCost);
   }
 
   async createMilestone(projectId: string, body: CreateMilestoneDto) {

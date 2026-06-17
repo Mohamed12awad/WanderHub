@@ -44,6 +44,30 @@ describe('calcTotals', () => {
     expect(r.tax).toBe(0);
     expect(r.total).toBe(100);
   });
+
+  it('adds tax on top in exclusive mode (default)', () => {
+    const r = calcTotals([{ description: 'A', quantity: 1, unitPrice: 100 }], 15, false);
+    expect(r.subtotal).toBe(100);
+    expect(r.tax).toBeCloseTo(15);
+    expect(r.total).toBeCloseTo(115);
+  });
+
+  it('back-calculates tax out of inclusive prices', () => {
+    // 115 inclusive @ 15% → net 100, tax 15, total stays 115 (what the customer pays).
+    const r = calcTotals([{ description: 'A', quantity: 1, unitPrice: 115 }], 15, true);
+    expect(r.subtotal).toBeCloseTo(100);
+    expect(r.tax).toBeCloseTo(15);
+    expect(r.total).toBeCloseTo(115);
+    expect(r.items[0].total).toBeCloseTo(100); // line total is net of tax
+  });
+
+  it('inclusive mode honours per-line discount before extracting tax', () => {
+    // 200 gross, 25% discount → 150 inclusive @ 20% → net 125, tax 25.
+    const r = calcTotals([{ description: 'A', quantity: 1, unitPrice: 200, discount: 25, taxRate: 20 }], 0, true);
+    expect(r.subtotal).toBeCloseTo(125);
+    expect(r.tax).toBeCloseTo(25);
+    expect(r.total).toBeCloseTo(150);
+  });
 });
 
 describe('deriveInvoiceStatus', () => {

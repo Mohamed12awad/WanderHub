@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import { TaxRateSelect } from "@/components/common/TaxRateSelect";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { AutoTextarea } from "@/components/ui/auto-textarea";
 import {
@@ -11,7 +11,7 @@ import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { EntityFormPage } from "@/components/common/EntityFormPage";
 import { StickyFormBar } from "@/components/common/StickyFormBar";
 import { useQuery } from "@tanstack/react-query";
-import { getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice, getProjects } from "@/utils/api";
+import { getCostCenters, getCustomers, getDeals, getDealById, getInvoiceById, createInvoice, updateInvoice, getProjects, getInvoiceDefaults } from "@/utils/api";
 import LineItemsTable, { LineItemRow, computeTotals } from "./LineItemsTable";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -20,6 +20,7 @@ import { useOrgSettings } from "@/hooks/useOrgSettings";
 import { CURRENCIES } from "@/utils/constants";
 import DynamicFields from "@/components/common/DynamicFields";
 import { toCustomFieldValues } from "@/utils/customFields";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 
 async function fetchExchangeRate(baseCurrency: string, toCurrency: string): Promise<number | null> {
   try {
@@ -52,9 +53,12 @@ const InvoiceForm: React.FC = () => {
   const [dealLabel, setDealLabel] = useState("");
   const [project, setProject] = useState(cloneData?.project ?? "none");
   const [projectLabel, setProjectLabel] = useState("");
+  const [costCenterId, setCostCenterId] = useState(cloneData?.costCenterId ?? "none");
+  const [costCenterLabel, setCostCenterLabel] = useState(cloneData?.costCenterLabel ?? "");
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [currency, setCurrency] = useState(cloneData?.currency ?? "EGP");
   const [taxRate, setTaxRate] = useState<number>(cloneData?.taxRate ?? 0);
+  const [taxInclusive, setTaxInclusive] = useState<boolean>(cloneData?.taxInclusive ?? false);
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState(cloneData?.notes ?? "");
@@ -70,6 +74,10 @@ const InvoiceForm: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number | "">("");
   const [fetchingRate, setFetchingRate] = useState(false);
+  const [initializing, setInitializing] = useState(Boolean(!isEdit && dealParam && !cloneData));
+  // Defers the unsaved-changes baseline until the workspace tax-mode default has
+  // been applied, so seeding it doesn't mark a pristine new invoice as dirty.
+  const [loadingDefaults, setLoadingDefaults] = useState(Boolean(!isEdit && !cloneData));
 
   const fetchCustomers = useCallback(
     (q: string) =>
@@ -100,6 +108,14 @@ const InvoiceForm: React.FC = () => {
       ),
     [],
   );
+  const fetchCostCenters = useCallback(
+    (q: string) =>
+      getCostCenters({ q, isActive: true }).then((r) => [
+        { value: "none", label: "None" },
+        ...(r.data ?? []).map((cc) => ({ value: cc._id, label: `${cc.code} — ${cc.name}` })),
+      ]),
+    [],
+  );
 
   // Pre-fill from deal when creating new invoice from a deal's page
   useEffect(() => {
@@ -112,9 +128,25 @@ const InvoiceForm: React.FC = () => {
         setCustomerLabel(d.customer.name ?? "");
       }
       if (d.title) setDealLabel(d.title);
-    }).catch(() => {});
+    }).catch((e: any) => {
+      toast({ title: e?.response?.data?.message ?? "Failed to load deal data", variant: "destructive" });
+    }).finally(() => setInitializing(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealParam, isEdit]);
+
+  // Seed the tax mode from the workspace Invoice Defaults when creating a brand-
+  // new invoice (not on edit, and not when cloning — a clone carries its own flag).
+  useEffect(() => {
+    if (isEdit || cloneData) return;
+    getInvoiceDefaults()
+      .then((res) => {
+        const def = (res.data as { taxInclusive?: boolean } | null)?.taxInclusive;
+        if (typeof def === "boolean") setTaxInclusive(def);
+      })
+      .catch(() => {/* non-fatal: fall back to the false default */})
+      .finally(() => setLoadingDefaults(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-fetch today's rate whenever the currency changes (create mode only)
   useEffect(() => {
@@ -142,9 +174,12 @@ const InvoiceForm: React.FC = () => {
     setDealLabel(inv.deal?.title ?? "None");
     setProject(inv.project?._id ?? "none");
     setProjectLabel(inv.project?.name ?? "None");
+    setCostCenterId(inv.costCenter?._id ?? "none");
+    setCostCenterLabel(inv.costCenter ? `${inv.costCenter.code} — ${inv.costCenter.name}` : "None");
     setStatus(inv.status);
     setCurrency(inv.currency);
     setTaxRate(inv.taxRate);
+    setTaxInclusive(inv.taxInclusive ?? false);
     setIssueDate(inv.issueDate ? inv.issueDate.split("T")[0] : "");
     setDueDate(inv.dueDate ? inv.dueDate.split("T")[0] : "");
     setNotes(inv.notes ?? "");
@@ -161,7 +196,11 @@ const InvoiceForm: React.FC = () => {
     setCustomFields(toCustomFieldValues(inv.customFields));
   }, [invoiceData]);
 
-  const { subtotal, tax, total } = computeTotals(items, taxRate);
+  const { subtotal, tax, total } = computeTotals(items, taxRate, taxInclusive);
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { title, customer, deal, project, costCenterId, status, currency, exchangeRate, taxRate, taxInclusive, issueDate, dueDate, notes, terms, items, customFields },
+    { enabled: isEdit ? !!invoiceData?.data?.invoice : !initializing && !fetchingRate && !loadingDefaults },
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,10 +214,12 @@ const InvoiceForm: React.FC = () => {
         customer,
         deal: deal && deal !== "none" ? deal : undefined,
         project: project && project !== "none" ? project : undefined,
+        costCenterId: costCenterId && costCenterId !== "none" ? costCenterId : null,
         status,
         currency,
         exchangeRate: currency !== baseCurrency && exchangeRate !== "" ? Number(exchangeRate) : undefined,
         taxRate,
+        taxInclusive,
         issueDate: issueDate || undefined,
         dueDate: dueDate || undefined,
         notes: notes || undefined,
@@ -188,6 +229,8 @@ const InvoiceForm: React.FC = () => {
       };
       const res = isEdit ? await updateInvoice(id!, payload) : await createInvoice(payload);
       const newId = (res as any)?.data?._id ?? id;
+      allowNavigation();
+      resetSnapshot();
       navigate(newId ? `/finance/invoices/${newId}` : "/finance/invoices");
     } catch {
       toast({ title: "Failed to save invoice", variant: "destructive" });
@@ -243,6 +286,18 @@ const InvoiceForm: React.FC = () => {
                   selectedLabel={projectLabel}
                   placeholder="None"
                   searchPlaceholder="Search projects..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cost Center (optional)</Label>
+                <AsyncSearchableSelect
+                  value={costCenterId}
+                  onChange={setCostCenterId}
+                  fetchFn={fetchCostCenters}
+                  selectedLabel={costCenterLabel}
+                  placeholder="None"
+                  searchPlaceholder="Search cost centers..."
+                  onSelectItem={(item) => setCostCenterLabel(item.label)}
                 />
               </div>
               <div className="space-y-2">
@@ -308,10 +363,12 @@ const InvoiceForm: React.FC = () => {
                   {subtotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
                 </span>
               </div>
-              <div className="flex gap-8 items-center">
-                <span className="text-muted-foreground">{f.taxRate}</span>
-                <TaxRateSelect value={taxRate} onChange={setTaxRate} compact />
-              </div>
+              <label className="flex gap-8 items-center cursor-pointer select-none">
+                <span className="text-muted-foreground">{f.taxInclusive}</span>
+                <span className="w-32 flex justify-end">
+                  <Checkbox checked={taxInclusive} onCheckedChange={(v) => setTaxInclusive(v === true)} />
+                </span>
+              </label>
               <div className="flex gap-8">
                 <span className="text-muted-foreground">{f.tax}</span>
                 <span className="font-medium w-32 text-right">

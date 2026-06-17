@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SentryExceptionFilter } from './common/sentry.filter';
 import { LoggerModule } from 'nestjs-pino';
 import { LoggingInterceptor } from './common/logging.interceptor';
+import { DecimalSerializeInterceptor } from './common/decimal-serialize.interceptor';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { WorkspaceConfigModule } from './common/workspace-config.module';
@@ -29,7 +30,7 @@ import { VendorBillsModule } from './procurement/vendor-bills.module';
 import { ProjectsModule } from './projects/projects.module';
 import { LogsModule } from './logs/logs.module';
 import { SearchModule } from './search/search.module';
-import { SummeryModule } from './summery/summery.module';
+import { SummaryModule } from './summary/summary.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { AccountsModule } from './accounts/accounts.module';
@@ -40,6 +41,8 @@ import { InventoryModule } from './inventory/inventory.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { ImportModule } from './import/import.module';
+import { ExportModule } from './export/export.module';
+import { CostCentersModule } from './cost-centers/cost-centers.module';
 import { DedupModule } from './dedup/dedup.module';
 import { BulkModule } from './bulk/bulk.module';
 import { SavedViewsModule } from './saved-views/saved-views.module';
@@ -49,11 +52,15 @@ import { EmailsModule } from './emails/emails.module';
 import { AiModule } from './ai/ai.module';
 import { SalesOrdersModule } from './sales-orders/sales-orders.module';
 import { SampleDataModule } from './sample-data/sample-data.module';
+import { AccountingModule } from './accounting/accounting.module';
+import { WarehousesModule } from './warehouses/warehouses.module';
+import { ProductCategoriesModule } from './product-categories/product-categories.module';
 
 @Module({
   providers: [
     { provide: APP_FILTER,      useClass: SentryExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: DecimalSerializeInterceptor },
     { provide: APP_GUARD,       useClass: ThrottlerGuard },
   ],
   imports: [
@@ -101,7 +108,7 @@ import { SampleDataModule } from './sample-data/sample-data.module';
     ProjectsModule,
     LogsModule,
     SearchModule,
-    SummeryModule,
+    SummaryModule,
     ReportsModule,
     SettingsModule,
     AccountsModule,
@@ -110,6 +117,8 @@ import { SampleDataModule } from './sample-data/sample-data.module';
     AttachmentsModule,
     ApprovalsModule,
     ImportModule,
+    ExportModule,
+    CostCentersModule,
     DedupModule,
     BulkModule,
     SavedViewsModule,
@@ -119,6 +128,9 @@ import { SampleDataModule } from './sample-data/sample-data.module';
     AiModule,
     SalesOrdersModule,
     SampleDataModule,
+    AccountingModule,
+    WarehousesModule,
+    ProductCategoriesModule,
   ],
 })
 export class AppModule {}

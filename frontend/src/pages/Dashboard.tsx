@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, Users, DollarSign, CreditCard,
-  Activity, PlusCircle, Rocket, Landmark, Wallet, Lock,
+  Activity, Landmark, Wallet, Lock,
   Clock, CheckCircle2, FileText, Receipt,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  getSummery, getDeals, getAccounts, getLowStock,
+  getSummary, getDeals, getAccounts, getLowStock,
   getPendingApprovals, getOutstandingReport, getLeadsReport, getPipelineReport,
 } from "@/utils/api";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +24,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { Account } from "@/types/types";
 import { PeriodSelector, defaultPeriod, type PeriodValue } from "@/components/common/PeriodSelector";
+import { PageShell } from "@/components/common/PageShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { QuickActions } from "@/components/common/QuickActions";
+import { GettingStartedCard } from "@/components/common/GettingStartedCard";
 
 const LEAD_COLORS: Record<string, string> = {
   new: "#3b82f6", contacted: "#8b5cf6", qualified: "#22c55e",
@@ -109,12 +113,12 @@ export function Dashboard() {
   const d = tr.dashboard;
 
   const [period, setPeriod] = useState<PeriodValue>(() => defaultPeriod("month"));
-  const { data: summeryData, isPending: summeryLoading } = useQuery({
-    queryKey: ["summery", period.preset, period.startDate, period.endDate],
+  const { data: summaryData, isPending: summaryLoading } = useQuery({
+    queryKey: ["summary", period.preset, period.startDate, period.endDate],
     queryFn: () =>
       period.preset === "custom"
-        ? getSummery(undefined, { startDate: period.startDate, endDate: period.endDate })
-        : getSummery(period.preset),
+        ? getSummary(undefined, { startDate: period.startDate, endDate: period.endDate })
+        : getSummary(period.preset),
   });
   const { data: dealsData, isPending: dealsLoading } = useQuery({
     queryKey: ["deals"],
@@ -168,8 +172,8 @@ export function Dashboard() {
   const leadStats: { status: string; count: number }[] = leadsData?.data ? Object.entries(leadsData.data).map(([status, count]) => ({ status, count: count as number })) : [];
   const pipeline: { stage: string; count: number; value: number }[] = pipelineData?.data ?? [];
 
-  const cur = summeryData?.data?.currentPeriod ?? {};
-  const prev = summeryData?.data?.previousPeriod ?? {};
+  const cur = summaryData?.data?.currentPeriod ?? {};
+  const prev = summaryData?.data?.previousPeriod ?? {};
 
   const allCurrencies = Array.from(
     new Set([...Object.keys(cur.revenue ?? {}), ...Object.keys(prev.revenue ?? {})])
@@ -183,7 +187,7 @@ export function Dashboard() {
 
   // Prefer the base-currency consolidated totals (multi-currency normalized);
   // fall back to the first currency's figure if the backend didn't supply them.
-  const baseCurrency: string = summeryData?.data?.baseCurrency ?? allCurrencies[0] ?? "USD";
+  const baseCurrency: string = summaryData?.data?.baseCurrency ?? allCurrencies[0] ?? "USD";
   const primaryCurrency = baseCurrency;
   const revenue = cur.revenueBase ?? cur.revenue?.[primaryCurrency] ?? 0;
   const prevRevenue = prev.revenueBase ?? prev.revenue?.[primaryCurrency] ?? 0;
@@ -198,40 +202,27 @@ export function Dashboard() {
     ? (dealsData.data as Deal[]).slice(0, 5)
     : [];
 
-  const isOnboarding = !summeryLoading && !dealsLoading && newCustomers === 0 && recentDeals.length === 0;
+  const isOnboarding = !summaryLoading && !dealsLoading && newCustomers === 0 && recentDeals.length === 0;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 max-w-7xl mx-auto">
+    <PageShell width="default">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{d.title}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {format(new Date(), "EEEE, d MMMM yyyy")}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PeriodSelector value={period} onChange={setPeriod} />
-          <Link to="/customers/add">
-            <Button variant="outline" size="sm" className="gap-1.5 h-9">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{d.addContact}</span>
-            </Button>
-          </Link>
-          <Link to="/deals/add">
-            <Button size="sm" className="gap-1.5 h-9">
-              <PlusCircle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{d.addDeal}</span>
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title={d.title}
+        description={format(new Date(), "EEEE, d MMMM yyyy")}
+        primaryAction={
+          <div className="flex flex-wrap items-center gap-2">
+            <PeriodSelector value={period} onChange={setPeriod} />
+            <QuickActions />
+          </div>
+        }
+      />
 
       <Tabs defaultValue="overview">
         <TabsList className="h-9">
-          <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-          <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
-          <TabsTrigger value="finance" className="text-xs">Finance</TabsTrigger>
+          <TabsTrigger value="overview" className="text-xs">{d.tabOverview}</TabsTrigger>
+          <TabsTrigger value="sales" className="text-xs">{d.tabSales}</TabsTrigger>
+          <TabsTrigger value="finance" className="text-xs">{d.tabFinance}</TabsTrigger>
         </TabsList>
 
         {/* ── Finance tab ── */}
@@ -242,21 +233,21 @@ export function Dashboard() {
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Clock className="h-4 w-4 text-amber-500" />
-                  Pending Approvals
+                  {d.pendingApprovals}
                   {pending.total > 0 && (
                     <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
                       {pending.total}
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription className="text-xs">Items waiting for your review</CardDescription>
+                <CardDescription className="text-xs">{d.pendingApprovalsDesc}</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               {pending.total === 0 ? (
                 <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  All caught up — no pending approvals.
+                  {d.allCaughtUp}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -283,7 +274,7 @@ export function Dashboard() {
           {accounts.length > 0 && (
             <Card className="shadow-sm border-border/60">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Account Balances</CardTitle>
+                <CardTitle className="text-base">{d.accountBalances}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -310,10 +301,10 @@ export function Dashboard() {
             <Card className="shadow-sm border-border/60">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Outstanding Invoices</CardTitle>
-                  <CardDescription className="text-xs">{outstanding.length} invoice{outstanding.length !== 1 ? "s" : ""} awaiting payment</CardDescription>
+                  <CardTitle className="text-base">{d.outstandingInvoices}</CardTitle>
+                  <CardDescription className="text-xs">{d.invoicesAwaiting(outstanding.length)}</CardDescription>
                 </div>
-                <Link to="/finance/invoices"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">View all</Button></Link>
+                <Link to="/finance/invoices"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">{d.viewAll}</Button></Link>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -327,7 +318,7 @@ export function Dashboard() {
                           <p className="text-xs text-muted-foreground truncate">{inv.dealTitle}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {isOverdue && <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 h-4 px-1.5">Overdue</Badge>}
+                          {isOverdue && <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 h-4 px-1.5">{d.overdue}</Badge>}
                           <span className="text-sm font-bold tabular-nums text-destructive">{owed.toLocaleString()} {inv.currency}</span>
                         </div>
                       </Link>
@@ -345,12 +336,12 @@ export function Dashboard() {
             {/* Leads by status */}
             <Card className="shadow-sm border-border/60">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Leads by Status</CardTitle>
-                <CardDescription className="text-xs">Current lead pipeline breakdown</CardDescription>
+                <CardTitle className="text-base">{d.leadsByStatus}</CardTitle>
+                <CardDescription className="text-xs">{d.leadsByStatusDesc}</CardDescription>
               </CardHeader>
               <CardContent>
                 {leadStats.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No lead data available.</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">{d.noLeadData}</p>
                 ) : (
                   <div className="flex items-center gap-6">
                     <ResponsiveContainer width="100%" height={180}>
@@ -382,12 +373,12 @@ export function Dashboard() {
             {/* Pipeline by stage */}
             <Card className="shadow-sm border-border/60">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Pipeline Stages</CardTitle>
-                <CardDescription className="text-xs">Deal count and value per stage</CardDescription>
+                <CardTitle className="text-base">{d.pipelineStages}</CardTitle>
+                <CardDescription className="text-xs">{d.pipelineStagesDesc}</CardDescription>
               </CardHeader>
               <CardContent>
                 {pipeline.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">No pipeline data available.</p>
+                  <p className="text-sm text-muted-foreground py-8 text-center">{d.noPipelineData}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={pipeline} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -397,7 +388,7 @@ export function Dashboard() {
                       <Tooltip
                         contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
                       />
-                      <Bar dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="count" name={d.deals} radius={[4, 4, 0, 0]}>
                         {pipeline.map((entry) => (
                           <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage] ?? "#94a3b8"} />
                         ))}
@@ -415,13 +406,12 @@ export function Dashboard() {
             const total = pipeline.filter((s) => !["lead"].includes(s.stage)).reduce((a, s) => a + s.count, 0);
             const rate = total ? Math.round((won / total) * 100) : 0;
             const wonValue = pipeline.find((s) => s.stage === "won")?.value ?? 0;
-            const currency = "EGP";
             return (
               <div className="grid sm:grid-cols-3 gap-4">
                 {[
-                  { label: "Win Rate", value: `${rate}%`, sub: `${won} won of ${total} qualified` },
-                  { label: "Won Value", value: `${wonValue.toLocaleString()} ${currency}`, sub: "Total closed revenue" },
-                  { label: "Active Deals", value: String(pipeline.filter((s) => !["won", "lost", "cancelled"].includes(s.stage)).reduce((a, s) => a + s.count, 0)), sub: "In pipeline right now" },
+                  { label: d.winRate, value: `${rate}%`, sub: d.winRateSub(won, total) },
+                  { label: d.wonValue, value: `${wonValue.toLocaleString()} ${baseCurrency}`, sub: d.wonValueSub },
+                  { label: d.activeDeals, value: String(pipeline.filter((s) => !["won", "lost", "cancelled"].includes(s.stage)).reduce((a, s) => a + s.count, 0)), sub: d.activeDealsSub },
                 ].map(({ label, value, sub }) => (
                   <Card key={label} className="shadow-sm border-border/60">
                     <CardContent className="pt-5 pb-4">
@@ -440,40 +430,7 @@ export function Dashboard() {
         <TabsContent value="overview" className="mt-5 space-y-5">
 
       {/* Onboarding guide */}
-      {isOnboarding && (
-        <Card className="border-dashed border-2 shadow-none bg-muted/20">
-          <CardContent className="py-10">
-            <div className="flex flex-col items-center text-center gap-5 max-w-md mx-auto">
-              <div className="rounded-2xl bg-primary/10 p-4">
-                <Rocket className="h-7 w-7 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold mb-1.5">Get started with your workspace</h2>
-                <p className="text-sm text-muted-foreground">Complete these steps to set up your CRM.</p>
-              </div>
-              <div className="w-full space-y-2.5 text-left">
-                {[
-                  { step: 1, label: "Add your first contact", href: "/customers/add", cta: "Add Contact" },
-                  { step: 2, label: "Create a deal", href: "/deals/add", cta: "Create Deal" },
-                  { step: 3, label: "Send a quote or invoice", href: "/finance/quotes/new", cta: "New Quote" },
-                ].map(({ step, label, href, cta }) => (
-                  <div key={step} className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary shrink-0">
-                        {step}
-                      </span>
-                      <span className="text-sm font-medium">{label}</span>
-                    </div>
-                    <Link to={href}>
-                      <Button size="sm" variant="outline" className="h-7 text-xs px-3 shrink-0">{cta}</Button>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {isOnboarding && <GettingStartedCard />}
 
       {/* KPI stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -483,7 +440,7 @@ export function Dashboard() {
           sub={`vs ${prevRevenue.toLocaleString()} ${primaryCurrency} last period`}
           change={pct(revenue, prevRevenue)}
           icon={DollarSign}
-          loading={summeryLoading}
+          loading={summaryLoading}
           colorIdx={0}
         />
         <StatCard
@@ -492,7 +449,7 @@ export function Dashboard() {
           sub={`vs ${prevCustomers} last period`}
           change={pct(newCustomers, prevCustomers)}
           icon={Users}
-          loading={summeryLoading}
+          loading={summaryLoading}
           colorIdx={1}
         />
         <StatCard
@@ -501,7 +458,7 @@ export function Dashboard() {
           sub={`vs ${prevUnder.toLocaleString()} ${primaryCurrency} last period`}
           change={pct(underCollection, prevUnder)}
           icon={CreditCard}
-          loading={summeryLoading}
+          loading={summaryLoading}
           colorIdx={2}
         />
         <StatCard
@@ -510,7 +467,7 @@ export function Dashboard() {
           sub={`vs ${prevExpenses.toLocaleString()} last period`}
           change={pct(expenses, prevExpenses)}
           icon={Activity}
-          loading={summeryLoading}
+          loading={summaryLoading}
           colorIdx={3}
         />
       </div>
@@ -523,7 +480,7 @@ export function Dashboard() {
             <CardDescription className="text-xs">{d.revenueDesc}</CardDescription>
           </CardHeader>
           <CardContent>
-            {summeryLoading ? (
+            {summaryLoading ? (
               <Skeleton className="h-[220px] w-full" />
             ) : revenueChartData.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center">
@@ -603,11 +560,11 @@ export function Dashboard() {
         <Card className="shadow-sm border-border/60">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base">Accounts</CardTitle>
-              <CardDescription className="text-xs">Balance per account</CardDescription>
+              <CardTitle className="text-base">{d.accounts}</CardTitle>
+              <CardDescription className="text-xs">{d.balancePerAccount}</CardDescription>
             </div>
             <Link to="/settings/accounts">
-              <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground hover:text-foreground">Manage</Button>
+              <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground hover:text-foreground">{d.manage}</Button>
             </Link>
           </CardHeader>
           <CardContent>
@@ -635,7 +592,7 @@ export function Dashboard() {
       )}
 
       {/* Expense Breakdown */}
-      {!summeryLoading && Object.keys(cur.expenses?.categories ?? {}).length > 0 && (
+      {!summaryLoading && Object.keys(cur.expenses?.categories ?? {}).length > 0 && (
         <Card className="shadow-sm border-border/60">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{d.expenseBreakdown}</CardTitle>
@@ -666,8 +623,8 @@ export function Dashboard() {
       {lowStock.length > 0 && (
         <Card className="shadow-sm border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Low stock</CardTitle>
-            <CardDescription className="text-xs">{lowStock.length} product(s) at or below reorder level</CardDescription>
+            <CardTitle className="text-base">{d.lowStock}</CardTitle>
+            <CardDescription className="text-xs">{d.lowStockDesc(lowStock.length)}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -685,6 +642,6 @@ export function Dashboard() {
       )}
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

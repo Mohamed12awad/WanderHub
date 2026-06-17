@@ -18,6 +18,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { QuoteStatus } from "@/types/types";
 import DynamicFields from "@/components/common/DynamicFields";
 import { toCustomFieldValues } from "@/utils/customFields";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
 
@@ -53,6 +54,7 @@ const QuoteForm: React.FC = () => {
     cloneData?.customFields ? toCustomFieldValues(cloneData.customFields) : {},
   );
   const [saving, setSaving] = useState(false);
+  const [initializing, setInitializing] = useState(Boolean(!isEdit && dealParam && !cloneData));
 
   const fetchCustomers = useCallback(
     (q: string) =>
@@ -84,7 +86,7 @@ const QuoteForm: React.FC = () => {
         setCustomerLabel(d.customer.name ?? "");
       }
       if (d.title) setDealLabel(d.title);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setInitializing(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealParam, isEdit]);
 
@@ -120,6 +122,10 @@ const QuoteForm: React.FC = () => {
   }, [quoteData]);
 
   const { subtotal, tax, total } = computeTotals(items, taxRate);
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { title, customer, deal, status, currency, taxRate, validUntil, notes, terms, items, customFields },
+    { enabled: isEdit ? !!quoteData?.data : !initializing },
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +149,8 @@ const QuoteForm: React.FC = () => {
       };
       const res = isEdit ? await updateQuote(id!, payload) : await createQuote(payload);
       const newId = (res as any)?.data?._id ?? id;
+      allowNavigation();
+      resetSnapshot();
       navigate(newId ? `/finance/quotes/${newId}` : "/finance/quotes");
     } catch {
       toast({ title: "Failed to save quote", variant: "destructive" });

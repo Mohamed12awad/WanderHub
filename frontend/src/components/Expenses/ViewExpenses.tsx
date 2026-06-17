@@ -9,7 +9,7 @@ import {
 } from "@/utils/api";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ApprovalStepsTimeline } from "@/components/common/ApprovalStepsTimeline";
-import { Edit, CheckCircle, XCircle, Clock, Trash2, Copy } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Copy, Edit, ReceiptText, Trash2, XCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoadingSpinner from "../common/spinner";
 import { useAuth } from "@/contexts/authContext";
@@ -24,6 +24,8 @@ import type { ApprovalStatus } from "@/types/types";
 import { useApprovalConfig } from "@/hooks/useApprovalConfig";
 import { InfoRow } from "@/components/common/InfoRow";
 import { AuditRows } from "@/components/common/AuditRows";
+import { DocumentJournalEntries } from "@/components/common/DocumentJournalEntries";
+import { ErrorState } from "@/components/common/ErrorState";
 
 interface ExpenseItem {
   _id: string;
@@ -39,6 +41,7 @@ interface ExpenseData {
   title: string;
   userId: { _id: string; name: string } | string;
   project?: { _id: string; name: string } | null;
+  costCenter?: { _id: string; code: string; name: string } | null;
   expenses: ExpenseItem[];
   approved: boolean;
   approvalStatus?: ApprovalStatus;
@@ -62,10 +65,14 @@ const ViewExpense = () => {
   const perms = user?.permissions ?? [];
   const hasPerm = (p: string) => perms.includes('*') || perms.includes(p);
   const canDelete = hasPerm('expenses:delete');
+  const normalizedExpenseId =
+    expenseId && expenseId !== "undefined" && expenseId !== "null" ? expenseId : undefined;
+  const hasInvalidExpenseId = !normalizedExpenseId;
 
-  const { data: expenseData, isLoading, error } = useQuery({
-    queryKey: ["expenses", expenseId],
-    queryFn: async () => (await getExpenseById(expenseId!)).data
+  const { data: expenseData, isLoading, error, refetch } = useQuery({
+    queryKey: ["expenses", normalizedExpenseId],
+    queryFn: async () => (await getExpenseById(normalizedExpenseId!)).data,
+    enabled: Boolean(normalizedExpenseId),
   });
   const [formData, setFormData] = useState<ExpenseData | null>(null);
   useEffect(() => { if (expenseData) setFormData(expenseData); }, [expenseData]);
@@ -114,6 +121,8 @@ const ViewExpense = () => {
       state: {
         clone: {
           title: `Copy of ${formData.title}`,
+          costCenterId: formData.costCenter?._id ?? "",
+          costCenterLabel: formData.costCenter ? `${formData.costCenter.code} — ${formData.costCenter.name}` : "",
           expenses: formData.expenses.map(({ _id, ...item }) => item),
         },
       },
@@ -129,8 +138,53 @@ const ViewExpense = () => {
     }
   };
 
+  if (hasInvalidExpenseId) {
+    return (
+      <DetailPageLayout>
+        <ErrorState
+          icon={ReceiptText}
+          title="Expense report link is incomplete"
+          description="This page needs a valid expense report ID. The current URL points to an undefined report, so there is no record to load."
+          action={
+            <>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(-1)}>
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Go back
+              </Button>
+              <Button asChild size="sm" className="gap-1.5">
+                <Link to="/expenses">
+                  <ReceiptText className="h-3.5 w-3.5" />
+                  Open expenses
+                </Link>
+              </Button>
+            </>
+          }
+        />
+      </DetailPageLayout>
+    );
+  }
+
   if (isLoading) return <LoadingSpinner loading />;
-  if (error || !formData) return <div className="p-4 text-sm text-destructive">Could not load expense report.</div>;
+  if (error || !formData) {
+    return (
+      <DetailPageLayout>
+        <ErrorState
+          icon={ReceiptText}
+          title="Could not load expense report"
+          description="The report may have been deleted, you may not have access to it, or the server could not return it right now."
+          onRetry={() => void refetch()}
+          action={
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/expenses">
+                <ReceiptText className="h-3.5 w-3.5" />
+                Open expenses
+              </Link>
+            </Button>
+          }
+        />
+      </DetailPageLayout>
+    );
+  }
 
   const canDeleteItem = hasPerm('expenses:edit');
   const approvalStatus = formData.approvalStatus ?? (formData.approved ? "approved" : "pending");
@@ -138,7 +192,7 @@ const ViewExpense = () => {
   const isPending = approvalStatus === "pending";
   const isRejected = approvalStatus === "rejected";
   const canEdit = hasPerm('expenses:edit') || !approvalEnabled || isRejected;
-  const userCanApprove = canUserApprove("expenses", user!.role, perms);
+  const userCanApprove = user ? canUserApprove("expenses", user.role, perms) : false;
 
   const menuItems: DetailMenuItem[] = [
     { label: "Clone", icon: <Copy className="h-3.5 w-3.5 me-2" />, onClick: handleClone },
@@ -248,6 +302,7 @@ const ViewExpense = () => {
                   <Link to={`/projects/${formData.project._id}`} className="text-sm text-blue-500 hover:underline">{formData.project.name}</Link>
                 </InfoRow>
               )}
+              <InfoRow label="Cost Center" value={formData.costCenter ? `${formData.costCenter.code} — ${formData.costCenter.name}` : "—"} />
               {approvalEnabled && (
                 <>
                   <InfoRow label="Approval">
@@ -320,6 +375,9 @@ const ViewExpense = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* GL footprint — shown once the report is approved and posted */}
+      {expenseId && <DocumentJournalEntries model="ExpenseReport" id={expenseId} />}
     </DetailPageLayout>
   );
 };

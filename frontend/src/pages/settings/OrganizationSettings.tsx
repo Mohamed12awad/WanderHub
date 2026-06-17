@@ -85,7 +85,7 @@ export default function OrganizationSettings() {
   };
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h2 className="text-base font-semibold">Organization</h2>
         <p className="text-sm text-muted-foreground mt-0.5">

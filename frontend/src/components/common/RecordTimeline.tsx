@@ -144,14 +144,17 @@ function TimelineItemRow({
 }) {
   const isActivity = item._sourceType === "activity";
   const eventType = item.eventType ?? "custom";
+  // Any "<entity>.updated" event shares the generic "updated" treatment when it
+  // isn't one of the explicitly-mapped types.
+  const isUpdate = typeof eventType === "string" && eventType.endsWith(".updated");
   const color = isActivity
     ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-    : EVENT_COLOR[eventType] ?? EVENT_COLOR["custom"];
+    : EVENT_COLOR[eventType] ?? (isUpdate ? EVENT_COLOR["deal.updated"] : EVENT_COLOR["custom"]);
 
   const icon = isActivity ? (
     <span className="text-sm">{ACTIVITY_TYPE_ICON[item.type ?? ""] ?? "📌"}</span>
   ) : (
-    EVENT_ICON[eventType] ?? EVENT_ICON["custom"]
+    EVENT_ICON[eventType] ?? (isUpdate ? EVENT_ICON["deal.updated"] : EVENT_ICON["custom"])
   );
 
   const actor = item.triggeredBy?.name ?? item.createdBy?.name ?? t.system;
@@ -200,6 +203,12 @@ const FIELD_LABELS: Record<string, string> = {
   lostReason: "Lost Reason", name: "Name", email: "Email",
   phone: "Phone", mobile: "Mobile", location: "Location",
   status: "Status", gender: "Gender", notes: "Notes",
+  company: "Company", jobTitle: "Job Title", website: "Website",
+  ownerId: "Owner", customerId: "Customer", dealId: "Deal", projectId: "Project",
+  assignedToId: "Assignee", dueDate: "Due Date", description: "Description",
+  type: "Type", sku: "SKU", unitPrice: "Unit Price", cost: "Cost", taxRate: "Tax Rate",
+  rating: "Rating", budget: "Budget", expectedDate: "Expected Date",
+  reorderLevel: "Reorder Level", customFields: "Custom Fields", address: "Address",
 };
 
 function formatFieldValue(field: string, value: unknown): string {
@@ -229,7 +238,7 @@ function PayloadChips({
       </div>
     );
   }
-  if (eventType === "deal.updated" || eventType === "contact.updated") {
+  if (payload.changes) {
     const changes = payload.changes as Record<string, { from: unknown; to: unknown }> | undefined;
     if (!changes || Object.keys(changes).length === 0) return null;
     return (

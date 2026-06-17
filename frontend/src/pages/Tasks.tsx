@@ -12,8 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { AddTaskPanel } from "@/components/Tasks/AddTaskPanel";
+import { TasksList } from "@/components/Tasks/TasksList";
+import { ViewSwitch } from "@/components/common/ViewSwitch";
 import {
-  PlusCircle, List, LayoutGrid, Check,
+  PlusCircle, Check,
   Pencil, Trash2, CalendarDays, User, Copy, FolderKanban,
 } from "lucide-react";
 
@@ -190,6 +192,10 @@ export function Tasks() {
     { key: "overdue", label: t.overdue },
   ];
 
+  const switcher = <ViewSwitch active={view} onChange={setView} />;
+  // List view uses the standard GenericTable (server search + pagination).
+  if (view === "list") return <TasksList headerExtra={switcher} />;
+
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
@@ -239,20 +245,7 @@ export function Tasks() {
           className="h-8 w-48 text-sm"
         />
 
-        <div className="ml-auto flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
-          <button
-            onClick={() => setView("list")}
-            className={cn("p-1.5 rounded transition-colors", view === "list" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
-          >
-            <List className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setView("board")}
-            className={cn("p-1.5 rounded transition-colors", view === "board" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <div className="ml-auto">{switcher}</div>
       </div>
 
       {/* Content */}
@@ -262,8 +255,6 @@ export function Tasks() {
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-muted-foreground text-sm">{search ? t.noSearch(search) : t.empty}</p>
         </div>
-      ) : view === "list" ? (
-        <ListView tasks={filtered} onEdit={openEdit} onClone={openClone} onDelete={(id) => deleteMut.mutate(id)} onComplete={(id) => completeMut.mutate(id)} statuses={t.statuses} priorities={t.priorities} />
       ) : (
         <GenericKanban<Task>
           items={filtered}
@@ -303,18 +294,4 @@ export function Tasks() {
   );
 }
 
-function ListView({ tasks, onEdit, onClone, onDelete, onComplete, statuses, priorities }: {
-  tasks: Task[]; onEdit: (t: Task) => void; onClone: (t: Task) => void;
-  onDelete: (id: string) => void; onComplete: (id: string) => void;
-  statuses: Record<string, string>; priorities: Record<string, string>;
-}) {
-  return (
-    <div className="space-y-2">
-      {tasks.map((task) => (
-        <TaskCard key={task._id} task={task} onEdit={() => onEdit(task)} onClone={() => onClone(task)}
-          onDelete={() => onDelete(task._id)} onComplete={() => onComplete(task._id)} statuses={statuses} priorities={priorities} />
-      ))}
-    </div>
-  );
-}
 

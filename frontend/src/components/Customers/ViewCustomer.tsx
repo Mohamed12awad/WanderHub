@@ -12,7 +12,7 @@ import { getCustomerById, deleteCustomer, createDeal, getDeals, getQuotes, getIn
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Edit, Trash2, Handshake, TrendingUp, Copy, FolderKanban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Customer } from "@/types/types";
+import { Customer, DealData } from "@/types/types";
 import { Button } from "../ui/button";
 import { EmailsPanel } from "@/components/common/EmailsPanel";
 import { AiInsights } from "@/components/common/AiInsights";
@@ -71,14 +71,14 @@ const ViewCustomer: React.FC = () => {
   });
   const { data: projectsData }   = useQuery({
     queryKey: ["customer-projects", id],
-    queryFn: () => getProjects({ customer: id, limit: 50 }),
+    queryFn: () => getProjects({ customerId: id, limit: 50 }),
     enabled: !!id
   });
 
   const quotesCount     = ((quotesData?.data)     as any[])?.length ?? 0;
   const invoicesCount   = ((invoicesData?.data)   as any[])?.length ?? 0;
   const dealsCount      = ((dealsData?.data as any)?.data as any[])?.length ?? 0;
-  const projectsCount   = ((projectsData?.data as any)?.data as any[])?.length ?? 0;
+  const projectsCount   = ((projectsData?.data)   as any[])?.length ?? 0;
 
   const handleClone = () => {
     if (!customerData) return;
@@ -102,21 +102,21 @@ const ViewCustomer: React.FC = () => {
     if (Object.keys(errs).length) { setDealErrors(errs); return; }
     try {
       setDealLoading(true);
-      const { data } = await createDeal({
+      // Only send fields the Deal API accepts. The previous payload smuggled
+      // legacy fields (product/totalPaid/quantity/startDate/endDate) past TS via
+      // `as any`; the backend ValidationPipe (forbidNonWhitelisted) rejected them
+      // with a 400. Typing against DealData prevents that drift from recurring.
+      const payload: DealData = {
         title: dealForm.title,
         customer: id!,
-        product: "",
         price: Number(dealForm.price),
         currency: dealForm.currency,
-        totalPaid: 0,
         status: dealForm.status,
         source: dealForm.source,
-        quantity: 1,
         expectedCloseDate: dealForm.expectedCloseDate ? new Date(dealForm.expectedCloseDate) : new Date(),
-        startDate: new Date(),
-        endDate: new Date(),
         notes: dealForm.notes,
-      } as any);
+      };
+      const { data } = await createDeal(payload);
       navigate(`/deals/${data._id ?? data.id}`);
     } catch {
       toast({ title: "Failed to create deal", variant: "destructive" });
@@ -129,8 +129,8 @@ const ViewCustomer: React.FC = () => {
     try {
       await deleteCustomer(id!);
       navigate("/customers");
-    } catch {
-      toast({ title: "Delete failed", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: e?.response?.data?.message ?? "Delete failed", variant: "destructive" });
     }
   };
 
@@ -447,9 +447,9 @@ const CustomerDealsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
 const CustomerProjectsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
   const { data, isPending } = useQuery({
     queryKey: ["customer-projects", customerId],
-    queryFn: () => getProjects({ customer: customerId, limit: 50 })
+    queryFn: () => getProjects({ customerId, limit: 50 })
   });
-  const projects: any[] = (data?.data as any)?.data ?? [];
+  const projects: any[] = (data?.data as any[]) ?? [];
 
   if (isPending) return (
     <div className="space-y-2">

@@ -192,19 +192,13 @@ export class DealsService {
       );
     }
 
-    const TRACKED_FIELDS = ['title', 'price', 'currency', 'priority', 'probability', 'source', 'category', 'dealType', 'expectedCloseDate', 'lostReason'];
-    const changes: Record<string, { from: unknown; to: unknown }> = {};
-    for (const field of TRACKED_FIELDS) {
-      if (cleaned[field] === undefined) continue;
-      const oldVal = (oldDeal as Record<string, unknown>)[field];
-      const newVal = cleaned[field];
-      const oldStr = oldVal instanceof Date ? oldVal.toISOString().slice(0, 10) : String(oldVal ?? '');
-      const newStr = newVal instanceof Date ? (newVal as Date).toISOString().slice(0, 10) : String(newVal ?? '');
-      if (oldStr !== newStr) changes[field] = { from: oldVal, to: newVal };
-    }
-    if (Object.keys(changes).length > 0) {
-      await this.timeline.log('deal.updated', 'Deal updated', id, 'Deal', { changes }, userId);
-    }
+    // Status transitions are logged above as their own events; exclude `status`
+    // here so the generic diff doesn't double-record it.
+    await this.timeline.logUpdate({
+      eventType: 'deal.updated', title: 'Deal updated', linkedModel: 'Deal',
+      id, before: oldDeal as Record<string, unknown>, changed: cleaned, userId,
+      ignore: ['status'],
+    });
 
     return toClient(deal);
   }

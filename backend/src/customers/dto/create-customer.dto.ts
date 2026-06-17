@@ -1,8 +1,23 @@
-import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { ContactType } from '@prisma/client';
 
 export class CreateCustomerDto {
   @IsString() @IsNotEmpty() name: string;
   @IsString() @IsNotEmpty() phone: string;
+
+  // Individual vs company. Defaults to `individual` in the DB when omitted. The
+  // type-specific identity fields below are all optional structured extras — the
+  // canonical required field is `name`; which extras are surfaced/required in the
+  // UI is driven by the workspace field config, not hardcoded here.
+  @IsOptional() @IsEnum(ContactType) type?: ContactType;
+
+  // Individual-only structured fields (optional).
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+
+  // Company-only structured fields (optional).
+  @IsOptional() @IsString() companyName?: string;
+  @IsOptional() @IsString() taxId?: string;
 
   @IsOptional() @IsString() mobile?: string;
   @IsOptional() @IsString() email?: string;

@@ -15,11 +15,12 @@ import {
   Lock, Trash2, Plus, GripVertical, Filter, ChevronDown, ChevronRight, FolderPlus,
   Users2, UserSearch, Handshake, Package, Briefcase, CheckSquare, CalendarDays,
   Banknote, Truck, FileText, Receipt, ClipboardCheck, ShoppingCart, ClipboardList, Users,
+  Eye, EyeOff,
 } from "lucide-react";
 import { getWorkspaceSettings, updateWorkspaceSettings } from "@/utils/api";
 import { toast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
-import type { FieldDef, FieldType, SectionDef } from "@/hooks/useWorkspaceSettings";
+import { normalizeWorkspaceSettings, type FieldDef, type FieldType, type SectionDef } from "@/hooks/useWorkspaceSettings";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   DndContext, DragOverlay, closestCorners, PointerSensor, useSensor, useSensors,
@@ -115,7 +116,7 @@ export default function FieldsSettings() {
     getWorkspaceSettings()
       .then((res) => {
         const groups: { module: string; fields: FieldDef[]; sections?: SectionDef[] }[] =
-          res.data?.fieldGroups ?? [];
+          normalizeWorkspaceSettings(res.data).fieldGroups;
         const fg = emptyMap<FieldDef[]>(() => []);
         const sg = emptyMap<SectionDef[]>(() => []);
 
@@ -413,7 +414,7 @@ export default function FieldsSettings() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="page-pad page-gap">
       <div>
         <h2 className="text-lg font-semibold">{s.fields}</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -538,6 +539,7 @@ export default function FieldsSettings() {
                       onLabelSave={(label) => { setEditingId(null); saveFieldPatch(field.id, { label }); }}
                       onOptionsChange={(options) => saveFieldPatch(field.id, { options })}
                       onRequiredChange={(required) => saveFieldPatch(field.id, { required })}
+                      onHiddenChange={(hidden) => saveFieldPatch(field.id, { hidden })}
                       onFilterableChange={(filterable) => saveFieldPatch(field.id, { filterable })}
                       onDelete={field.isSystem ? undefined : () => deleteField(field.id)}
                       saving={saving}
@@ -769,6 +771,7 @@ interface FieldRowProps {
   onLabelSave: (v: string) => void;
   onOptionsChange: (v: string) => void;
   onRequiredChange: (v: boolean) => void;
+  onHiddenChange: (v: boolean) => void;
   onFilterableChange: (v: boolean) => void;
   onDelete?: () => void;
   saving: boolean;
@@ -801,11 +804,12 @@ function SortableFieldRow(props: Omit<FieldRowProps, "dragListeners" | "dragAttr
 function FieldRow({
   field, editingId, editRef,
   onStartEdit, onLabelChange, onLabelSave,
-  onOptionsChange, onRequiredChange, onFilterableChange,
+  onOptionsChange, onRequiredChange, onHiddenChange, onFilterableChange,
   onDelete, saving, dragListeners, dragAttributes, setActivatorNodeRef,
 }: FieldRowProps) {
   const isEditing = editingId === field.id;
   const isSystem = !!field.isSystem;
+  const isHidden = !!field.hidden;
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [optionsDraft, setOptionsDraft] = useState(field.options ?? "");
 
@@ -854,9 +858,25 @@ function FieldRow({
 
           <div className="flex items-center gap-1" title="Required">
             <Switch checked={!!field.required} onCheckedChange={onRequiredChange}
-              disabled={saving} className="scale-[0.7] origin-right" />
+              disabled={saving || isHidden} className="scale-[0.7] origin-right" />
             <span className="text-xs text-foreground/60">Req</span>
           </div>
+
+          {/* Visibility — hidden fields are omitted from create/edit forms. */}
+          <button
+            onClick={() => onHiddenChange(!isHidden)}
+            disabled={saving}
+            title={isHidden ? "Hidden on forms — click to show" : "Visible on forms — click to hide"}
+            className={cn(
+              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all",
+              isHidden
+                ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20"
+                : "border-input text-foreground/60 hover:bg-muted/50 hover:text-foreground"
+            )}
+          >
+            {isHidden ? <EyeOff className="h-2.5 w-2.5" /> : <Eye className="h-2.5 w-2.5" />}
+            {isHidden ? "Hidden" : "Shown"}
+          </button>
 
           {/* Filterable — meaningful for custom fields (auto-generated list filters). */}
           {!isSystem && (

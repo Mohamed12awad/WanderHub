@@ -389,10 +389,11 @@ NawaHub/
 │   │   ├── notes/               # Standalone notes per entity
 │   │   ├── attachments/         # File upload (Multer)
 │   │   ├── reports/             # Business intelligence endpoints
-│   │   ├── summery/             # Dashboard summary aggregates
+│   │   ├── summary/             # Dashboard summary aggregates
 │   │   ├── search/              # Full-text search across CRM entities
-│   │   ├── import/              # CSV bulk import with column mapping
-│   │   ├── bulk/                # Bulk operations on CRM records
+│   │   ├── import/              # CSV import with column mapping (CRM, catalog, projects, tasks, COA)
+│   │   ├── export/              # Streamed full-dataset CSV export per module
+│   │   ├── bulk/                # Bulk delete / assign-owner / set-status across modules
 │   │   ├── dedup/               # Duplicate detection and merge
 │   │   ├── saved-views/         # User-defined saved filter sets
 │   │   ├── emails/              # SMTP send + open/click tracking

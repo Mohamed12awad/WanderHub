@@ -61,7 +61,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(id)}>Edit</DropdownMenuItem>
-            <DropdownMenuItem disabled={user?.id === id} onClick={handleToggleState}>
+            <DropdownMenuItem disabled={user?._id === id} onClick={handleToggleState}>
               {active ? "Deactivate" : "Activate"}
             </DropdownMenuItem>
             {(user!.permissions?.some((p) => p === '*' || p === 'users:delete')) && (
@@ -69,7 +69,7 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  disabled={user?.id === id}
+                  disabled={user?._id === id}
                   onClick={() => handleDelete(id)}
                 >
                   Delete

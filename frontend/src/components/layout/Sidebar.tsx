@@ -19,10 +19,10 @@ export default function Sidebar() {
       {/* Logo */}
       <div className={`flex h-[60px] items-center shrink-0 ${collapsed ? "justify-center px-2" : "gap-3 px-5"}`}>
         <Link to="/" className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/40 overflow-hidden">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-md shadow-black/15">
             {logo
-              ? <img src={logo} className="h-full w-full object-contain p-0.5" alt="Logo" />
-              : <img src="/logo.png" className="h-5 w-5" alt="NawaHub" />}
+              ? <img src={logo} className="h-full w-full object-contain p-1" alt="Logo" />
+              : <img src="/logo.png" className="h-full w-full object-cover" alt="NawaHub" />}
           </div>
           {!collapsed && (
             <span className="text-sm font-semibold tracking-tight text-white truncate">

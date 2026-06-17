@@ -25,6 +25,14 @@ const optionalUrl = z.string().trim().url("Invalid website URL").optional().or(z
 
 export const customerSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
+  // Contact type + optional structured identity fields. These are supplementary —
+  // `name` stays the canonical required field. `.nullish()` so the API's `null`
+  // for an empty column never trips validation on the edit form.
+  type: z.enum(["individual", "company"]).optional(),
+  firstName: z.string().nullish(),
+  lastName: z.string().nullish(),
+  companyName: z.string().nullish(),
+  taxId: z.string().nullish(),
   phone: z.string().trim().min(1, "Phone is required"),
   mobile: z.string().optional(),
   email: optionalEmail,
@@ -64,6 +72,17 @@ export const customerSchema = z.object({
   status: z.string().optional(),
   owner: z.string().trim().min(1, "Owner is required"),
   notes: z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (val.type === "company") {
+    if (!val.companyName?.trim())
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["companyName"], message: "Company name is required" });
+  } else {
+    // individual (the default when type is omitted)
+    if (!val.firstName?.trim())
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["firstName"], message: "First name is required" });
+    if (!val.lastName?.trim())
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["lastName"], message: "Last name is required" });
+  }
 });
 
 /**

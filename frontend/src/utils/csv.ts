@@ -41,6 +41,16 @@ export function parseCSV(text: string): { headers: string[]; rows: Record<string
   return { headers, rows };
 }
 
+/** Triggers a browser download for an already-built Blob (e.g. a server CSV stream). */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function downloadCSV(rows: Record<string, unknown>[], filename: string) {
   if (!rows.length) return;
   const headers = Object.keys(rows[0]);

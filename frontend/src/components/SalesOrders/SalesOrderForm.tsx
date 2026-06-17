@@ -14,6 +14,7 @@ import { StickyFormBar } from "@/components/common/StickyFormBar";
 import LineItemsTable, { LineItemRow, toLineItemPayload } from "@/components/Finance/LineItemsTable";
 import DynamicFields from "@/components/common/DynamicFields";
 import { useSaveMutation } from "@/hooks/useSaveMutation";
+import { useUnsavedChangesSnapshot } from "@/hooks/useUnsavedChangesGuard";
 import { queryKeys } from "@/lib/queryKeys";
 import { createSalesOrder, updateSalesOrder, getSalesOrderById, getCustomers, getDeals, getProjects } from "@/utils/api";
 import { toCustomFieldValues } from "@/utils/customFields";
@@ -72,6 +73,7 @@ export default function SalesOrderForm({ mode }: { mode: "add" | "edit" }) {
       taxRate: clone?.taxRate ?? 14,
     },
   });
+  const values = form.watch();
 
   const fetchCustomers = useCallback((q: string) => getCustomers({ page: 1, limit: 20, q }).then((r) => asOptions(r, "name")), []);
   const fetchDeals     = useCallback((q: string) => getDeals({ page: 1, limit: 20, q }).then((r) => asOptions(r, "title")), []);
@@ -99,6 +101,10 @@ export default function SalesOrderForm({ mode }: { mode: "add" | "edit" }) {
   }, [soData, form]);
 
   const backHref = mode === "edit" ? `/sales-orders/${id}` : "/sales-orders";
+  const { allowNavigation, resetSnapshot } = useUnsavedChangesSnapshot(
+    { values, items, customFields },
+    { enabled: mode === "add" || !!soData?.data },
+  );
 
   const mutation = useSaveMutation<Record<string, unknown>>({
     save: (payload) => mode === "add" ? createSalesOrder(payload as any) : updateSalesOrder(id!, payload as any),
@@ -107,7 +113,11 @@ export default function SalesOrderForm({ mode }: { mode: "add" | "edit" }) {
       : [queryKeys.salesOrders.all],
     successMessage: "Sales order saved",
     errorMessage:   "Failed to save sales order",
-    onSuccess: (res: any) => navigate(`/sales-orders/${res?.data?._id ?? ""}`),
+    onSuccess: (res: any) => {
+      allowNavigation();
+      resetSnapshot();
+      navigate(`/sales-orders/${res?.data?._id ?? ""}`);
+    },
   });
 
   const onSubmit = (values: FormValues) => {

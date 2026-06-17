@@ -99,7 +99,7 @@ export default function ApprovalsSettings() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="page-w-narrow page-pad page-gap">
         {MODULES.map((m) => <Skeleton key={m.key} className="h-32 w-full rounded-xl" />)}
       </div>
     );
@@ -121,7 +121,7 @@ export default function ApprovalsSettings() {
   );
 
   return (
-    <div className="p-6 space-y-5 max-w-2xl">
+    <div className="page-w-narrow page-pad page-gap">
       <div>
         <h1 className="text-lg font-bold text-foreground">Approval Workflow</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
