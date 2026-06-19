@@ -336,6 +336,7 @@ export class PostingService {
     },
     tx?: Prisma.TransactionClient,
     createdById?: string,
+    sourceId?: string,
   ) {
     if (!(await this.shouldPost(invoice.issueDate))) return;
     const db: Db = tx ?? this.prisma;
@@ -359,7 +360,7 @@ export class PostingService {
     }
     void base;
     await this.post(
-      { sourceType: 'Invoice', sourceId: invoice.id, date: invoice.issueDate, memo: `Invoice ${invoice.invoiceNumber}`, createdById, lines },
+      { sourceType: 'Invoice', sourceId: sourceId ?? invoice.id, date: invoice.issueDate, memo: `Invoice ${invoice.invoiceNumber}`, createdById, lines },
       tx,
     );
   }
@@ -410,10 +411,12 @@ export class PostingService {
       id: string; billNumber: string; currency: string; supplierId: string;
       subtotal: Prisma.Decimal | number; tax: Prisma.Decimal | number; total: Prisma.Decimal | number;
       issueDate?: Date | null; createdAt: Date; taxRate?: number; costCenterId?: string | null;
+      exchangeRate?: number | null;
     },
     tx?: Prisma.TransactionClient,
     createdById?: string,
     opts: { useGrni?: boolean } = {},
+    sourceId?: string,
   ) {
     const date = bill.issueDate ?? bill.createdAt;
     if (!(await this.shouldPost(date))) return;
@@ -427,18 +430,21 @@ export class PostingService {
     const subtotal = Number(bill.subtotal);
     const tax = Number(bill.tax);
     const total = Number(bill.total);
+    // Book every leg at the bill's captured rate, so the payment path can relieve
+    // AP at the same historical rate and the account clears to zero (mirrors Invoice).
+    const rate = bill.exchangeRate;
 
     const lines: PostLine[] = [
-      { accountId: goodsAccount, debit: subtotal, currency: bill.currency, supplierId: bill.supplierId, costCenterId: bill.costCenterId, memo: `Bill ${bill.billNumber}` },
-      { accountId: ap, credit: total, currency: bill.currency, supplierId: bill.supplierId, costCenterId: bill.costCenterId },
+      { accountId: goodsAccount, debit: subtotal, currency: bill.currency, rate, supplierId: bill.supplierId, costCenterId: bill.costCenterId, memo: `Bill ${bill.billNumber}` },
+      { accountId: ap, credit: total, currency: bill.currency, rate, supplierId: bill.supplierId, costCenterId: bill.costCenterId },
     ];
     if (tax > 0.005) {
       const code = (await this.taxInputCode(bill.taxRate, db)) ?? gl.defaultTaxRecoverable ?? gl.defaultTaxPayable;
       const taxAcc = await this.requireCode(code, 'Tax Recoverable', db);
-      lines.push({ accountId: taxAcc, debit: tax, currency: bill.currency, supplierId: bill.supplierId, costCenterId: bill.costCenterId });
+      lines.push({ accountId: taxAcc, debit: tax, currency: bill.currency, rate, supplierId: bill.supplierId, costCenterId: bill.costCenterId });
     }
     await this.post(
-      { sourceType: 'VendorBill', sourceId: bill.id, date, memo: `Vendor Bill ${bill.billNumber}`, createdById, lines },
+      { sourceType: 'VendorBill', sourceId: sourceId ?? bill.id, date, memo: `Vendor Bill ${bill.billNumber}`, createdById, lines },
       tx,
     );
   }
@@ -457,10 +463,14 @@ export class PostingService {
     },
     tx?: Prisma.TransactionClient,
     createdById?: string,
+    sourceId?: string,
   ) {
     if (!(await this.shouldPost(report.createdAt))) return;
     const total = report.expenses.reduce((s, e) => s + Number(e.amount), 0);
-    if (total < POST_TOLERANCE) return;
+    // Skip only a genuinely zero report. A net-negative report (refund/credit
+    // lines outweighing expenses) must still post a reversing-direction entry —
+    // `post()` handles signed debit/credit legs (see fxLine).
+    if (Math.abs(total) < POST_TOLERANCE) return;
     const db: Db = tx ?? this.prisma;
     const gl = await this.getGlConfig();
     const base = await this.currency.getBaseCurrency();
@@ -468,7 +478,7 @@ export class PostingService {
     const ap = await this.requireCode(gl.defaultApAccount, 'Accounts Payable', db);
     await this.post(
       {
-        sourceType: 'ExpenseReport', sourceId: report.id, date: report.createdAt,
+        sourceType: 'ExpenseReport', sourceId: sourceId ?? report.id, date: report.createdAt,
         memo: `Expense ${report.title}`, createdById,
         lines: [
           { accountId: expense, debit: total, currency: base, costCenterId: report.costCenterId, memo: report.title },
@@ -560,7 +570,7 @@ export class PostingService {
   /** Vendor bill payment: Dr AP / Cr Cash / realized FX. */
   async postVendorBillPayment(
     payment: { id: string; amount: Prisma.Decimal | number; currency: string; date: Date; accountId: string | null },
-    bill: { id: string; billNumber: string; currency: string; supplierId: string },
+    bill: { id: string; billNumber: string; currency: string; supplierId: string; exchangeRate?: number | null },
     tx?: Prisma.TransactionClient,
     createdById?: string,
     sourceId?: string,
@@ -576,12 +586,15 @@ export class PostingService {
     }
     const ap = await this.requireCode(gl.defaultApAccount, 'Accounts Payable', db);
     const amount = Number(payment.amount);
+    // Cash leaves at the payment-date rate; AP is relieved at the bill's recorded
+    // historical rate. The base-currency difference is realized FX (mirrors
+    // postInvoicePayment). Relieving AP at the current rate would never clear it.
     const baseCash = await this.currency.toBase(amount, payment.currency);
-    const baseAp = await this.currency.toBase(amount, bill.currency);
+    const baseAp = await this.currency.toBase(amount, bill.currency, bill.exchangeRate);
     const fx = baseAp - baseCash;
 
     const lines: PostLine[] = [
-      { accountId: ap, debit: amount, currency: bill.currency, baseAmount: baseAp, supplierId: bill.supplierId, memo: `Payment ${bill.billNumber}` },
+      { accountId: ap, debit: amount, currency: bill.currency, baseAmount: baseAp, rate: bill.exchangeRate, supplierId: bill.supplierId, memo: `Payment ${bill.billNumber}` },
       { accountId: cash, credit: amount, currency: payment.currency, baseAmount: -baseCash, supplierId: bill.supplierId },
     ];
     if (Math.abs(fx) > POST_TOLERANCE) {

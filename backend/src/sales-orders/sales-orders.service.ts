@@ -263,7 +263,8 @@ export class SalesOrdersService {
       await this.approvals.act('SalesOrder', id, userId, userRole, order.createdById, 'reject', reason);
       const updated = await this.prisma.salesOrder.update({
         where: { id },
-        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+        // Clear any prior approval: the rejecter is not the approver.
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
         include: SO_INCLUDE,
       });
       return toClient(updated);
@@ -274,7 +275,8 @@ export class SalesOrdersService {
     if (order.createdById === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot reject a sales order you created');
     const updated = await this.prisma.salesOrder.update({
       where: { id },
-      data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
+      // Clear any prior approval (see chain path above).
+      data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
       include: SO_INCLUDE,
     });
     return toClient(updated);

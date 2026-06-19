@@ -14,6 +14,8 @@ function buildMocks() {
     invoice: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     invoicePayment: { findFirst: jest.fn() },
     quote: { findFirst: jest.fn() },
+    // No prior issued entry by default ⇒ first approval posts under the base id.
+    journalEntry: { findFirst: jest.fn().mockResolvedValue(null) },
     workspaceConfig: { findFirst: jest.fn().mockResolvedValue({}) },
     $transaction: jest.fn((cb: any) => cb(tx)),
   };
@@ -89,21 +91,40 @@ describe('InvoicesService — approval separation of duties', () => {
     expect(res._id).toBe('inv1');
   });
 
-  it('clears approvedBy/approvedAt when rejecting a previously-approved invoice', async () => {
-    const { prisma } = buildMocks();
+  it('clears approvedBy/approvedAt and reverses the GL entry when rejecting a previously-approved invoice', async () => {
+    const { prisma, tx } = buildMocks();
     prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'other', approvalStatus: 'approved', approvedById: 'approver1', deletedAt: null });
     prisma.workspaceConfig.findFirst.mockResolvedValue({ approvals: [{ module: 'invoices', enabled: true, approverRoles: ['admin'] }] });
-    prisma.invoice.update.mockResolvedValue({ id: 'inv1', approvalStatus: 'rejected' });
+    tx.invoice.update.mockResolvedValue({ id: 'inv1', approvalStatus: 'rejected' });
     const svc = makeService(prisma);
 
     await svc.rejectInvoice('inv1', 'approver1', 'bad numbers', 'admin', ['*']);
 
-    expect(prisma.invoice.update.mock.calls[0][0].data).toMatchObject({
+    // The status update now runs inside the reject $transaction (on the tx client).
+    expect(tx.invoice.update.mock.calls[0][0].data).toMatchObject({
       approvalStatus: 'rejected',
       approvedById: null,
       approvedAt: null,
       rejectionReason: 'bad numbers',
     });
+    // The issued GL entry approval posted must be reversed in the same transaction.
+    expect((svc as any).posting.reverseLive).toHaveBeenCalledWith('Invoice', 'inv1', { createdById: 'approver1' }, tx);
+  });
+
+  it('re-posts the issued entry under a versioned sourceId on re-approval after a reject', async () => {
+    const { prisma } = buildMocks();
+    prisma.invoice.findFirst.mockResolvedValue({ id: 'inv1', createdById: 'other', deletedAt: null });
+    prisma.workspaceConfig.findFirst.mockResolvedValue({ approvals: [{ module: 'invoices', enabled: true, approverRoles: ['admin'] }] });
+    prisma.invoice.update.mockResolvedValue({ id: 'inv1', approvalStatus: 'approved' });
+    // A prior (reversed) issued entry exists from the first approval, so post()
+    // would no-op on the base id — re-approval must use a versioned sourceId.
+    prisma.journalEntry.findFirst.mockResolvedValue({ id: 'je1' });
+    const svc = makeService(prisma);
+
+    await svc.approveInvoice('inv1', 'approver1', 'admin');
+
+    const sourceIdArg = (svc as any).posting.postInvoiceIssued.mock.calls[0][3];
+    expect(sourceIdArg).toMatch(/^inv1#r\d+$/);
   });
 });
 

@@ -88,6 +88,32 @@ function normalizeWorkspaceFieldGroups(value: unknown) {
   return parseOrThrow(fieldGroupsSchema, Array.isArray(value) ? value : [], 'fieldGroups');
 }
 
+/**
+ * Read-path normalizer: tolerant of historical/partial stored configs. Coalesces
+ * `_id`→`id` and drops entries that lack any id, instead of throwing. The strict
+ * `fieldGroupsSchema` validation is enforced only on the write path, so a single
+ * malformed legacy row must never break the whole workspace/settings fetch.
+ */
+function normalizeFieldGroupsForRead(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const isObj = (e: unknown): e is Record<string, unknown> =>
+    !!e && typeof e === 'object' && !Array.isArray(e);
+  const norm = (arr: unknown) =>
+    Array.isArray(arr)
+      ? arr
+          .filter((e): e is Record<string, unknown> =>
+            isObj(e) && (typeof e.id === 'string' || typeof e._id === 'string'))
+          .map(({ _id, ...rest }) => ({ ...rest, id: (rest.id ?? _id) as string }))
+      : [];
+  return value
+    .filter((g): g is Record<string, unknown> => isObj(g) && typeof g.module === 'string')
+    .map((g) => {
+      const out: Record<string, unknown> = { module: g.module, fields: norm(g.fields) };
+      if (g.sections !== undefined) out.sections = norm(g.sections);
+      return out;
+    });
+}
+
 @Injectable()
 export class SettingsService {
   constructor(
@@ -124,7 +150,7 @@ export class SettingsService {
   async getWorkspace() {
     const config = await this.getOrCreate();
     return {
-      fieldGroups: normalizeWorkspaceFieldGroups(config.fieldGroups),
+      fieldGroups: normalizeFieldGroupsForRead(config.fieldGroups),
       moduleSettings: config.moduleSettings,
       pipelineStages: config.pipelineStages,
     };
@@ -152,7 +178,7 @@ export class SettingsService {
     });
     this.workspaceConfig.invalidate();
     return {
-      fieldGroups: normalizeWorkspaceFieldGroups(updated.fieldGroups),
+      fieldGroups: normalizeFieldGroupsForRead(updated.fieldGroups),
       moduleSettings: updated.moduleSettings,
       pipelineStages: updated.pipelineStages,
     };

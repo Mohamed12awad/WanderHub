@@ -59,7 +59,13 @@ export class InvoicesService {
   private async postInvoiceIssued(invoiceId: string, userId: string) {
     const inv = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
     if (!inv) return;
-    await this.posting.postInvoiceIssued(inv, undefined, userId);
+    // If a prior issued entry exists (approve → reject reversed it → re-approve),
+    // the base sourceId is taken; post() is idempotent on (sourceType,sourceId)
+    // and would no-op. Re-post under a versioned sourceId so AR is re-recognized.
+    const prior = await this.prisma.journalEntry.findFirst({
+      where: { sourceType: 'Invoice', sourceId: { startsWith: invoiceId } }, select: { id: true },
+    });
+    await this.posting.postInvoiceIssued(inv, undefined, userId, prior ? `${invoiceId}#r${Date.now()}` : undefined);
   }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -173,56 +179,64 @@ export class InvoicesService {
     const invoiceNumber = await this.numberSequence.nextNumber('invoice', 'INV');
     const enabled = await this.approvals.isEnabled('invoices');
     const customFields = await this.customFields.validateAndClean('invoices', rawCf);
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        ...rest,
-        ...(customFields !== undefined ? { customFields } : {}),
-        invoiceNumber,
-        taxRate,
-        taxInclusive,
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        total: totals.total,
-        approvalStatus: enabled ? 'pending' : 'approved',
-        issueDate: rest.issueDate ? new Date(rest.issueDate) : new Date(),
-        customerId: customer,
-        ...(deal ? { dealId: deal } : {}),
-        createdById: userId,
-        items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
-      } as Prisma.InvoiceUncheckedCreateInput,
-      include: INVOICE_INCLUDE,
-    });
 
-    // Build the approval chain. If no step applies (amount below thresholds),
-    // the document is auto-approved.
-    if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'Invoice', invoice.id, 'invoices', Number(invoice.total));
-      if (overall === 'approved') {
-        await this.prisma.invoice.update({ where: { id: invoice.id }, data: { approvalStatus: 'approved' } });
-        (invoice as { approvalStatus: string }).approvalStatus = 'approved';
-      }
-    }
-    // A sale draws stock-tracked items out of stock and books COGS.
-    for (const it of totals.items) {
-      if (!it.productId) continue;
-      const product = await this.prisma.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
-      if (!product?.tracksInventory) continue;
-      const move = await this.inventory.applyMovement({
-        productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: invoice.id, userId,
+    // Create the invoice, draw stock + book COGS, and post the issued GL entry as
+    // one atomic unit. Previously these ran sequentially outside any transaction,
+    // so a mid-loop failure left partial stock depletion and partial/missing
+    // COGS/issued entries — the very drift reconciliation.service is built to detect.
+    const invoice = await this.prisma.$transaction(async (tx) => {
+      const inv = await tx.invoice.create({
+        data: {
+          ...rest,
+          ...(customFields !== undefined ? { customFields } : {}),
+          invoiceNumber,
+          taxRate,
+          taxInclusive,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          total: totals.total,
+          approvalStatus: enabled ? 'pending' : 'approved',
+          issueDate: rest.issueDate ? new Date(rest.issueDate) : new Date(),
+          customerId: customer,
+          ...(deal ? { dealId: deal } : {}),
+          createdById: userId,
+          items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
+        } as Prisma.InvoiceUncheckedCreateInput,
+        include: INVOICE_INCLUDE,
       });
-      if (move) {
-        await this.posting.postCogs(
-          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
-          undefined, userId,
-        );
-      }
-    }
 
-    // Auto-approved (approvals disabled) → post the issued GL entry now, since
-    // approveInvoice won't be called for this invoice.
-    if (invoice.approvalStatus === 'approved') {
-      await this.posting.postInvoiceIssued(invoice, undefined, userId);
-    }
+      // Build the approval chain. If no step applies (amount below thresholds),
+      // the document is auto-approved.
+      if (enabled) {
+        const overall = await this.approvals.initSteps(tx, 'Invoice', inv.id, 'invoices', Number(inv.total));
+        if (overall === 'approved') {
+          await tx.invoice.update({ where: { id: inv.id }, data: { approvalStatus: 'approved' } });
+          (inv as { approvalStatus: string }).approvalStatus = 'approved';
+        }
+      }
+      // A sale draws stock-tracked items out of stock and books COGS.
+      for (const it of totals.items) {
+        if (!it.productId) continue;
+        const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+        if (!product?.tracksInventory) continue;
+        const move = await this.inventory.applyMovement({
+          productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: inv.id, userId,
+        }, tx);
+        if (move) {
+          await this.posting.postCogs(
+            { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
+            tx, userId,
+          );
+        }
+      }
+
+      // Auto-approved (approvals disabled) → post the issued GL entry now, since
+      // approveInvoice won't be called for this invoice.
+      if (inv.approvalStatus === 'approved') {
+        await this.posting.postInvoiceIssued(inv, tx, userId);
+      }
+      return inv;
+    });
 
     await this.timeline.log('invoice.created', `Invoice ${invoice.invoiceNumber} created`, invoice.id, 'Invoice', { total: invoice.total, currency: invoice.currency }, userId);
     return toClient(invoice);
@@ -276,7 +290,12 @@ export class InvoicesService {
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before sending');
-    if (invoice.status !== 'draft') throw new BadRequestException('Invoice has already been sent');
+    // Idempotent: re-sending an already-sent invoice (double-click, retry) is a
+    // no-op that returns the current invoice, not a 400.
+    if (invoice.status !== 'draft') {
+      const full = await this.prisma.invoice.findUnique({ where: { id }, include: INVOICE_INCLUDE });
+      return toClient(full);
+    }
     const updated = await this.prisma.invoice.update({
       where: { id },
       data: { status: 'sent' },
@@ -375,12 +394,17 @@ export class InvoicesService {
     const steps = await this.approvals.listSteps('Invoice', id);
     if (steps.length) {
       await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason, userPermissions);
-      const updated = await this.prisma.invoice.update({
-        where: { id },
-        // Clear any prior approval: rejecting a previously-approved invoice must
-        // not leave stale approvedBy/approvedAt behind.
-        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
-        include: INVOICE_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        // Reverse the issued GL entry that approval posted (idempotent no-op when
+        // nothing was posted). A later re-approval re-posts under a versioned id.
+        await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
+        return tx.invoice.update({
+          where: { id },
+          // Clear any prior approval: rejecting a previously-approved invoice must
+          // not leave stale approvedBy/approvedAt behind.
+          data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+          include: INVOICE_INCLUDE,
+        });
       });
       return toClient(updated);
     }
@@ -388,11 +412,14 @@ export class InvoicesService {
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to reject invoices');
     if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject an invoice you created');
-    const updated = await this.prisma.invoice.update({
-      where: { id },
-      // Clear any prior approval (see chain path above).
-      data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
-      include: INVOICE_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
+      return tx.invoice.update({
+        where: { id },
+        // Clear any prior approval (see chain path above).
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+        include: INVOICE_INCLUDE,
+      });
     });
     return toClient(updated);
   }

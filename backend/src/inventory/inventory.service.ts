@@ -26,8 +26,6 @@ type StockMovementRow = Prisma.StockMovementGetPayload<object>;
 
 @Injectable()
 export class InventoryService {
-  private defaultWarehouseId: string | null = null;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly workspaceConfig: WorkspaceConfigService,
@@ -100,19 +98,20 @@ export class InventoryService {
       await db.stockCostLayer.update({ where: { id: l.id }, data: { remainingQty: { decrement: take } } });
     }
     // Legacy stock with no layers (pre-costing): value the remainder at avg.
-    if (remaining > 1e-9) { totalCost += remaining * fallback; remaining = 0; }
+    if (remaining > 1e-9) totalCost += remaining * fallback;
     return { unitCost: need > 0 ? totalCost / need : 0, totalCost };
   }
 
   /** Resolves an explicit warehouse, else the (cached) default warehouse id. */
   private async resolveWarehouseId(db: Db, warehouseId?: string): Promise<string> {
     if (warehouseId) return warehouseId;
-    if (this.defaultWarehouseId) return this.defaultWarehouseId;
+    // Resolve the default each call. Memoizing it on this singleton would keep
+    // routing stock to a stale warehouse after an admin changes which one is
+    // default (or deactivates/soft-deletes it) until the process restarts.
     const wh = await db.warehouse.findFirst({
       where: { isDefault: true, isActive: true, deletedAt: null },
     });
     if (!wh) throw new BadRequestException('No default warehouse configured');
-    this.defaultWarehouseId = wh.id;
     return wh.id;
   }
 
@@ -138,11 +137,14 @@ export class InventoryService {
   private async applyMovementTx(input: MovementInput, db: Prisma.TransactionClient): Promise<StockMovementRow> {
     const warehouseId = await this.resolveWarehouseId(db, input.warehouseId);
 
-    // Serialize concurrent movers of this exact (product, warehouse) row.
+    // Serialize concurrent movers of this exact (product, warehouse). A row lock
+    // (SELECT … FOR UPDATE) cannot cover the first-ever movement — no StockItem
+    // row exists yet to lock, so two concurrent first movements would both read a
+    // zero snapshot and race the upsert. A transaction-scoped advisory lock keyed
+    // on the (product, warehouse) pair serializes regardless of row existence and
+    // releases automatically at commit.
     await db.$queryRaw(Prisma.sql`
-      SELECT id FROM "StockItem"
-      WHERE "productId" = ${input.productId} AND "warehouseId" = ${warehouseId}
-      FOR UPDATE
+      SELECT pg_advisory_xact_lock(hashtext(${input.productId}), hashtext(${warehouseId}))
     `);
 
     const current = await db.stockItem.findUnique({
@@ -162,14 +164,19 @@ export class InventoryService {
     const newQty = oldQty + input.qty;
     let unitCost: number;
     let newTotal: number;
+    // For a FIFO return, the date its restored layer re-enters the queue at —
+    // the original outbound's date, so returned units are consumed ahead of
+    // stock purchased after the sale (rather than dumped at the back as "newest").
+    let sourceReceivedAt: Date | undefined;
 
     if (input.qty > 0) {
       // Inbound. A return reuses its originating outbound move's exact unit cost.
       if (input.sourceMovementId) {
         const orig = await db.stockMovement.findUnique({
-          where: { id: input.sourceMovementId }, select: { unitCost: true },
+          where: { id: input.sourceMovementId }, select: { unitCost: true, createdAt: true },
         });
         unitCost = Number(orig?.unitCost ?? input.unitCost ?? oldAvg);
+        sourceReceivedAt = orig?.createdAt;
       } else {
         unitCost = input.unitCost ?? oldAvg;
       }
@@ -212,13 +219,16 @@ export class InventoryService {
       },
     });
 
-    // FIFO inbound creates a new cost layer for later consumption.
+    // FIFO inbound creates a new cost layer for later consumption. A return
+    // (sourceMovementId set) re-enters at the original outbound's date so it
+    // keeps its historical FIFO position instead of jumping to the back.
     if (input.qty > 0 && method === 'fifo') {
       await db.stockCostLayer.create({
         data: {
           productId: input.productId, warehouseId,
           remainingQty: input.qty, originalQty: input.qty,
-          unitCost, sourceMovementId: movement.id, receivedAt: movement.createdAt,
+          unitCost, sourceMovementId: movement.id,
+          receivedAt: sourceReceivedAt ?? movement.createdAt,
         },
       });
     }

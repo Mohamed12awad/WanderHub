@@ -90,7 +90,8 @@ export class StatementsService {
   /** Income statement over [start, end]: movement of income/expense accounts. */
   async profitAndLoss(start?: string, end?: string) {
     const endAt = end ? endOfDay(end) : undefined;
-    const startAt = start ? new Date(new Date(start).setHours(0, 0, 0, 0) - 1) : undefined;
+    // 1ms before UTC midnight of `start` — exclusive lower bound for the period.
+    const startAt = start ? new Date(startOfDay(start).getTime() - 1) : undefined;
     const [endBal, startBal, accounts] = await Promise.all([
       this.closingBalances(endAt),
       startAt ? this.closingBalances(startAt) : Promise.resolve(new Map<string, number>()),
@@ -155,7 +156,8 @@ export class StatementsService {
   /** Cash flow over [start, end]: net change on cash/bank GL accounts. */
   async cashFlow(start?: string, end?: string) {
     const endAt = end ? endOfDay(end) : undefined;
-    const startAt = start ? new Date(new Date(start).setHours(0, 0, 0, 0) - 1) : undefined;
+    // 1ms before UTC midnight of `start` — exclusive lower bound for the period.
+    const startAt = start ? new Date(startOfDay(start).getTime() - 1) : undefined;
     const [endBal, startBal, cashAccounts] = await Promise.all([
       this.closingBalances(endAt),
       startAt ? this.closingBalances(startAt) : Promise.resolve(new Map<string, number>()),
@@ -181,8 +183,17 @@ export class StatementsService {
   }
 }
 
+// Journal `date`s are stored in UTC, so day boundaries must be computed in UTC.
+// A local-time setHours would shift the cutoff by the server's offset and
+// misclassify entries near midnight / the period edge.
 function endOfDay(date: string): Date {
   const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfDay(date: string): Date {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }

@@ -1153,6 +1153,10 @@ model VendorBill {
   purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   status          String         @default("draft")
   currency        String         @default("EGP")
+  // Foreign→base rate captured at bill creation, so AP is booked and later
+  // relieved at the historical rate (mirrors Invoice.exchangeRate). Without it,
+  // payments would relieve AP at the current market rate and never clear.
+  exchangeRate    Float?
   subtotal        Decimal        @default(0) @db.Decimal(18, 4)
   taxRate         Float          @default(0)
   // Whether line prices already include tax (back-calculated). Mirrors Invoice. See finance.math.ts.

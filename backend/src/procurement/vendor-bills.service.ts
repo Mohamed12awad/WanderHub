@@ -53,7 +53,17 @@ export class VendorBillsService {
   private async postBillIssued(billId: string, userId: string) {
     const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
     if (!bill) return;
-    await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
+    // Re-post under a versioned sourceId when a prior (reversed) entry exists, so
+    // re-approval after a reject re-recognizes AP instead of no-opping. See the
+    // identical pattern in invoices.service postInvoiceIssued.
+    const prior = await this.prisma.journalEntry.findFirst({
+      where: { sourceType: 'VendorBill', sourceId: { startsWith: billId } }, select: { id: true },
+    });
+    await this.posting.postVendorBill(
+      bill, undefined, userId,
+      { useGrni: await this.wasReceived(bill.purchaseOrderId) },
+      prior ? `${billId}#r${Date.now()}` : undefined,
+    );
   }
 
   /** True if the linked PO has been received into stock (GRNI was accrued). */
@@ -143,11 +153,15 @@ export class VendorBillsService {
     const totals = calcTotals(items, taxRate, taxInclusive);
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const enabled = await this.approvals.isEnabled('vendor_bills');
+    // Pin the foreign→base rate now so AP is booked and later relieved at the
+    // historical rate (toBase(1, ccy) yields the rate; 1 for base/unknown).
+    const exchangeRate = await this.currency.toBase(1, (data.currency as string) ?? 'EGP');
 
     const bill = await this.prisma.vendorBill.create({
       data: {
         ...data,
         billNumber,
+        exchangeRate,
         taxRate,
         taxInclusive,
         subtotal: totals.subtotal,
@@ -273,11 +287,16 @@ export class VendorBillsService {
     const steps = await this.approvals.listSteps('VendorBill', id);
     if (steps.length) {
       await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'reject', reason);
-      const updated = await this.prisma.vendorBill.update({
-        where: { id },
-        // Clear any prior approval so a rejected bill never keeps stale approvedBy/approvedAt.
-        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
-        include: BILL_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        // Reverse the issued GL entry that approval posted (idempotent no-op when
+        // nothing was posted). A later re-approval re-posts under a versioned id.
+        await this.posting.reverseLive('VendorBill', id, { createdById: userId }, tx);
+        return tx.vendorBill.update({
+          where: { id },
+          // Clear any prior approval so a rejected bill never keeps stale approvedBy/approvedAt.
+          data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+          include: BILL_INCLUDE,
+        });
       });
       await this.timeline.log('bill.rejected', 'Vendor Bill rejected', id, 'VendorBill', { reason }, userId);
       return toClient(updated);
@@ -286,11 +305,14 @@ export class VendorBillsService {
     const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to reject');
 
-    const updated = await this.prisma.vendorBill.update({
-      where: { id },
-      // Clear any prior approval (see chain path above).
-      data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
-      include: BILL_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('VendorBill', id, { createdById: userId }, tx);
+      return tx.vendorBill.update({
+        where: { id },
+        // Clear any prior approval (see chain path above).
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+        include: BILL_INCLUDE,
+      });
     });
     await this.timeline.log('bill.rejected', 'Vendor Bill rejected', id, 'VendorBill', { reason }, userId);
     return toClient(updated);
@@ -310,9 +332,10 @@ export class VendorBillsService {
       const fresh = await tx.vendorBill.findUnique({ where: { id: billId } });
       if (!fresh) throw new NotFoundException('Vendor bill not found');
       const outstanding = Number(fresh.total) - Number(fresh.totalPaid ?? 0);
-      // Compare in the bill currency: convert foreign-currency payments so an
-      // overpayment is caught regardless of the payment currency.
-      const amountInBillCcy = await this.currency.convert(body.amount, payCurrency, fresh.currency);
+      // Compare in the bill currency: convert foreign-currency payments at the
+      // bill's recorded rate so an overpayment is caught regardless of the payment
+      // currency (mirrors the invoice path).
+      const amountInBillCcy = await this.currency.convert(body.amount, payCurrency, fresh.currency, undefined, fresh.exchangeRate);
       if (amountInBillCcy > outstanding + paymentTolerance(fresh.currency)) {
         throw new BadRequestException(
           `Payment of ${body.amount} ${payCurrency} exceeds the outstanding balance of ${outstanding.toFixed(2)} ${fresh.currency}`,
@@ -403,6 +426,7 @@ export class VendorBillsService {
         supplierId: po.supplierId,
         purchaseOrderId: po.id,
         currency: po.currency ?? 'EGP',
+        exchangeRate: await this.currency.toBase(1, po.currency ?? 'EGP'),
         taxRate: po.taxRate,
         subtotal: po.subtotal,
         tax: po.tax,

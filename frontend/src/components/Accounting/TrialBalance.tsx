@@ -11,6 +11,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { getTrialBalance } from "@/utils/api";
 import { PageShell } from "@/components/common/PageShell";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ErrorState } from "@/components/common/ErrorState";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TBRow { accountId: string; code: string; name: string; type: string; debit: string; credit: string }
@@ -22,7 +23,7 @@ export default function TrialBalance() {
   const { tr } = useLanguage();
   const a = tr.accounting;
   const [asOf, setAsOf] = useState("");
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.accounting.trialBalance(asOf || undefined),
     queryFn: () => getTrialBalance(asOf ? { asOf } : undefined),
     staleTime: 15000,
@@ -54,7 +55,9 @@ export default function TrialBalance() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
+          {isError ? (
+            <ErrorState onRetry={() => refetch()} />
+          ) : isLoading ? (
             <div className="py-12 text-center text-sm text-muted-foreground">{a.loading}</div>
           ) : !tb || tb.rows.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">{a.noPostedActivity}</div>

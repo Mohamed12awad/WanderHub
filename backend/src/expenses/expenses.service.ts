@@ -41,7 +41,12 @@ export class ExpensesService {
       include: { expenses: true },
     });
     if (!report) return;
-    await this.posting.postExpenseReport(report, undefined, userId);
+    // Re-post under a versioned sourceId when a prior (reversed) entry exists, so
+    // re-approval after a reject re-recognizes the expense instead of no-opping.
+    const prior = await this.prisma.journalEntry.findFirst({
+      where: { sourceType: 'ExpenseReport', sourceId: { startsWith: id } }, select: { id: true },
+    });
+    await this.posting.postExpenseReport(report, undefined, userId, prior ? `${id}#r${Date.now()}` : undefined);
   }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -54,7 +59,10 @@ export class ExpensesService {
 
   private canUserApprove(approverRoles: string[], userRole: string): boolean {
     if (['admin', 'super admin'].includes(userRole)) return true;
-    if (!approverRoles.length) return true;
+    // Approvals enabled but no roles configured ⇒ admins only (above). Matches
+    // every sibling module (invoices/quotes/sales-orders/vendor-bills/POs); a
+    // `return true` here would let any expenses:approve holder approve.
+    if (!approverRoles.length) return false;
     return approverRoles.includes(userRole);
   }
 
@@ -219,10 +227,17 @@ export class ExpensesService {
     const steps = await this.approvals.listSteps('ExpenseReport', id);
     if (steps.length) {
       await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'reject', reason);
-      const updated = await this.prisma.expenseReport.update({
-        where: { id },
-        data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
-        include: EXPENSE_REPORT_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        // Reverse the issued GL entry that approval posted (idempotent no-op when
+        // nothing was posted). A later re-approval re-posts under a versioned id.
+        await this.posting.reverseLive('ExpenseReport', id, { createdById: userId }, tx);
+        return tx.expenseReport.update({
+          where: { id },
+          // Clear any prior approval: the rejecter is not the approver, and a
+          // rejected report must not keep stale approvedBy/approvedAt.
+          data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+          include: EXPENSE_REPORT_INCLUDE,
+        });
       });
       await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
       return toClient(updated);
@@ -231,10 +246,14 @@ export class ExpensesService {
     const { approverRoles } = await this.getApprovalConfig('expenses');
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to reject expense reports');
     if (report.userId === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot reject an expense report you created');
-    const updated = await this.prisma.expenseReport.update({
-      where: { id },
-      data: { approvalStatus: 'rejected', approvedById: userId, approvedAt: new Date(), rejectionReason: reason },
-      include: EXPENSE_REPORT_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('ExpenseReport', id, { createdById: userId }, tx);
+      return tx.expenseReport.update({
+        where: { id },
+        // Clear any prior approval (see chain path above).
+        data: { approvalStatus: 'rejected', approvedById: null, approvedAt: null, rejectionReason: reason },
+        include: EXPENSE_REPORT_INCLUDE,
+      });
     });
     await this.timeline.log('expense.rejected', `Expense report "${report.title}" rejected`, id, 'Expense', { reason }, userId);
     return toClient(updated);

@@ -8,6 +8,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { getIncomeStatement } from "@/utils/api";
 import { PageShell } from "@/components/common/PageShell";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ErrorState } from "@/components/common/ErrorState";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Row { code: string; name: string; amount: string }
@@ -22,7 +23,7 @@ export default function ProfitLoss() {
   const [start, setStart] = useState(yearStart());
   const [end, setEnd] = useState(today());
   const accounting = tr.accounting;
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.accounting.profitLoss(start, end),
     queryFn: () => getIncomeStatement({ start, end }),
     staleTime: 15000,
@@ -63,7 +64,9 @@ export default function ProfitLoss() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading || !pl ? (
+          {isError ? (
+            <ErrorState onRetry={() => refetch()} />
+          ) : isLoading || !pl ? (
             <div className="py-12 text-center text-sm text-muted-foreground">{accounting.loading}</div>
           ) : (
             <Table>

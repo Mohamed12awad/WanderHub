@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -10,7 +10,22 @@ export class ApiKeysService {
 
   /** Creates a key and returns the raw secret EXACTLY ONCE (never stored plaintext). */
   async create(dto: CreateApiKeyDto, creator: AuthUser) {
-    const userId = dto.userId || creator.id;
+    let userId = creator.id;
+    // Binding a key to another user is an admin-only action: the key inherits
+    // that user's role + permissions at request time (see ApiKeyGuard), so
+    // letting any settings:manage holder target an arbitrary user is privilege
+    // escalation (mint a key bound to a super admin, then call /public/v1 as
+    // them). Restrict cross-user binding to super admins / '*' holders and
+    // require the target to be a real, active user.
+    if (dto.userId && dto.userId !== creator.id) {
+      const isSuperAdmin = creator.role === 'super admin' || creator.permissions.includes('*');
+      if (!isSuperAdmin) {
+        throw new ForbiddenException('You can only create API keys bound to your own user.');
+      }
+      const target = await this.prisma.user.findFirst({ where: { id: dto.userId, active: true } });
+      if (!target) throw new BadRequestException('Target user not found or inactive.');
+      userId = target.id;
+    }
     const raw = `nh_${randomBytes(24).toString('hex')}`;
     const keyHash = createHash('sha256').update(raw).digest('hex');
     const prefix = raw.slice(0, 11);

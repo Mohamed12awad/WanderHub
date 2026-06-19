@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { getBalanceSheet } from "@/utils/api";
 import { PageShell } from "@/components/common/PageShell";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ErrorState } from "@/components/common/ErrorState";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Row { code: string; name: string; amount: string }
@@ -24,7 +25,7 @@ export default function BalanceSheet() {
   const { tr } = useLanguage();
   const [asOf, setAsOf] = useState(today());
   const accounting = tr.accounting;
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.accounting.balanceSheet(asOf),
     queryFn: () => getBalanceSheet({ asOf }),
     staleTime: 15000,
@@ -67,7 +68,9 @@ export default function BalanceSheet() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading || !bs ? (
+          {isError ? (
+            <ErrorState onRetry={() => refetch()} />
+          ) : isLoading || !bs ? (
             <div className="py-12 text-center text-sm text-muted-foreground">{accounting.loading}</div>
           ) : (
             <Table>
