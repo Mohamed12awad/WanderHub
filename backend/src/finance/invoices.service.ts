@@ -172,6 +172,64 @@ export class InvoicesService {
     return { invoice: toClient(invoice), payments: toClient(payments) };
   }
 
+  /**
+   * Creates an invoice together with everything that must be true the moment it
+   * exists — its approval chain, the stock it draws, its COGS, and its issued GL
+   * entry — inside the CALLER's transaction.
+   *
+   * Extracted so quote→invoice conversion produces identical financial effects
+   * (audit 2026-08, P0: conversion wrote the invoice directly and posted
+   * nothing, so an approved invoice could carry no AR, revenue, tax, stock
+   * movement or COGS). Conversion has its own concurrency guard to run in the
+   * same transaction, which is why this takes a `tx` rather than opening one.
+   */
+  async createInvoiceInTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      data: Prisma.InvoiceUncheckedCreateInput;
+      /** Line items used to draw stock; only `productId`/`quantity` are read. */
+      lineItems: { productId?: string | null; quantity: number }[];
+      approvalsEnabled: boolean;
+      userId: string;
+    },
+  ) {
+    const { data, lineItems, approvalsEnabled, userId } = params;
+    const inv = await tx.invoice.create({ data, include: INVOICE_INCLUDE });
+
+    // Build the approval chain. If no step applies (amount below thresholds),
+    // the document is auto-approved.
+    if (approvalsEnabled) {
+      const overall = await this.approvals.initSteps(tx, 'Invoice', inv.id, 'invoices', Number(inv.total));
+      if (overall === 'approved') {
+        await tx.invoice.update({ where: { id: inv.id }, data: { approvalStatus: 'approved' } });
+        (inv as { approvalStatus: string }).approvalStatus = 'approved';
+      }
+    }
+
+    // A sale draws stock-tracked items out of stock and books COGS.
+    for (const it of lineItems) {
+      if (!it.productId) continue;
+      const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+      if (!product?.tracksInventory) continue;
+      const move = await this.inventory.applyMovement({
+        productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: inv.id, userId,
+      }, tx);
+      if (move) {
+        await this.posting.postCogs(
+          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
+          tx, userId,
+        );
+      }
+    }
+
+    // Auto-approved (approvals disabled) → post the issued GL entry now, since
+    // approveInvoice won't be called for this invoice.
+    if (inv.approvalStatus === 'approved') {
+      await this.posting.postInvoiceIssued(inv, tx, userId);
+    }
+    return inv;
+  }
+
   async createInvoice(body: CreateInvoiceDto, userId: string) {
     const { items = [], taxRate = 0, customer, deal, customFields: rawCf, taxInclusive: bodyTaxInclusive, ...rest } = body;
     const taxInclusive = bodyTaxInclusive ?? (await this.defaultTaxInclusive());
@@ -184,8 +242,8 @@ export class InvoicesService {
     // one atomic unit. Previously these ran sequentially outside any transaction,
     // so a mid-loop failure left partial stock depletion and partial/missing
     // COGS/issued entries — the very drift reconciliation.service is built to detect.
-    const invoice = await this.prisma.$transaction(async (tx) => {
-      const inv = await tx.invoice.create({
+    const invoice = await this.prisma.$transaction((tx) =>
+      this.createInvoiceInTx(tx, {
         data: {
           ...rest,
           ...(customFields !== undefined ? { customFields } : {}),
@@ -202,41 +260,11 @@ export class InvoicesService {
           createdById: userId,
           items: { create: totals.items.map((it, idx) => ({ ...it, order: idx })) },
         } as Prisma.InvoiceUncheckedCreateInput,
-        include: INVOICE_INCLUDE,
-      });
-
-      // Build the approval chain. If no step applies (amount below thresholds),
-      // the document is auto-approved.
-      if (enabled) {
-        const overall = await this.approvals.initSteps(tx, 'Invoice', inv.id, 'invoices', Number(inv.total));
-        if (overall === 'approved') {
-          await tx.invoice.update({ where: { id: inv.id }, data: { approvalStatus: 'approved' } });
-          (inv as { approvalStatus: string }).approvalStatus = 'approved';
-        }
-      }
-      // A sale draws stock-tracked items out of stock and books COGS.
-      for (const it of totals.items) {
-        if (!it.productId) continue;
-        const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
-        if (!product?.tracksInventory) continue;
-        const move = await this.inventory.applyMovement({
-          productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: inv.id, userId,
-        }, tx);
-        if (move) {
-          await this.posting.postCogs(
-            { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
-            tx, userId,
-          );
-        }
-      }
-
-      // Auto-approved (approvals disabled) → post the issued GL entry now, since
-      // approveInvoice won't be called for this invoice.
-      if (inv.approvalStatus === 'approved') {
-        await this.posting.postInvoiceIssued(inv, tx, userId);
-      }
-      return inv;
-    });
+        lineItems: totals.items,
+        approvalsEnabled: enabled,
+        userId,
+      }),
+    );
 
     await this.timeline.log('invoice.created', `Invoice ${invoice.invoiceNumber} created`, invoice.id, 'Invoice', { total: invoice.total, currency: invoice.currency }, userId);
     return toClient(invoice);

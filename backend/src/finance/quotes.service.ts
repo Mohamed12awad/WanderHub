@@ -11,6 +11,7 @@ import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
+import { InvoicesService } from './invoices.service';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -25,13 +26,9 @@ const QUOTE_INCLUDE = {
   updatedBy: { select: { id: true, name: true } },
 };
 
-// Minimal include for the invoice returned by quote→invoice conversion.
-const INVOICE_RETURN_INCLUDE = {
-  customer: { select: { id: true, name: true, phone: true } },
-  deal: { select: { id: true, title: true } },
-  fromQuote: { select: { id: true, quoteNumber: true } },
-  items: { orderBy: { order: 'asc' as const } },
-};
+// The invoice returned by conversion now carries InvoicesService's own include
+// (a superset of the old local one), since conversion routes through the shared
+// creation path.
 
 @Injectable()
 export class QuotesService {
@@ -42,6 +39,7 @@ export class QuotesService {
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
     private readonly visibility: VisibilityService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -236,7 +234,15 @@ export class QuotesService {
         // Atomically claim the quote: only the first converter flips
         // convertedToInvoiceId from null. A concurrent request updating 0 rows
         // means it was already converted — bail out.
-        const created = await tx.invoice.create({
+        // Audit 2026-08 (P0): this used to write the invoice row directly and
+        // post nothing, so with invoice approvals disabled a converted quote
+        // produced an APPROVED invoice carrying no AR, revenue, tax, stock
+        // movement or COGS — revenue simply missing from the books. Routed
+        // through the shared creation path so conversion has identical
+        // financial effects to creating the invoice normally. It runs on this
+        // transaction, so the claim below still rolls everything back on a
+        // lost race.
+        const created = await this.invoices.createInvoiceInTx(tx, {
           data: {
             invoiceNumber,
             title: quote.title,
@@ -266,8 +272,10 @@ export class QuotesService {
                 order: it.order,
               })),
             },
-          },
-          include: INVOICE_RETURN_INCLUDE,
+          } as Prisma.InvoiceUncheckedCreateInput,
+          lineItems: quote.items,
+          approvalsEnabled: invoiceApprovalEnabled,
+          userId,
         });
 
         const claim = await tx.quote.updateMany({
