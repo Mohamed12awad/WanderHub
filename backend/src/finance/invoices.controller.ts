@@ -29,6 +29,12 @@ export class InvoicesController {
     return this.invoices.getInvoices(query, user);
   }
 
+  @Get('invoices/summary')
+  @RequirePermission('invoices:view')
+  getSummary(@CurrentUser() user: AuthUser) {
+    return this.invoices.getInvoiceSummary(user);
+  }
+
   @Get('invoices/:id')
   @RequirePermission('invoices:view')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {

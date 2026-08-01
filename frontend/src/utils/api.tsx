@@ -16,6 +16,18 @@ import {
 
 import { getAccessToken, setAccessToken, clearAccessToken } from "./tokenStore";
 
+type FinanceListParams = {
+  page?: number;
+  limit?: number;
+  q?: string;
+  sort?: string;
+  dir?: "asc" | "desc";
+  status?: string;
+  customer?: string;
+  deal?: string;
+  [key: string]: string | number | undefined;
+};
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   // Send the httpOnly refresh cookie on requests that need it (refresh/logout).
@@ -356,7 +368,7 @@ export const deleteTask = (id: string): Promise<void> => api.delete(`/tasks/${id
 export const completeTask = (id: string) => api.patch(`/tasks/${id}/complete`);
 
 // Finance — Quotes
-export const getQuotes = (params?: { status?: string; customer?: string; deal?: string }) =>
+export const getQuotes = (params?: FinanceListParams) =>
   api.get("/finance/quotes", { params });
 export const getQuoteById = (id: string) => api.get(`/finance/quotes/${id}`);
 export const createQuote = (data: QuoteFormData) => api.post("/finance/quotes", data);
@@ -389,8 +401,9 @@ export const getSalesOrderPurchaseOrderPrefill = (id: string) =>
   api.get(`/sales-orders/${id}/purchase-order-prefill`);
 
 // Finance — Invoices
-export const getInvoices = (params?: { status?: string; customer?: string; deal?: string }) =>
+export const getInvoices = (params?: FinanceListParams) =>
   api.get("/finance/invoices", { params });
+export const getInvoiceSummary = () => api.get("/finance/invoices/summary");
 export const getInvoiceById = (id: string) => api.get(`/finance/invoices/${id}`);
 export const createInvoice = (data: InvoiceFormData) => api.post("/finance/invoices", data);
 export const updateInvoice = (id: string, data: Partial<InvoiceFormData>) =>
@@ -472,7 +485,7 @@ export const getTaskStats = (params?: ReportFilters) =>
   api.get("/reports/task-stats", { params });
 
 // Finance — Payments
-export const getPayments = (params?: { page?: number; limit?: number }) =>
+export const getPayments = (params?: FinanceListParams) =>
   api.get("/finance/payments", { params });
 
 // Deals — create quote from deal

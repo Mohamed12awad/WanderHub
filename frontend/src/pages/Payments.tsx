@@ -14,6 +14,7 @@ const PAYMENT_METHODS = ["cash", "bank_transfer", "card", "cheque", "other"];
 const METHOD_LABELS: Record<string, string> = {
   cash: "Cash", bank_transfer: "Bank Transfer", card: "Card", cheque: "Cheque", other: "Other",
 };
+const PAYMENT_SORT_FIELDS: Record<string, string> = { Date: "date", Amount: "amount" };
 
 const PAYMENT_FILTER_CONFIGS: FilterConfig[] = [
   {
@@ -40,7 +41,7 @@ const PAYMENT_FILTER_CONFIGS: FilterConfig[] = [
   },
 ];
 
-// ── Client-side fetch wrapper ─────────────────────────────────────────────────
+// ── Server-side table query ───────────────────────────────────────────────────
 
 type TableParams = {
   page: number;
@@ -51,13 +52,6 @@ type TableParams = {
   dir?: "asc" | "desc";
 };
 
-function paginate<T>(list: T[], page: number, limit: number) {
-  const total = list.length;
-  const pages = Math.max(1, Math.ceil(total / limit));
-  const data = list.slice((page - 1) * limit, page * limit);
-  return { data, total, page, pages };
-}
-
 // ── Payments Page ─────────────────────────────────────────────────────────────
 
 const Payments: React.FC = () => {
@@ -67,47 +61,18 @@ const Payments: React.FC = () => {
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
   const invoiceMapRef = useRef<Map<string, string>>(new Map());
 
-  const fetchPaymentsForTable = useCallback(async (params: TableParams): Promise<{ data: ReturnType<typeof paginate<PaymentRecord>> }> => {
-    const resp = await getPayments({ page: 1, limit: 1000 });
-    let list: PaymentRecord[] = resp.data?.data ?? [];
-
+  const fetchPaymentsForTable = useCallback(async (params: TableParams) => {
+    const { filters = {}, sort, dir, ...pageParams } = params;
+    const serverSort = sort ? PAYMENT_SORT_FIELDS[sort] : undefined;
+    const resp = await getPayments({
+      ...pageParams,
+      ...filters,
+      ...(serverSort ? { sort: serverSort, dir } : {}),
+    });
+    const list: PaymentRecord[] = resp.data?.data ?? [];
     invoiceMapRef.current.clear();
     for (const p of list) invoiceMapRef.current.set(p._id, p.invoice._id);
-
-    if (params.q) {
-      const s = params.q.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.invoice?.invoiceNumber?.toLowerCase().includes(s) ||
-          p.invoice?.customer?.name?.toLowerCase().includes(s) ||
-          p.invoice?.title?.toLowerCase().includes(s) ||
-          p.reference?.toLowerCase().includes(s),
-      );
-    }
-
-    const f = params.filters ?? {};
-    if (f.method) list = list.filter((p) => p.method === f.method);
-    if (f.currency) list = list.filter((p) => p.currency === f.currency);
-    if (f.amount_min) list = list.filter((p) => p.amount >= Number(f.amount_min));
-    if (f.amount_max) list = list.filter((p) => p.amount <= Number(f.amount_max));
-    if (f.date_from) list = list.filter((p) => p.date >= f.date_from);
-    if (f.date_to) list = list.filter((p) => p.date <= f.date_to + "T23:59:59");
-
-    if (params.sort) {
-      const key = { Date: "date", Amount: "amount" }[params.sort] as keyof PaymentRecord | undefined;
-      if (key) {
-        list = [...list].sort((a, b) => {
-          const va = a[key] ?? "";
-          const vb = b[key] ?? "";
-          const d = params.dir ?? "desc";
-          if (va < vb) return d === "asc" ? -1 : 1;
-          if (va > vb) return d === "asc" ? 1 : -1;
-          return 0;
-        });
-      }
-    }
-
-    return { data: paginate(list, params.page, params.limit) };
+    return resp;
   }, []);
 
   const deletePayment = useCallback(async (paymentId: string) => {

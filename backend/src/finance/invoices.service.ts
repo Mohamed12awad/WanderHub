@@ -9,7 +9,7 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { EditPaymentDto } from './dto/edit-payment.dto';
 import { calcTotals, deriveInvoiceStatus, paymentTolerance } from './finance.math';
-import { UNPAGINATED_MAX } from '../common/paginate';
+import { dateRange, UNPAGINATED_MAX } from '../common/paginate';
 import { CurrencyService } from '../common/currency.service';
 import { withSerializableRetry } from '../common/prisma-retry';
 import { InventoryService } from '../inventory/inventory.service';
@@ -83,6 +83,31 @@ export class InvoicesService {
     return approverRoles.includes(userRole);
   }
 
+  private resolveInvoiceOrderBy(sort?: string, dir?: string): Prisma.InvoiceOrderByWithRelationInput {
+    if (!sort) return { createdAt: 'desc' };
+    const fields = {
+      invoiceNumber: 'invoiceNumber',
+      total: 'total',
+      dueDate: 'dueDate',
+    } as const;
+    const field = fields[sort as keyof typeof fields];
+    if (!field) throw new BadRequestException(`Unsupported invoice sort field: ${sort}`);
+    if (dir && dir !== 'asc' && dir !== 'desc') throw new BadRequestException(`Unsupported sort direction: ${dir}`);
+    return { [field]: dir === 'asc' ? 'asc' : 'desc' } as Prisma.InvoiceOrderByWithRelationInput;
+  }
+
+  private resolvePaymentOrderBy(sort?: string, dir?: string): Prisma.InvoicePaymentOrderByWithRelationInput {
+    if (!sort) return { date: 'desc' };
+    const fields = {
+      date: 'date',
+      amount: 'amount',
+    } as const;
+    const field = fields[sort as keyof typeof fields];
+    if (!field) throw new BadRequestException(`Unsupported payment sort field: ${sort}`);
+    if (dir && dir !== 'asc' && dir !== 'desc') throw new BadRequestException(`Unsupported sort direction: ${dir}`);
+    return { [field]: dir === 'asc' ? 'asc' : 'desc' } as Prisma.InvoicePaymentOrderByWithRelationInput;
+  }
+
   /**
    * Recomputes an invoice's totalPaid as the authoritative SUM of its payments,
    * derives its status, and keeps the linked deal's won/active state in sync.
@@ -139,25 +164,80 @@ export class InvoicesService {
   }
 
   async getInvoices(query: Record<string, string>, user: AuthUser) {
-    const { status, customer, deal, page, limit: limitRaw, q } = query;
+    const {
+      status, customer, deal, page, limit: limitRaw, q, currency, approvalStatus,
+      total_min, total_max, issueDate_from, issueDate_to, dueDate_from, dueDate_to,
+      createdAt_from, createdAt_to,
+    } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const where: Prisma.InvoiceWhereInput = { deletedAt: null, ...scopeWhere };
     if (status) where.status = status as Prisma.InvoiceWhereInput['status'];
     if (customer) where.customerId = customer;
     if (deal) where.dealId = deal;
-    if (q) where.OR = [{ invoiceNumber: { contains: q, mode: 'insensitive' } }, { title: { contains: q, mode: 'insensitive' } }];
+    if (q) where.OR = [
+      { invoiceNumber: { contains: q, mode: 'insensitive' } },
+      { title: { contains: q, mode: 'insensitive' } },
+      { customer: { name: { contains: q, mode: 'insensitive' } } },
+      { deal: { title: { contains: q, mode: 'insensitive' } } },
+    ];
+    if (currency) where.currency = currency;
+    if (approvalStatus) where.approvalStatus = approvalStatus as Prisma.InvoiceWhereInput['approvalStatus'];
+    if (total_min || total_max) {
+      const range: { gte?: number; lte?: number } = {};
+      if (total_min) range.gte = this.parseListNumber(total_min, 'total_min');
+      if (total_max) range.lte = this.parseListNumber(total_max, 'total_max');
+      where.total = range;
+    }
+    const issueDateRange = dateRange(issueDate_from, issueDate_to);
+    if (issueDateRange) where.issueDate = issueDateRange;
+    const dueDateRange = dateRange(dueDate_from, dueDate_to);
+    if (dueDateRange) where.dueDate = dueDateRange;
+    const createdAtRange = dateRange(createdAt_from, createdAt_to);
+    if (createdAtRange) where.createdAt = createdAtRange;
+    const orderBy = this.resolveInvoiceOrderBy(query.sort, query.dir);
 
     if (!page) {
-      const invoices = await this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy: { createdAt: 'desc' }, take: UNPAGINATED_MAX });
+      const invoices = await this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy, take: UNPAGINATED_MAX });
       return toClient(invoices);
     }
     const p = Math.max(1, parseInt(page) || 1);
     const limit = Math.min(100, parseInt(limitRaw) || 25);
     const [data, total] = await Promise.all([
-      this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy: { createdAt: 'desc' }, skip: (p - 1) * limit, take: limit }),
+      this.prisma.invoice.findMany({ where, include: INVOICE_INCLUDE, orderBy, skip: (p - 1) * limit, take: limit }),
       this.prisma.invoice.count({ where }),
     ]);
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+  }
+
+  async getInvoiceSummary(user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
+    const where: Prisma.InvoiceWhereInput = { deletedAt: null, ...scopeWhere };
+    const [allByCurrency, outstandingByCurrency, overdue] = await Promise.all([
+      this.prisma.invoice.groupBy({
+        by: ['currency'],
+        where,
+        _sum: { total: true, totalPaid: true },
+      }),
+      this.prisma.invoice.groupBy({
+        by: ['currency'],
+        where: { ...where, status: { in: ['overdue', 'sent', 'partially_paid'] } },
+        _sum: { total: true, totalPaid: true },
+      }),
+      this.prisma.invoice.count({ where: { ...where, status: 'overdue' } }),
+    ]);
+    return {
+      hasInvoices: allByCurrency.length > 0,
+      invoiced: allByCurrency
+        .map((row) => [row.currency, Number(row._sum.total ?? 0)] as [string, number])
+        .filter(([, value]) => value > 0),
+      collected: allByCurrency
+        .map((row) => [row.currency, Number(row._sum.totalPaid ?? 0)] as [string, number])
+        .filter(([, value]) => value > 0),
+      outstanding: outstandingByCurrency
+        .map((row) => [row.currency, Number(row._sum.total ?? 0) - Number(row._sum.totalPaid ?? 0)] as [string, number])
+        .filter(([, value]) => value > 0),
+      overdue,
+    };
   }
 
   async getInvoiceById(id: string, user?: AuthUser) {
@@ -669,7 +749,24 @@ export class InvoicesService {
     const limit = Math.min(100, parseInt(query.limit) || 25);
     const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     // Exclude payments whose invoice has been (soft) deleted; scope to user's visible invoices.
-    const where = { invoice: { deletedAt: null, ...scopeWhere } };
+    const where: Prisma.InvoicePaymentWhereInput = { invoice: { deletedAt: null, ...scopeWhere } };
+    if (query.q) where.OR = [
+      { invoice: { invoiceNumber: { contains: query.q, mode: 'insensitive' } } },
+      { invoice: { customer: { name: { contains: query.q, mode: 'insensitive' } } } },
+      { invoice: { title: { contains: query.q, mode: 'insensitive' } } },
+      { reference: { contains: query.q, mode: 'insensitive' } },
+    ];
+    if (query.method) where.method = query.method;
+    if (query.currency) where.currency = query.currency;
+    if (query.amount_min || query.amount_max) {
+      const range: { gte?: number; lte?: number } = {};
+      if (query.amount_min) range.gte = this.parseListNumber(query.amount_min, 'amount_min');
+      if (query.amount_max) range.lte = this.parseListNumber(query.amount_max, 'amount_max');
+      where.amount = range;
+    }
+    const paymentDateRange = dateRange(query.date_from, query.date_to);
+    if (paymentDateRange) where.date = paymentDateRange;
+    const orderBy = this.resolvePaymentOrderBy(query.sort, query.dir);
     const [data, total] = await Promise.all([
       this.prisma.invoicePayment.findMany({
         where,
@@ -678,12 +775,18 @@ export class InvoicesService {
           createdBy: { select: { id: true, name: true } },
           account: { select: { id: true, name: true } },
         },
-        orderBy: { date: 'desc' },
+        orderBy,
         skip: (p - 1) * limit,
         take: limit,
       }),
       this.prisma.invoicePayment.count({ where }),
     ]);
     return { data: toClient(data), total, page: p, pages: Math.ceil(total / limit) };
+  }
+
+  private parseListNumber(value: string, field: string): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new BadRequestException(`Invalid numeric filter: ${field}`);
+    return parsed;
   }
 }

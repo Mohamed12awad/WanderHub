@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReceiptText, CircleDollarSign, AlertCircle } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  getQuotes, getInvoices, deleteQuote, deleteInvoice, convertQuoteToInvoice,
+  getQuotes, getInvoices, getInvoiceSummary, deleteQuote, deleteInvoice, convertQuoteToInvoice,
 } from "@/utils/api";
 import { GenericTable, FilterConfig } from "@/components/common/GenericTable";
 import { ViewSwitch } from "@/components/common/ViewSwitch";
@@ -23,7 +23,7 @@ const INVOICE_STATUSES: InvoiceStatus[] = ["draft", "sent", "partially_paid", "p
 const CURRENCIES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
 const APPROVAL_STATUSES = ["pending", "approved", "rejected"];
 
-// ── Client-side fetch wrappers ────────────────────────────────────────────────
+// ── Server-side table queries ─────────────────────────────────────────────────
 
 type TableParams = {
   page: number;
@@ -34,118 +34,33 @@ type TableParams = {
   dir?: "asc" | "desc";
 };
 
-function applySort<T extends Record<string, unknown>>(
-  list: T[],
-  sortMap: Record<string, string>,
-  sort: string | undefined,
-  dir: "asc" | "desc" | undefined,
-  computedFields?: Record<string, (item: T) => number | string>,
-): T[] {
-  const key = sort ? sortMap[sort] : "createdAt";
-  if (!key) return list;
-
-  return [...list].sort((a, b) => {
-    const va = computedFields?.[key] ? computedFields[key](a) : (a[key] ?? "");
-    const vb = computedFields?.[key] ? computedFields[key](b) : (b[key] ?? "");
-    const d = dir ?? "desc";
-    if (va < vb) return d === "asc" ? -1 : 1;
-    if (va > vb) return d === "asc" ? 1 : -1;
-    return 0;
-  });
+function serverParams(params: TableParams, sortMap: Record<string, string>) {
+  const { filters = {}, sort, dir, ...pageParams } = params;
+  const serverSort = sort ? sortMap[sort] : undefined;
+  return {
+    ...pageParams,
+    ...filters,
+    ...(serverSort ? { sort: serverSort, dir } : {}),
+  };
 }
 
-function paginate<T>(list: T[], page: number, limit: number) {
-  const total = list.length;
-  const pages = Math.max(1, Math.ceil(total / limit));
-  const data = list.slice((page - 1) * limit, page * limit);
-  return { data, total, page, pages };
+function fetchQuotesForTable(params: TableParams, sortMap: Record<string, string>) {
+  return getQuotes(serverParams(params, sortMap));
 }
 
-async function fetchQuotesForTable(params: TableParams, sortMap: Record<string, string>): Promise<{ data: ReturnType<typeof paginate<Quote>> }> {
-  const resp = await getQuotes();
-  let list: Quote[] = Array.isArray(resp.data) ? resp.data : [];
-
-  if (params.q) {
-    const s = params.q.toLowerCase();
-    list = list.filter(
-      (q) =>
-        q.title?.toLowerCase().includes(s) ||
-        q.quoteNumber?.toLowerCase().includes(s) ||
-        q.customer?.name?.toLowerCase().includes(s) ||
-        q.deal?.title?.toLowerCase().includes(s),
-    );
-  }
-
-  const f = params.filters ?? {};
-  if (f.status) list = list.filter((q) => q.status === f.status);
-  if (f.currency) list = list.filter((q) => q.currency === f.currency);
-  if (f.approvalStatus) list = list.filter((q) => (q.approvalStatus ?? "pending") === f.approvalStatus);
-  if (f.total_min) list = list.filter((q) => q.total >= Number(f.total_min));
-  if (f.total_max) list = list.filter((q) => q.total <= Number(f.total_max));
-  if (f.validUntil_from) list = list.filter((q) => q.validUntil && q.validUntil >= f.validUntil_from);
-  if (f.validUntil_to) list = list.filter((q) => q.validUntil && q.validUntil <= f.validUntil_to + "T23:59:59");
-  if (f.createdAt_from) list = list.filter((q) => q.createdAt >= f.createdAt_from);
-  if (f.createdAt_to) list = list.filter((q) => q.createdAt <= f.createdAt_to + "T23:59:59");
-
-  list = applySort(
-    list as unknown as Record<string, unknown>[],
-    sortMap,
-    params.sort,
-    params.dir ?? "desc",
-  ) as unknown as Quote[];
-
-  return { data: paginate(list, params.page, params.limit) };
-}
-
-async function fetchInvoicesForTable(params: TableParams, sortMap: Record<string, string>): Promise<{ data: ReturnType<typeof paginate<Invoice>> }> {
-  const resp = await getInvoices();
-  let list: Invoice[] = Array.isArray(resp.data) ? resp.data : [];
-
-  if (params.q) {
-    const s = params.q.toLowerCase();
-    list = list.filter(
-      (i) =>
-        i.title?.toLowerCase().includes(s) ||
-        i.invoiceNumber?.toLowerCase().includes(s) ||
-        i.customer?.name?.toLowerCase().includes(s) ||
-        i.deal?.title?.toLowerCase().includes(s),
-    );
-  }
-
-  const f = params.filters ?? {};
-  if (f.status) list = list.filter((i) => i.status === f.status);
-  if (f.currency) list = list.filter((i) => i.currency === f.currency);
-  if (f.approvalStatus) list = list.filter((i) => (i.approvalStatus ?? "pending") === f.approvalStatus);
-  if (f.total_min) list = list.filter((i) => i.total >= Number(f.total_min));
-  if (f.total_max) list = list.filter((i) => i.total <= Number(f.total_max));
-  if (f.issueDate_from) list = list.filter((i) => i.issueDate >= f.issueDate_from);
-  if (f.issueDate_to) list = list.filter((i) => i.issueDate <= f.issueDate_to + "T23:59:59");
-  if (f.dueDate_from) list = list.filter((i) => i.dueDate && i.dueDate >= f.dueDate_from);
-  if (f.dueDate_to) list = list.filter((i) => i.dueDate && i.dueDate <= f.dueDate_to + "T23:59:59");
-  if (f.createdAt_from) list = list.filter((i) => i.createdAt >= f.createdAt_from);
-  if (f.createdAt_to) list = list.filter((i) => i.createdAt <= f.createdAt_to + "T23:59:59");
-
-  list = applySort(
-    list as unknown as Record<string, unknown>[],
-    sortMap,
-    params.sort,
-    params.dir ?? "desc",
-    { "Outstanding": (i) => (i as unknown as Invoice).total - (i as unknown as Invoice).totalPaid },
-  ) as unknown as Invoice[];
-
-  return { data: paginate(list, params.page, params.limit) };
+function fetchInvoicesForTable(params: TableParams, sortMap: Record<string, string>) {
+  return getInvoices(serverParams(params, sortMap));
 }
 
 // ── Invoice summary bar ───────────────────────────────────────────────────────
 
-function groupByCurrency(invoices: Invoice[], getValue: (inv: Invoice) => number): [string, number][] {
-  const map: Record<string, number> = {};
-  for (const inv of invoices) {
-    const cur = inv.currency || "—";
-    map[cur] = (map[cur] ?? 0) + getValue(inv);
-  }
-  return Object.entries(map).filter(([, v]) => v > 0);
-}
+type InvoiceSummary = {
+  hasInvoices: boolean;
+  invoiced: [string, number][];
+  collected: [string, number][];
+  outstanding: [string, number][];
+  overdue: number;
+};
 
 function CurrencyAmounts({ entries, className }: { entries: [string, number][]; className?: string }) {
   if (entries.length === 0) return <span className={`font-semibold tabular-nums ${className ?? ""}`}>0</span>;
@@ -162,43 +77,36 @@ function CurrencyAmounts({ entries, className }: { entries: [string, number][]; 
   );
 }
 
-function InvoiceSummaryBar({ invoices }: { invoices: Invoice[] }) {
+function InvoiceSummaryBar({ summary }: { summary: InvoiceSummary }) {
   const { tr } = useLanguage();
   const f = tr.finance;
-  const invoicedByCur = groupByCurrency(invoices, (i) => i.total);
-  const collectedByCur = groupByCurrency(invoices, (i) => i.totalPaid);
-  const outstandingByCur = groupByCurrency(
-    invoices.filter((i) => ["overdue", "sent", "partially_paid"].includes(i.status)),
-    (i) => i.total - i.totalPaid,
-  );
-  const overdue = invoices.filter((i) => i.status === "overdue").length;
-  const hasOutstanding = outstandingByCur.length > 0;
+  const hasOutstanding = summary.outstanding.length > 0;
 
   return (
     <div className="flex flex-wrap items-center gap-4 text-sm">
       <div className="flex items-center gap-2">
         <ReceiptText className="h-3.5 w-3.5 text-purple-500 shrink-0" />
         <span className="text-muted-foreground text-xs">{f.invoiced}</span>
-        <CurrencyAmounts entries={invoicedByCur} />
+        <CurrencyAmounts entries={summary.invoiced} />
       </div>
       <div className="h-4 w-px bg-border hidden sm:block" />
       <div className="flex items-center gap-2">
         <CircleDollarSign className="h-3.5 w-3.5 text-green-500 shrink-0" />
         <span className="text-muted-foreground text-xs">{f.collected}</span>
-        <CurrencyAmounts entries={collectedByCur} className="text-green-600 dark:text-green-400" />
+        <CurrencyAmounts entries={summary.collected} className="text-green-600 dark:text-green-400" />
       </div>
       <div className="h-4 w-px bg-border hidden sm:block" />
       <div className="flex items-center gap-2">
         <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
         <span className="text-muted-foreground text-xs">{f.outstanding}</span>
         <CurrencyAmounts
-          entries={outstandingByCur}
+          entries={summary.outstanding}
           className={hasOutstanding ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}
         />
         {!hasOutstanding && <span className="font-semibold text-green-600 dark:text-green-400 tabular-nums">0</span>}
-        {overdue > 0 && (
+        {summary.overdue > 0 && (
           <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
-            {f.overdueCount(overdue)}
+            {f.overdueCount(summary.overdue)}
           </Badge>
         )}
       </div>
@@ -219,9 +127,7 @@ export function QuotesPage() {
   const [quotesView, setQuotesView] = useState<"list" | "board">("list");
   const quotesSwitch = <ViewSwitch active={quotesView} onChange={setQuotesView} />;
 
-  // Headers, sortable columns and the sort map are built from the same `tr` keys
-  // so the (translated) header labels stay in sync with the client-side sort —
-  // sorting keeps working after a language switch.
+  // GenericTable emits translated header labels; map them to stable API fields.
   const headers = useMemo(
     () => [f.quoteNumber, f.titleHeader, f.customer, f.status, f.approval, f.amount, f.validUntil, tr.common.created],
     [tr],
@@ -291,20 +197,20 @@ export function InvoicesPage() {
   const f = tr.finance;
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'invoices:delete');
 
-  const { data: allData } = useQuery({
-    queryKey: ["invoices-all"],
-    queryFn: () => getInvoices(),
+  const { data: summaryData } = useQuery({
+    queryKey: ["invoices-summary"],
+    queryFn: getInvoiceSummary,
     staleTime: 30_000
   });
-  const allInvoices: Invoice[] = allData?.data ?? [];
+  const summary: InvoiceSummary | undefined = summaryData?.data;
 
   const headers = useMemo(
     () => [f.invoiceNumber, f.titleHeader, f.customer, f.status, f.total, f.outstanding, f.dueDate],
     [tr],
   );
-  const sortableHeaders = useMemo(() => [f.invoiceNumber, f.total, f.outstanding, f.dueDate], [tr]);
+  const sortableHeaders = useMemo(() => [f.invoiceNumber, f.total, f.dueDate], [tr]);
   const sortMap = useMemo<Record<string, string>>(
-    () => ({ [f.invoiceNumber]: "invoiceNumber", [f.total]: "total", [f.outstanding]: "Outstanding", [f.dueDate]: "dueDate" }),
+    () => ({ [f.invoiceNumber]: "invoiceNumber", [f.total]: "total", [f.dueDate]: "dueDate" }),
     [tr],
   );
   const filterConfigs = useMemo<FilterConfig[]>(() => [
@@ -328,7 +234,7 @@ export function InvoicesPage() {
         options: INVOICE_STATUSES.map((s) => ({ value: s, label: f.invoiceStatuses[s] })),
       }}
       filterConfigs={filterConfigs}
-      topContent={allInvoices.length > 0 ? <InvoiceSummaryBar invoices={allInvoices} /> : undefined}
+      topContent={summary?.hasInvoices ? <InvoiceSummaryBar summary={summary} /> : undefined}
       renderRow={(item, handleDelete) => (
         <InvoiceRow
           key={item._id}

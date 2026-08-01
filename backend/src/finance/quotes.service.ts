@@ -12,6 +12,7 @@ import { CustomFieldsService } from '../common/custom-fields.service';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { InvoicesService } from './invoices.service';
+import { dateRange, UNPAGINATED_MAX } from '../common/paginate';
 
 // Sentinel used to roll back the conversion transaction when a concurrent
 // request won the race to convert the same quote.
@@ -57,14 +58,67 @@ export class QuotesService {
     return approverRoles.includes(userRole);
   }
 
+  private resolveOrderBy(sort?: string, dir?: string): Prisma.QuoteOrderByWithRelationInput {
+    if (!sort) return { createdAt: 'desc' };
+    const fields = {
+      quoteNumber: 'quoteNumber',
+      total: 'total',
+      validUntil: 'validUntil',
+      createdAt: 'createdAt',
+    } as const;
+    const field = fields[sort as keyof typeof fields];
+    if (!field) throw new BadRequestException(`Unsupported quote sort field: ${sort}`);
+    if (dir && dir !== 'asc' && dir !== 'desc') throw new BadRequestException(`Unsupported sort direction: ${dir}`);
+    return { [field]: dir === 'asc' ? 'asc' : 'desc' } as Prisma.QuoteOrderByWithRelationInput;
+  }
+
+  private parseListNumber(value: string, field: string): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new BadRequestException(`Invalid numeric filter: ${field}`);
+    return parsed;
+  }
+
   async getQuotes(query: Record<string, string>, user: AuthUser) {
     const scopeWhere = await this.visibility.ownershipWhere(user, 'quotes', 'createdById');
     const where: Prisma.QuoteWhereInput = { deletedAt: null, ...scopeWhere };
     if (query.status) where.status = query.status as Prisma.QuoteWhereInput['status'];
     if (query.customer) where.customerId = query.customer;
     if (query.deal) where.dealId = query.deal;
-    const quotes = await this.prisma.quote.findMany({ where, include: QUOTE_INCLUDE, orderBy: { createdAt: 'desc' } });
-    return toClient(quotes);
+    if (query.q) where.OR = [
+      { quoteNumber: { contains: query.q, mode: 'insensitive' } },
+      { title: { contains: query.q, mode: 'insensitive' } },
+      { customer: { name: { contains: query.q, mode: 'insensitive' } } },
+      { deal: { title: { contains: query.q, mode: 'insensitive' } } },
+    ];
+    if (query.currency) where.currency = query.currency;
+    if (query.approvalStatus) where.approvalStatus = query.approvalStatus as Prisma.QuoteWhereInput['approvalStatus'];
+    if (query.total_min || query.total_max) {
+      const range: { gte?: number; lte?: number } = {};
+      if (query.total_min) range.gte = this.parseListNumber(query.total_min, 'total_min');
+      if (query.total_max) range.lte = this.parseListNumber(query.total_max, 'total_max');
+      where.total = range;
+    }
+    const validUntilRange = dateRange(query.validUntil_from, query.validUntil_to);
+    if (validUntilRange) where.validUntil = validUntilRange;
+    const createdAtRange = dateRange(query.createdAt_from, query.createdAt_to);
+    if (createdAtRange) where.createdAt = createdAtRange;
+    const orderBy = this.resolveOrderBy(query.sort, query.dir);
+
+    if (!query.page) {
+      const quotes = await this.prisma.quote.findMany({
+        where, include: QUOTE_INCLUDE, orderBy, take: UNPAGINATED_MAX,
+      });
+      return toClient(quotes);
+    }
+    const page = Math.max(1, parseInt(query.page) || 1);
+    const limit = Math.min(100, parseInt(query.limit) || 25);
+    const [data, total] = await Promise.all([
+      this.prisma.quote.findMany({
+        where, include: QUOTE_INCLUDE, orderBy, skip: (page - 1) * limit, take: limit,
+      }),
+      this.prisma.quote.count({ where }),
+    ]);
+    return { data: toClient(data), total, page, pages: Math.ceil(total / limit) };
   }
 
   async getQuoteById(id: string, user: AuthUser) {
