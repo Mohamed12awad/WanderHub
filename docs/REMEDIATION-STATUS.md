@@ -1,12 +1,12 @@
 # NawaHub Remediation — Status Handover
 
-**Branch:** `main` — 18 commits merged from `fix/audit-2026-08-batch-0-1` (fast-forward). **Not pushed** to origin.
+**Branch:** `main`. Pushed through `b4b045e`; everything after that is local only.
 **Baseline audit:** [`docs/AUDIT-2026-08.md`](./AUDIT-2026-08.md)
 **Date:** 2026-08-01
 
-**Gates, re-run at handover:** backend **21 suites / 155 tests pass** · frontend **3 files / 33 tests pass** ·
-backend + frontend typecheck clean · backend lint 0 errors (3 pre-existing warnings) ·
-**0 it.failing remain** · **verify:gl 5/5 against a live DB** · working tree clean.
+**Gates, re-run at handover:** backend **29 suites / 192 tests pass** · frontend **5 files / 37 tests pass** ·
+backend + frontend typecheck clean · lint 0 errors (pre-existing warnings only) ·
+**0 `it.failing`** · **`verify:gl` 5/5 against a live DB** · working tree clean.
 
 ---
 
@@ -268,18 +268,21 @@ resolution differs from what the audit proposed:
 
 ## Suggested next session
 
-1. **Manual stock adjustments post no GL** (P1). `defaultInventoryAdjustment` is declared, seeded and
-   exposed in Settings but referenced by no posting code, so Inventory Asset drifts from the stock
-   subledger with every recount or write-off. `verify:gl` check 3 will start catching this once there
-   is real valued stock in the database.
-2. **Vendor-bill self-approval** (P1). Gated on `enabled`, which defaults to false, while the PO path
-   applies the same check unconditionally — so with approvals off, one user can raise a bill and
-   approve it.
-3. **Edit/delete posting parity for vendor bills and expenses** (P1). `invoices.service.ts` now
-   reverses on edit and delete; those two modules have the same shape and the same gap.
-4. **IDOR on mutation handlers** (P1). Fail-closed scoping fixed *reads*; six mutation paths still
-   fetch by raw id without caller scope.
-5. Re-run `npm --prefix backend run verify:gl` after each — fastest end-to-end signal. Note it needs a
-   live database; the Docker Postgres used during this work is `nawahub-pg` on port 5433.
+**Every audit finding is closed** except the absent modules (item 28) and two documented follow-ups.
+What is left is new work and configuration, not remediation:
 
-> Items 1–3 are currently dispatched to Codex; check `git log` before starting them.
+1. **Fixed assets** — the highest-value absent module, and the reason the classified cash-flow
+   statement shows an empty investing section by default.
+2. **Fully conformant clickable rows** — a real link in each row's primary cell (~21 components),
+   replacing the focusable-row compromise described under P2/P3 item 25.
+3. **Tag investing / financing accounts.** `ChartOfAccount.cashFlowCategory` now exists but the seeded
+   chart leaves every account on its default, so a real workspace should tag loan accounts as
+   `financing` and fixed-asset accounts as `investing` — otherwise everything but equity reports as
+   operating.
+4. **Set the three-way-match tolerances.** `glConfig.overReceiptTolerancePct` and `overBillTolerancePct`
+   both default to 0, so over-receipt and over-billing are refused outright. Decide the policy before
+   go-live rather than discovering it at the goods-in desk.
+5. **Review the fail-closed scoping against real roles** (see Notes) — the one behaviour change in this
+   effort that can surprise an existing deployment.
+6. Re-run `npm --prefix backend run verify:gl` after any accounting change — fastest end-to-end signal.
+   It needs a live database; the Docker Postgres used here is `nawahub-pg` on port 5433.
