@@ -11,14 +11,15 @@ import { queryKeys } from "@/lib/queryKeys";
 import { getStockValuation, getWarehouses } from "@/utils/api";
 import { PageShell } from "@/components/common/PageShell";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Row { productId: string; product: string; category: string | null; warehouse: string | null; quantityOnHand: number; avgCost: string; totalValue: string }
 interface Val { data: Row[]; total: number; page: number; pages: number; grandTotal: string }
 interface Warehouse { _id: string; name: string }
 
-const num = (v: string | number) => (typeof v === "number" ? v : parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
 export default function Valuation() {
+  const { formatNumber } = useLanguage();
+  const num = (v: string | number) => formatNumber(typeof v === "number" ? v : parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const [warehouseId, setWarehouseId] = useState("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);

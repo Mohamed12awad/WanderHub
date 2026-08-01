@@ -30,7 +30,7 @@ const InvoiceDetail: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const f = tr.finance;
 
@@ -268,8 +268,8 @@ const InvoiceDetail: React.FC = () => {
             </div>
             <div className="text-right text-sm">
               <p className="font-semibold">{invoice.customer.name}</p>
-              <p className="text-gray-500">Issued: {new Date(invoice.issueDate).toLocaleDateString()}</p>
-              {invoice.dueDate && <p className="text-gray-500">Due: {new Date(invoice.dueDate).toLocaleDateString()}</p>}
+              <p className="text-gray-500">Issued: {formatDate(invoice.issueDate)}</p>
+              {invoice.dueDate && <p className="text-gray-500">Due: {formatDate(invoice.dueDate)}</p>}
             </div>
           </div>
         </div>
@@ -304,10 +304,10 @@ const InvoiceDetail: React.FC = () => {
               <InfoRow label="Cost Center" value={invoice.costCenter ? `${invoice.costCenter.code} — ${invoice.costCenter.name}` : "—"} />
               <InfoRow label={f.currency} value={invoice.currency} />
               {invoice.exchangeRate != null && (
-                <InfoRow label="Exchange Rate" value={`${invoice.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${invoice.currency}`} />
+                <InfoRow label="Exchange Rate" value={`${formatNumber(invoice.exchangeRate, { maximumFractionDigits: 6 })} ${invoice.currency}`} />
               )}
-              <InfoRow label={f.issueDate} value={new Date(invoice.issueDate).toLocaleDateString()} />
-              <InfoRow label={f.dueDate} value={invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—"} />
+              <InfoRow label={f.issueDate} value={formatDate(invoice.issueDate)} />
+              <InfoRow label={f.dueDate} value={invoice.dueDate ? formatDate(invoice.dueDate) : "—"} />
             </section>
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Notes & Terms</h2>
@@ -346,9 +346,9 @@ const InvoiceDetail: React.FC = () => {
                   <TableRow key={idx}>
                     <TableCell dir="auto">{item.description}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">{item.unitPrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(item.unitPrice)}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.discount}%</TableCell>
-                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {invoice.currency}</TableCell>
+                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{formatCurrency(item.total, invoice.currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -359,7 +359,7 @@ const InvoiceDetail: React.FC = () => {
             <div className="w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.subtotal}</span>
-                <span className="tabular-nums text-foreground">{invoice.subtotal.toLocaleString()} {invoice.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.taxRate}</span>
@@ -367,20 +367,20 @@ const InvoiceDetail: React.FC = () => {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.tax}</span>
-                <span className="tabular-nums text-foreground">{invoice.tax.toLocaleString()} {invoice.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(invoice.tax, invoice.currency)}</span>
               </div>
               <div className="flex items-baseline justify-between border-t pt-2">
                 <span className="text-sm font-medium">{f.total}</span>
-                <span className="text-xl font-bold tabular-nums">{invoice.total.toLocaleString()} {invoice.currency}</span>
+                <span className="text-xl font-bold tabular-nums">{formatCurrency(invoice.total, invoice.currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{f.totalPaid}</span>
-                <span className="text-green-600 font-medium tabular-nums">{invoice.totalPaid.toLocaleString()} {invoice.currency}</span>
+                <span className="text-green-600 font-medium tabular-nums">{formatCurrency(invoice.totalPaid, invoice.currency)}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="font-semibold">{f.outstanding}</span>
                 <span className={`font-semibold tabular-nums ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
-                  {outstanding.toLocaleString()} {invoice.currency}
+                  {formatCurrency(outstanding, invoice.currency)}
                 </span>
               </div>
             </div>
@@ -411,8 +411,8 @@ const InvoiceDetail: React.FC = () => {
               <TableBody>
                 {payments.map((p) => (
                   <TableRow key={p._id}>
-                    <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
-                    <TableCell dir="auto" className="text-right font-medium tabular-nums">{p.amount.toLocaleString()} {p.currency}</TableCell>
+                    <TableCell>{formatDate(p.date)}</TableCell>
+                    <TableCell dir="auto" className="text-right font-medium tabular-nums">{formatCurrency(p.amount, p.currency)}</TableCell>
                     <TableCell className="capitalize">
                       {f.paymentMethods[p.method] ?? p.method}
                     </TableCell>

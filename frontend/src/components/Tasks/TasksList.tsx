@@ -26,7 +26,7 @@ const PRIORITY_STYLE: Record<string, string> = {
 };
 
 export function TasksList({ headerExtra }: { headerExtra?: ReactNode }) {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const t = tr.tasks;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -86,7 +86,7 @@ export function TasksList({ headerExtra }: { headerExtra?: ReactNode }) {
               <TableCell><Badge variant="outline" className={cn("border-0", STATUS_BADGE[task.status])}>{t.statuses[task.status] ?? task.status}</Badge></TableCell>
               <TableCell><Badge variant="secondary" className={cn("text-xs", PRIORITY_STYLE[task.priority])}>{t.priorities[task.priority]}</Badge></TableCell>
               <TableCell dir="auto" className="text-sm text-muted-foreground">{task.project ? <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 hover:text-primary hover:underline"><FolderKanban className="h-3 w-3" />{task.project.name}</Link> : "—"}</TableCell>
-              <TableCell className={cn("text-xs", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}</TableCell>
+              <TableCell className={cn("text-xs", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>{task.dueDate ? formatDate(task.dueDate) : "—"}</TableCell>
               <TableCell dir="auto" className="text-xs text-muted-foreground">{task.assignedTo?.name ?? "—"}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <div className="flex gap-0.5">

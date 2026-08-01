@@ -73,7 +73,7 @@ export function computeTotals(items: LineItemRow[], docTaxRate = 0, taxInclusive
 }
 
 const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) => {
-  const { tr } = useLanguage();
+  const { tr, formatCurrency } = useLanguage();
   const f = tr.finance;
 
   const fetchProducts = useCallback(
@@ -194,7 +194,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                   />
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {rowTotal(item).toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
+                  {formatCurrency(rowTotal(item), currency, { maximumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell>
                   <Button

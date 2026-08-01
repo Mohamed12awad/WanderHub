@@ -18,11 +18,11 @@ interface BS {
   totalAssets: string; totalLiabilities: string; totalEquity: string; balanced: boolean;
 }
 
-const num = (v: string) => (parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function BalanceSheet() {
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
+  const num = (v: string) => formatNumber(parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const [asOf, setAsOf] = useState(today());
   const accounting = tr.accounting;
   const { data, isLoading, isError, refetch } = useQuery({

@@ -61,7 +61,7 @@ export default function ViewProject() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { toast } = useToast();
 
   const { data, isPending } = useQuery({ queryKey: ["project", id], queryFn: () => getProjectById(id!), enabled: !!id });
@@ -232,20 +232,20 @@ export default function ViewProject() {
                 )}
                 <InfoRow label="Manager" value={project.manager?.name} />
                 <InfoRow label="Customer" value={project.customer?.name} />
-                <InfoRow label="Start Date" value={project.startDate ? new Date(project.startDate).toLocaleDateString() : undefined} />
-                <InfoRow label="End Date" value={project.endDate ? new Date(project.endDate).toLocaleDateString() : undefined} />
-                <InfoRow label="Budget" value={project.budget != null ? `${Number(project.budget).toLocaleString()} ${project.currency ?? ""}` : undefined} />
-                <InfoRow label="Created" value={project.createdAt ? new Date(project.createdAt).toLocaleDateString() : undefined} />
+                <InfoRow label="Start Date" value={project.startDate ? formatDate(project.startDate) : undefined} />
+                <InfoRow label="End Date" value={project.endDate ? formatDate(project.endDate) : undefined} />
+                <InfoRow label="Budget" value={project.budget != null ? (project.currency ? formatCurrency(Number(project.budget), project.currency) : formatNumber(Number(project.budget))) : undefined} />
+                <InfoRow label="Created" value={project.createdAt ? formatDate(project.createdAt) : undefined} />
               </div>
             </CardContent>
           </Card>
 
           <div className="grid sm:grid-cols-4 gap-4">
             {[
-              { label: "Budget", value: `${(fin.budget ?? 0).toLocaleString()} ${fin.currency}` },
-              { label: "Costs",  value: `${(fin.costs  ?? 0).toLocaleString()} ${fin.currency}`, color: "text-amber-600" },
-              { label: "Billed", value: `${(fin.billed ?? 0).toLocaleString()} ${fin.currency}` },
-              { label: "Profit", value: `${(fin.profit ?? 0).toLocaleString()} ${fin.currency}`, color: (fin.profit ?? 0) >= 0 ? "text-emerald-600" : "text-destructive" },
+              { label: "Budget", value: formatCurrency(fin.budget ?? 0, fin.currency) },
+              { label: "Costs",  value: formatCurrency(fin.costs ?? 0, fin.currency), color: "text-amber-600" },
+              { label: "Billed", value: formatCurrency(fin.billed ?? 0, fin.currency) },
+              { label: "Profit", value: formatCurrency(fin.profit ?? 0, fin.currency), color: (fin.profit ?? 0) >= 0 ? "text-emerald-600" : "text-destructive" },
             ].map((s) => (
               <Card key={s.label}><CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -352,8 +352,8 @@ export default function ViewProject() {
                           {m.description && <p className="text-xs text-muted-foreground truncate">{m.description}</p>}
                           {(m.estimatedCost != null || m.actualCost != null) && (
                             <p className="text-[11px] text-muted-foreground">
-                              {m.actualCost != null && <>Actual {Number(m.actualCost).toLocaleString(undefined, { maximumFractionDigits: 2 })}</>}
-                              {m.estimatedCost != null && <> / Est. {Number(m.estimatedCost).toLocaleString(undefined, { maximumFractionDigits: 2 })}</>}
+                              {m.actualCost != null && <>Actual {formatNumber(Number(m.actualCost), { maximumFractionDigits: 2 })}</>}
+                              {m.estimatedCost != null && <> / Est. {formatNumber(Number(m.estimatedCost), { maximumFractionDigits: 2 })}</>}
                             </p>
                           )}
                         </span>
@@ -365,7 +365,7 @@ export default function ViewProject() {
                       </button>
                       {m.dueDate && (
                         <span className={`text-xs whitespace-nowrap ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                          {new Date(m.dueDate).toLocaleDateString()}
+                          {formatDate(m.dueDate)}
                         </span>
                       )}
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -513,7 +513,7 @@ export default function ViewProject() {
                       {task.dueDate && (
                         <span className={cn("text-xs flex items-center gap-0.5", isOverdue ? "text-destructive" : "text-muted-foreground")}>
                           <CalendarDays className="h-3 w-3" />
-                          {new Date(task.dueDate).toLocaleDateString()}
+                          {formatDate(task.dueDate)}
                         </span>
                       )}
                       {task.assignedTo && (
@@ -550,8 +550,8 @@ export default function ViewProject() {
                   {invoices.map((inv: any) => (
                     <TableRow key={inv._id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/finance/invoices/${inv._id}`)}>
                       <TableCell dir="auto" className="font-medium">{inv.invoiceNumber}</TableCell>
-                      <TableCell dir="auto" className="tabular-nums">{inv.total?.toLocaleString()} {inv.currency}</TableCell>
-                      <TableCell className="tabular-nums">{inv.totalPaid?.toLocaleString()}</TableCell>
+                      <TableCell dir="auto" className="tabular-nums">{inv.total != null ? formatCurrency(inv.total, inv.currency) : "—"}</TableCell>
+                      <TableCell className="tabular-nums">{inv.totalPaid != null ? formatNumber(inv.totalPaid) : "—"}</TableCell>
                       <TableCell className="capitalize">{inv.status?.replace("_", " ")}</TableCell>
                     </TableRow>
                   ))}
@@ -569,7 +569,7 @@ export default function ViewProject() {
                   {expenses.map((ex: any) => (
                     <TableRow key={ex._id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/expenses/${ex._id}`)}>
                       <TableCell dir="auto" className="font-medium">{ex.title}</TableCell>
-                      <TableCell className="tabular-nums">{(ex.expenses ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0).toLocaleString()}</TableCell>
+                      <TableCell className="tabular-nums">{formatNumber((ex.expenses ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0))}</TableCell>
                       <TableCell className="capitalize">{ex.approvalStatus}</TableCell>
                     </TableRow>
                   ))}
@@ -657,6 +657,7 @@ interface ProjectTaskRowProps {
 }
 
 function ProjectTaskRow({ task, onToggleDone, onStatus, onEdit, onDelete, showMilestone }: ProjectTaskRowProps) {
+  const { formatDate } = useLanguage();
   const done = task.status === "done";
   const overdue = task.dueDate && !done && task.status !== "cancelled" && new Date(task.dueDate) < new Date();
   const hasMeta = (showMilestone && task.milestone) || task.dueDate || task.assignedTo;
@@ -691,7 +692,7 @@ function ProjectTaskRow({ task, onToggleDone, onStatus, onEdit, onDelete, showMi
             )}
             {task.dueDate && (
               <span className={cn("inline-flex items-center gap-0.5 whitespace-nowrap", overdue && "text-destructive")}>
-                <CalendarDays className="h-3 w-3" />{new Date(task.dueDate).toLocaleDateString()}
+                <CalendarDays className="h-3 w-3" />{formatDate(task.dueDate)}
               </span>
             )}
             {task.assignedTo && (

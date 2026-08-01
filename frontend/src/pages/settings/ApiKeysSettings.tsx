@@ -12,7 +12,7 @@ import { getApiKeys, createApiKey, revokeApiKey } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function ApiKeysSettings() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const tk = tr.tools.apiKeys;
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["api-keys"], queryFn: getApiKeys });
@@ -90,7 +90,7 @@ export default function ApiKeysSettings() {
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   <code>{k.prefix}…</code> · {k.user?.name}
-                  {" · "}{k.lastUsedAt ? tk.lastUsed(new Date(k.lastUsedAt).toLocaleDateString()) : tk.neverUsed}
+                  {" · "}{k.lastUsedAt ? tk.lastUsed(formatDate(k.lastUsedAt)) : tk.neverUsed}
                 </div>
               </div>
               {!k.revokedAt && (

@@ -14,11 +14,12 @@ const COLUMN_COLORS: Record<string, string> = {
 };
 
 function Card({ po }: { po: PO }) {
+  const { formatCurrency } = useLanguage();
   return (
     <div className="bg-card border border-border/60 rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
       <Link to={`/procurement/purchase-orders/${po._id}`} onClick={(e) => e.stopPropagation()} className="block text-sm font-semibold hover:text-primary truncate">{po.poNumber}</Link>
       <p className="text-xs text-muted-foreground truncate mt-0.5">{po.title}{po.supplier?.name ? ` · ${po.supplier.name}` : ""}</p>
-      {(po.total ?? 0) > 0 && <p className="text-sm font-bold tabular-nums mt-2">{po.total!.toLocaleString()} {po.currency ?? "EGP"}</p>}
+      {(po.total ?? 0) > 0 && <p className="text-sm font-bold tabular-nums mt-2">{formatCurrency(po.total!, po.currency ?? "EGP")}</p>}
     </div>
   );
 }

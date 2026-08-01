@@ -132,7 +132,9 @@ const FinanceTab: React.FC<Props> = ({ linkedModel, linkedId, customerId, view }
   );
 };
 
-const QuotesTable: React.FC<{ quotes: Quote[]; navigate: (p: string) => void; f: any }> = ({ quotes, navigate, f }) => (
+const QuotesTable: React.FC<{ quotes: Quote[]; navigate: (p: string) => void; f: any }> = ({ quotes, navigate, f }) => {
+  const { formatCurrency, formatDate } = useLanguage();
+  return (
   <Table>
     <TableHeader>
       <TableRow>
@@ -149,17 +151,20 @@ const QuotesTable: React.FC<{ quotes: Quote[]; navigate: (p: string) => void; f:
           <TableCell dir="auto" className="font-mono text-sm">{q.quoteNumber}</TableCell>
           <TableCell dir="auto">{q.title}</TableCell>
           <TableCell><FinanceStatusBadge status={q.status} type="quote" /></TableCell>
-          <TableCell dir="auto" className="text-right font-medium">{q.total.toLocaleString()} {q.currency}</TableCell>
+          <TableCell dir="auto" className="text-right font-medium">{formatCurrency(q.total, q.currency)}</TableCell>
           <TableCell className="text-muted-foreground text-sm">
-            {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
+            {q.validUntil ? formatDate(q.validUntil) : "—"}
           </TableCell>
         </TableRow>
       ))}
     </TableBody>
   </Table>
-);
+  );
+};
 
-const InvoicesTable: React.FC<{ invoices: Invoice[]; navigate: (p: string) => void; f: any }> = ({ invoices, navigate, f }) => (
+const InvoicesTable: React.FC<{ invoices: Invoice[]; navigate: (p: string) => void; f: any }> = ({ invoices, navigate, f }) => {
+  const { formatCurrency, formatDate } = useLanguage();
+  return (
   <Table>
     <TableHeader>
       <TableRow>
@@ -179,18 +184,19 @@ const InvoicesTable: React.FC<{ invoices: Invoice[]; navigate: (p: string) => vo
             <TableCell dir="auto" className="font-mono text-sm">{inv.invoiceNumber}</TableCell>
             <TableCell dir="auto">{inv.title}</TableCell>
             <TableCell><FinanceStatusBadge status={inv.status} type="invoice" /></TableCell>
-            <TableCell dir="auto" className="text-right font-medium">{inv.total.toLocaleString()} {inv.currency}</TableCell>
+            <TableCell dir="auto" className="text-right font-medium">{formatCurrency(inv.total, inv.currency)}</TableCell>
             <TableCell dir="auto" className={`text-right font-medium ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
-              {outstanding.toLocaleString()} {inv.currency}
+              {formatCurrency(outstanding, inv.currency)}
             </TableCell>
             <TableCell className="text-muted-foreground text-sm">
-              {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
+              {inv.dueDate ? formatDate(inv.dueDate) : "—"}
             </TableCell>
           </TableRow>
         );
       })}
     </TableBody>
   </Table>
-);
+  );
+};
 
 export default FinanceTab;

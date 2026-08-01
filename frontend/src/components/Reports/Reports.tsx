@@ -28,6 +28,7 @@ import { defaultPeriod, type PeriodPreset } from "@/components/common/PeriodSele
 import { ReportsFilterBar, toReportFilters, type ReportsState } from "./ReportsFilterBar";
 import { PageShell } from "@/components/common/PageShell";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ const OUTSTANDING_STATUS = [
 // ── main component ────────────────────────────────────────────────────────────
 
 const Reports: React.FC = () => {
+  const { formatCurrency, formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = (user?.permissions ?? []).some((p) => p === "*" || p === "reports:view");
@@ -220,8 +222,8 @@ const Reports: React.FC = () => {
                   <BarChart data={revenue} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
-                    <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
+                    <Tooltip formatter={(v) => formatNumber(Number(v))} />
                     <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} name="Revenue" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -292,7 +294,7 @@ const Reports: React.FC = () => {
                     <XAxis dataKey="stage" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v, name) => [Number(v).toLocaleString(), String(name)]} />
+                    <Tooltip formatter={(v, name) => [formatNumber(Number(v)), String(name)]} />
                     <Legend />
                     <Bar yAxisId="left" dataKey="count" name="Deals" radius={[4, 4, 0, 0]}>
                       {pipeline.map((entry) => <Cell key={entry.stage} fill={STAGE_COLORS[entry.stage] ?? "#6366f1"} />)}
@@ -312,7 +314,7 @@ const Reports: React.FC = () => {
               {[
                 { label: "Win Rate", value: `${dealMetrics.winRate}%` },
                 { label: "Won Deals", value: String(dealMetrics.wonCount) },
-                { label: "Avg Deal Size", value: dealMetrics.avgDealSize.toLocaleString() },
+                { label: "Avg Deal Size", value: formatNumber(dealMetrics.avgDealSize) },
                 { label: "Avg Sales Cycle", value: `${dealMetrics.avgSalesCycleDays}d` },
               ].map((m) => (
                 <Card key={m.label}><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">{m.label}</p><p className="text-xl font-bold mt-1">{m.value}</p></CardContent></Card>
@@ -328,7 +330,7 @@ const Reports: React.FC = () => {
                     <TableHeader><TableRow><TableHead>Owner</TableHead><TableHead className="text-right">Won</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {leaderboard.map((o) => (
-                        <TableRow key={o.ownerId}><TableCell dir="auto">{o.name}</TableCell><TableCell className="text-right">{o.count}</TableCell><TableCell className="text-right font-medium">{o.value.toLocaleString()}</TableCell></TableRow>
+                        <TableRow key={o.ownerId}><TableCell dir="auto">{o.name}</TableCell><TableCell className="text-right">{o.count}</TableCell><TableCell className="text-right font-medium">{formatNumber(o.value)}</TableCell></TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -344,7 +346,7 @@ const Reports: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-border" />
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="stage" tick={{ fontSize: 11 }} width={60} />
-                      <Tooltip formatter={(v, n) => [Number(v).toLocaleString(), String(n)]} />
+                      <Tooltip formatter={(v, n) => [formatNumber(Number(v)), String(n)]} />
                       <Bar dataKey="count" name="Count" fill="#6366f1" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -366,7 +368,7 @@ const Reports: React.FC = () => {
                       <Pie data={expCat} dataKey="total" nameKey="category" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false}>
                         {expCat.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                      <Tooltip formatter={(v) => formatNumber(Number(v))} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -380,8 +382,8 @@ const Reports: React.FC = () => {
                     <LineChart data={expTrend} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
-                      <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
+                      <Tooltip formatter={(v) => formatNumber(Number(v))} />
                       <Line type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} name="Expenses" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -401,8 +403,8 @@ const Reports: React.FC = () => {
                   <ComposedChart data={pnl} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
-                    <Tooltip formatter={(v, n) => [Number(v).toLocaleString(), String(n)]} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
+                    <Tooltip formatter={(v, n) => [formatNumber(Number(v)), String(n)]} />
                     <Legend />
                     <Bar dataKey="revenue" name="Revenue" fill="#22c55e" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -421,7 +423,7 @@ const Reports: React.FC = () => {
               <CardTitle className="text-sm">Outstanding Invoices</CardTitle>
               <CardDescription className="text-xs">
                 Sent, partially paid, and overdue invoices. Total outstanding:{" "}
-                <span className="font-semibold text-red-600">{outstanding.reduce((s, i) => s + i.outstanding, 0).toLocaleString()}</span>
+                <span className="font-semibold text-red-600">{formatNumber(outstanding.reduce((s, i) => s + i.outstanding, 0))}</span>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -437,10 +439,10 @@ const Reports: React.FC = () => {
                           <TableCell><Link to={`/finance/invoices/${inv._id}`} className="font-mono text-sm text-blue-500 hover:underline">{inv.invoiceNumber}</Link></TableCell>
                           <TableCell dir="auto">{inv.customer ? <Link to={`/customers/${inv.customer._id}`} className="text-blue-500 hover:underline">{inv.customer.name}</Link> : "—"}</TableCell>
                           <TableCell dir="auto" className="text-sm text-muted-foreground">{inv.deal ? <Link to={`/deals/${inv.deal._id}`} className="text-blue-500 hover:underline">{inv.deal.title}</Link> : "—"}</TableCell>
-                          <TableCell className="text-right">{inv.total.toLocaleString()} {inv.currency}</TableCell>
-                          <TableCell className="text-right text-green-600">{inv.totalPaid.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-semibold text-red-600">{inv.outstanding.toLocaleString()} {inv.currency}</TableCell>
-                          <TableCell className={`text-sm ${inv.status === "overdue" ? "text-red-500" : "text-muted-foreground"}`}>{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(inv.total, inv.currency)}</TableCell>
+                          <TableCell className="text-right text-green-600">{formatNumber(inv.totalPaid)}</TableCell>
+                          <TableCell className="text-right font-semibold text-red-600">{formatCurrency(inv.outstanding, inv.currency)}</TableCell>
+                          <TableCell className={`text-sm ${inv.status === "overdue" ? "text-red-500" : "text-muted-foreground"}`}>{inv.dueDate ? formatDate(inv.dueDate) : "—"}</TableCell>
                           <TableCell><Badge variant="outline" className={STATUS_BADGE[inv.status] ?? ""}>{inv.status.replace("_", " ")}</Badge></TableCell>
                         </TableRow>
                       ))}
@@ -463,8 +465,8 @@ const Reports: React.FC = () => {
                     <BarChart data={aging} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString()} />
-                      <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => formatNumber(v)} />
+                      <Tooltip formatter={(v) => formatNumber(Number(v))} />
                       <Bar dataKey="total" name="Outstanding" radius={[4, 4, 0, 0]}>
                         {aging.map((_, i) => <Cell key={i} fill={["#22c55e", "#eab308", "#f97316", "#ef4444", "#b91c1c"][i % 5]} />)}
                       </Bar>
@@ -472,7 +474,7 @@ const Reports: React.FC = () => {
                   </ResponsiveContainer>
                   <Table>
                     <TableHeader><TableRow><TableHead>Bucket</TableHead><TableHead className="text-right">Invoices</TableHead><TableHead className="text-right">Outstanding</TableHead></TableRow></TableHeader>
-                    <TableBody>{aging.map((b) => <TableRow key={b.bucket}><TableCell>{b.bucket}</TableCell><TableCell className="text-right">{b.count}</TableCell><TableCell className="text-right font-medium">{b.total.toLocaleString()}</TableCell></TableRow>)}</TableBody>
+                    <TableBody>{aging.map((b) => <TableRow key={b.bucket}><TableCell>{b.bucket}</TableCell><TableCell className="text-right">{b.count}</TableCell><TableCell className="text-right font-medium">{formatNumber(b.total)}</TableCell></TableRow>)}</TableBody>
                   </Table>
                 </div>
               )}
@@ -488,7 +490,7 @@ const Reports: React.FC = () => {
               {topCustomers.length === 0 ? <ChartEmpty /> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Revenue</TableHead></TableRow></TableHeader>
-                  <TableBody>{topCustomers.map((c) => <TableRow key={c.customerId}><TableCell dir="auto"><Link to={`/customers/${c.customerId}`} className="text-blue-500 hover:underline">{c.name}</Link></TableCell><TableCell className="text-right font-medium">{c.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
+                  <TableBody>{topCustomers.map((c) => <TableRow key={c.customerId}><TableCell dir="auto"><Link to={`/customers/${c.customerId}`} className="text-blue-500 hover:underline">{c.name}</Link></TableCell><TableCell className="text-right font-medium">{formatNumber(c.revenue)}</TableCell></TableRow>)}</TableBody>
                 </Table>
               )}
             </CardContent>
@@ -499,7 +501,7 @@ const Reports: React.FC = () => {
               {topProducts.length === 0 ? <ChartEmpty /> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Product</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Revenue</TableHead></TableRow></TableHeader>
-                  <TableBody>{topProducts.map((p) => <TableRow key={p.productId ?? p.name}><TableCell dir="auto">{p.name}</TableCell><TableCell className="text-right">{p.qty.toLocaleString()}</TableCell><TableCell className="text-right font-medium">{p.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
+                  <TableBody>{topProducts.map((p) => <TableRow key={p.productId ?? p.name}><TableCell dir="auto">{p.name}</TableCell><TableCell className="text-right">{formatNumber(p.qty)}</TableCell><TableCell className="text-right font-medium">{formatNumber(p.revenue)}</TableCell></TableRow>)}</TableBody>
                 </Table>
               )}
             </CardContent>
@@ -516,7 +518,7 @@ const Reports: React.FC = () => {
                   <Card className="hover:border-primary/40 hover:shadow-sm transition-colors">
                     <CardContent className="pt-5 pb-4">
                       <div className="flex items-center gap-3 mb-3"><div className="rounded-lg bg-primary/10 p-2"><Icon className="h-4 w-4 text-primary" /></div><div><p className="text-sm font-semibold">{acc.name}</p><p className="text-xs text-muted-foreground capitalize">{acc.type}</p></div></div>
-                      <p className="text-2xl font-bold tabular-nums">{acc.balance.toLocaleString()}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatNumber(acc.balance)}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{acc.currency}</p>
                     </CardContent>
                   </Card>
@@ -625,6 +627,7 @@ interface DealRow {
 }
 
 function DealsReportTab({ startDate, endDate, enabled }: { startDate: string; endDate: string; enabled: boolean }) {
+  const { formatCurrency, formatDate, formatNumber } = useLanguage();
   const { data, isFetching } = useQuery({
     queryKey: ["report-deals-list", startDate, endDate],
     queryFn: () => getBookingReport({ startDate, endDate, location: "" }),
@@ -639,7 +642,7 @@ function DealsReportTab({ startDate, endDate, enabled }: { startDate: string; en
       <CardHeader>
         <CardTitle className="text-sm">Deals Report</CardTitle>
         <CardDescription className="text-xs">
-          {deals.length} deal{deals.length !== 1 ? "s" : ""} created in range · total value {total.toLocaleString()}
+          {deals.length} deal{deals.length !== 1 ? "s" : ""} created in range · total value {formatNumber(total)}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -654,8 +657,8 @@ function DealsReportTab({ startDate, endDate, enabled }: { startDate: string; en
                     <TableCell dir="auto" className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell>
                     <TableCell className="capitalize text-muted-foreground">{d.category?.replace(/_/g, " ") ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{d.status}</Badge></TableCell>
-                    <TableCell className="text-right font-medium">{Number(d.price || 0).toLocaleString()} {d.currency}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{d.expectedCloseDate ? new Date(d.expectedCloseDate).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(Number(d.price || 0), d.currency)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{d.expectedCloseDate ? formatDate(d.expectedCloseDate) : "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -675,6 +678,7 @@ interface FullReport {
 }
 
 function FullReportTab({ startDate, endDate, enabled }: { startDate: string; endDate: string; enabled: boolean }) {
+  const { formatCurrency, formatNumber } = useLanguage();
   const { data, isFetching } = useQuery({
     queryKey: ["report-full", startDate, endDate],
     queryFn: () => getReport({ startDate, endDate, location: "" }),
@@ -695,7 +699,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
           <Table>
             <TableHeader><TableRow><TableHead>Deal</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
             <TableBody>{report.bookings.map((d) => (
-              <TableRow key={d._id}><TableCell dir="auto"><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell><TableCell dir="auto" className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell><TableCell className="capitalize">{d.status}</TableCell><TableCell dir="auto" className="text-right">{Number(d.price || 0).toLocaleString()} {d.currency}</TableCell></TableRow>
+              <TableRow key={d._id}><TableCell dir="auto"><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell><TableCell dir="auto" className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell><TableCell className="capitalize">{d.status}</TableCell><TableCell dir="auto" className="text-right">{formatCurrency(Number(d.price || 0), d.currency)}</TableCell></TableRow>
             ))}</TableBody>
           </Table>
         </CardContent>
@@ -708,7 +712,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
             <Table>
               <TableHeader><TableRow><TableHead>PO</TableHead><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
               <TableBody>{report.purchases.map((p) => (
-                <TableRow key={p._id}><TableCell dir="auto" className="font-mono text-sm">{p.poNumber ?? "—"}</TableCell><TableCell dir="auto" className="text-muted-foreground">{p.title ?? "—"}</TableCell><TableCell className="capitalize">{p.status}</TableCell><TableCell dir="auto" className="text-right">{Number(p.total || 0).toLocaleString()} {p.currency ?? ""}</TableCell></TableRow>
+                <TableRow key={p._id}><TableCell dir="auto" className="font-mono text-sm">{p.poNumber ?? "—"}</TableCell><TableCell dir="auto" className="text-muted-foreground">{p.title ?? "—"}</TableCell><TableCell className="capitalize">{p.status}</TableCell><TableCell dir="auto" className="text-right">{p.currency ? formatCurrency(Number(p.total || 0), p.currency) : formatNumber(Number(p.total || 0))}</TableCell></TableRow>
               ))}</TableBody>
             </Table>
           )}
@@ -723,7 +727,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
               <TableHeader><TableRow><TableHead>Report</TableHead><TableHead>Approval</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
               <TableBody>{report.expenses.map((er) => {
                 const sum = (er.expenses ?? []).reduce((s, x) => s + Number(x.amount || 0), 0);
-                return <TableRow key={er._id}><TableCell dir="auto">{er.title}</TableCell><TableCell className="capitalize">{er.approvalStatus}</TableCell><TableCell className="text-right">{sum.toLocaleString()}</TableCell></TableRow>;
+                return <TableRow key={er._id}><TableCell dir="auto">{er.title}</TableCell><TableCell className="capitalize">{er.approvalStatus}</TableCell><TableCell className="text-right">{formatNumber(sum)}</TableCell></TableRow>;
               })}</TableBody>
             </Table>
           )}

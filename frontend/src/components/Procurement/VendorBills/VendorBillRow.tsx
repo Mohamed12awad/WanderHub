@@ -22,7 +22,7 @@ interface Props {
 
 const VendorBillRow: React.FC<Props> = ({ _id, billNumber, title, supplier, status, total, totalPaid, currency, handleDelete }) => {
   const navigate = useNavigate();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency } = useLanguage();
   const { user } = useAuth();
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete');
   const supplierName = typeof supplier === "object" ? supplier?.name : supplier;
@@ -34,8 +34,8 @@ const VendorBillRow: React.FC<Props> = ({ _id, billNumber, title, supplier, stat
       <TableCell dir="auto">{title}</TableCell>
       <TableCell dir="auto" className="text-muted-foreground">{supplierName ?? "—"}</TableCell>
       <TableCell><ProcurementStatusBadge status={status} /></TableCell>
-      <TableCell dir="auto" className="tabular-nums">{total?.toLocaleString()} {currency}</TableCell>
-      <TableCell dir="auto" className={`tabular-nums font-medium ${outstanding > 0 ? "text-destructive" : "text-emerald-600"}`}>{outstanding.toLocaleString()} {currency}</TableCell>
+      <TableCell dir="auto" className="tabular-nums">{total != null ? formatCurrency(total, currency) : "—"}</TableCell>
+      <TableCell dir="auto" className={`tabular-nums font-medium ${outstanding > 0 ? "text-destructive" : "text-emerald-600"}`}>{formatCurrency(outstanding, currency)}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -63,14 +63,14 @@ type InvoiceSummary = {
 };
 
 function CurrencyAmounts({ entries, className }: { entries: [string, number][]; className?: string }) {
+  const { formatCurrency } = useLanguage();
   if (entries.length === 0) return <span className={`font-semibold tabular-nums ${className ?? ""}`}>0</span>;
   return (
     <>
       {entries.map(([cur, val], idx) => (
         <span key={cur} className="tabular-nums">
           {idx > 0 && <span className="text-border mx-1">·</span>}
-          <span className={`font-semibold ${className ?? ""}`}>{val.toLocaleString()}</span>
-          {" "}<span className="text-[11px] font-normal text-muted-foreground">{cur}</span>
+          <span className={`font-semibold ${className ?? ""}`}>{formatCurrency(val, cur)}</span>
         </span>
       ))}
     </>

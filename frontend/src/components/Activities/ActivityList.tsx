@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getActivities, updateActivity, deleteActivity } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
-import { format } from "date-fns";
 import { CheckCircle2, Circle, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +10,7 @@ import { ActivityDetailDialog } from "./ActivityDetailDialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ActivityListProps {
   linkedTo: string;
@@ -32,6 +32,7 @@ const TYPE_BORDER: Record<ActivityType, string> = {
 };
 
 export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedModel, hideHeader = false }) => {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [detail, setDetail]     = useState<Activity | null>(null);
@@ -118,7 +119,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ linkedTo, linkedMode
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {format(new Date(activity.date), "dd MMM yyyy")}
+                {formatDate(activity.date, { day: "2-digit", month: "short", year: "numeric" })}
                 {activity.createdBy && ` · by ${activity.createdBy.name}`}
               </p>
             </div>

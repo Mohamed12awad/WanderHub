@@ -19,7 +19,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/authContext";
 import { Account } from "@/types/types";
@@ -109,7 +108,7 @@ function StatCard({
 }
 
 export function Dashboard() {
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const d = tr.dashboard;
 
   const [period, setPeriod] = useState<PeriodValue>(() => defaultPeriod("month"));
@@ -209,7 +208,7 @@ export function Dashboard() {
       {/* Page header */}
       <PageHeader
         title={d.title}
-        description={format(new Date(), "EEEE, d MMMM yyyy")}
+        description={formatDate(new Date(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         primaryAction={
           <div className="flex flex-wrap items-center gap-2">
             <PeriodSelector value={period} onChange={setPeriod} />
@@ -261,7 +260,7 @@ export function Dashboard() {
                       <Link key={item.id} to={item.href} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 hover:bg-muted/40 transition-colors group">
                         <Icon className={`h-4 w-4 shrink-0 ${item.color}`} />
                         <span className="text-sm font-medium flex-1 truncate group-hover:text-primary transition-colors">{item.label}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{format(new Date(item.createdAt), "dd MMM")}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{formatDate(item.createdAt, { day: "2-digit", month: "short" })}</span>
                       </Link>
                     );
                   })}
@@ -287,7 +286,7 @@ export function Dashboard() {
                           <p className="text-sm font-medium truncate">{acc.name}</p>
                           <p className="text-xs text-muted-foreground capitalize">{acc.type}</p>
                         </div>
-                        <p className="text-sm font-bold tabular-nums">{acc.balance.toLocaleString()} {acc.currency}</p>
+                        <p className="text-sm font-bold tabular-nums">{formatCurrency(acc.balance, acc.currency)}</p>
                       </Link>
                     );
                   })}
@@ -319,7 +318,7 @@ export function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {isOverdue && <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 h-4 px-1.5">{d.overdue}</Badge>}
-                          <span className="text-sm font-bold tabular-nums text-destructive">{owed.toLocaleString()} {inv.currency}</span>
+                          <span className="text-sm font-bold tabular-nums text-destructive">{formatCurrency(owed, inv.currency)}</span>
                         </div>
                       </Link>
                     );
@@ -410,7 +409,7 @@ export function Dashboard() {
               <div className="grid sm:grid-cols-3 gap-4">
                 {[
                   { label: d.winRate, value: `${rate}%`, sub: d.winRateSub(won, total) },
-                  { label: d.wonValue, value: `${wonValue.toLocaleString()} ${baseCurrency}`, sub: d.wonValueSub },
+                  { label: d.wonValue, value: formatCurrency(wonValue, baseCurrency), sub: d.wonValueSub },
                   { label: d.activeDeals, value: String(pipeline.filter((s) => !["won", "lost", "cancelled"].includes(s.stage)).reduce((a, s) => a + s.count, 0)), sub: d.activeDealsSub },
                 ].map(({ label, value, sub }) => (
                   <Card key={label} className="shadow-sm border-border/60">
@@ -436,8 +435,8 @@ export function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title={d.revenue}
-          value={`${revenue.toLocaleString()} ${primaryCurrency}`}
-          sub={`vs ${prevRevenue.toLocaleString()} ${primaryCurrency} last period`}
+          value={formatCurrency(revenue, primaryCurrency)}
+          sub={`vs ${formatCurrency(prevRevenue, primaryCurrency)} last period`}
           change={pct(revenue, prevRevenue)}
           icon={DollarSign}
           loading={summaryLoading}
@@ -454,8 +453,8 @@ export function Dashboard() {
         />
         <StatCard
           title={d.outstanding}
-          value={`${underCollection.toLocaleString()} ${primaryCurrency}`}
-          sub={`vs ${prevUnder.toLocaleString()} ${primaryCurrency} last period`}
+          value={formatCurrency(underCollection, primaryCurrency)}
+          sub={`vs ${formatCurrency(prevUnder, primaryCurrency)} last period`}
           change={pct(underCollection, prevUnder)}
           icon={CreditCard}
           loading={summaryLoading}
@@ -463,8 +462,8 @@ export function Dashboard() {
         />
         <StatCard
           title={d.expenses}
-          value={expenses.toLocaleString()}
-          sub={`vs ${prevExpenses.toLocaleString()} last period`}
+          value={formatNumber(expenses)}
+          sub={`vs ${formatNumber(prevExpenses)} last period`}
           change={pct(expenses, prevExpenses)}
           icon={Activity}
           loading={summaryLoading}
@@ -491,10 +490,10 @@ export function Dashboard() {
                 <BarChart data={revenueChartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="currency" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => v.toLocaleString()} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatNumber(v)} />
                   <Tooltip
                     contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", color: "hsl(var(--foreground))", fontSize: 12 }}
-                    formatter={(v) => (typeof v === "number" ? v.toLocaleString() : "")}
+                    formatter={(v) => (typeof v === "number" ? formatNumber(v) : "")}
                   />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey={d.recentDeals} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -533,7 +532,7 @@ export function Dashboard() {
                         {deal.title}
                       </Link>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {deal.customer?.name} · {format(new Date(deal.createdAt), "dd MMM")}
+                        {deal.customer?.name} · {formatDate(deal.createdAt, { day: "2-digit", month: "short" })}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -541,7 +540,7 @@ export function Dashboard() {
                         {deal.status}
                       </Badge>
                       <span className="text-xs font-semibold whitespace-nowrap tabular-nums text-muted-foreground">
-                        {deal.price?.toLocaleString()} {deal.currency}
+                        {deal.price != null ? formatCurrency(deal.price, deal.currency) : "—"}
                       </span>
                     </div>
                   </li>
@@ -581,7 +580,7 @@ export function Dashboard() {
                       <p className="text-xs text-muted-foreground capitalize">{acc.type}</p>
                     </div>
                     <p className="ms-auto text-sm font-semibold whitespace-nowrap tabular-nums">
-                      {acc.balance.toLocaleString()} {acc.currency}
+                      {formatCurrency(acc.balance, acc.currency)}
                     </p>
                   </Link>
                 );
@@ -606,11 +605,11 @@ export function Dashboard() {
                 margin={{ top: 0, right: 16, bottom: 0, left: 60 }}
               >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => v.toLocaleString()} />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => formatNumber(v)} />
                 <YAxis type="category" dataKey="category" axisLine={false} tickLine={false} width={60} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                 <Tooltip
                   contentStyle={{ borderRadius: "0.5rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 12 }}
-                  formatter={(v) => (typeof v === "number" ? v.toLocaleString() : "")}
+                  formatter={(v) => (typeof v === "number" ? formatNumber(v) : "")}
                 />
                 <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>

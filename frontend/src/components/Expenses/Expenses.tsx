@@ -27,7 +27,7 @@ const EXPENSE_FILTERS = [
 ];
 
 export function Expenses() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const e = tr.expenses;
 
   return (
@@ -53,7 +53,7 @@ export function Expenses() {
           total={item.expenses.reduce((t, i) => t + i.amount, 0)}
           approvalStatus={item.approvalStatus}
           owner={item.userId?.name ?? "—"}
-          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          date={formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}
@@ -73,7 +73,7 @@ export function Expenses() {
           Total: ex.expenses.reduce((s, i) => s + i.amount, 0),
           Status: ex.approvalStatus,
           Owner: ex.userId?.name ?? "",
-          "Created At": new Date(ex.createdAt).toLocaleDateString(),
+          "Created At": new Date(ex.createdAt).toISOString().slice(0, 10),
         }),
       }}
     />

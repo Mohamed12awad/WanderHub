@@ -44,7 +44,7 @@ export default function ViewSalesOrder() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -272,7 +272,7 @@ export default function ViewSalesOrder() {
           <MetaGrid>
             <MetaField label="Customer" value={so.customer?.name} />
             <MetaField label="Currency" value={so.currency} />
-            {so.expectedDate && <MetaField label="Expected" value={new Date(so.expectedDate).toLocaleDateString()} />}
+            {so.expectedDate && <MetaField label="Expected" value={formatDate(so.expectedDate)} />}
             {so.deal && <MetaField label="Deal" value={so.deal.title} />}
             {so.project && (
               <MetaField label="Project">
@@ -306,9 +306,9 @@ export default function ViewSalesOrder() {
                 <TableRow key={it.id ?? it._id ?? i}>
                   <TableCell dir="auto">{it.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
-                  <TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums">{it.unitPrice != null ? formatNumber(it.unitPrice) : "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.discount ?? 0}</TableCell>
-                  <TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums">{it.total != null ? formatNumber(it.total) : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -317,15 +317,15 @@ export default function ViewSalesOrder() {
             <div className="w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="tabular-nums text-foreground">{so.subtotal?.toLocaleString()} {so.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(so.subtotal ?? 0, so.currency)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Tax ({so.taxRate}%)</span>
-                <span className="tabular-nums text-foreground">{so.tax?.toLocaleString()} {so.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(so.tax ?? 0, so.currency)}</span>
               </div>
               <div className="flex items-baseline justify-between border-t pt-2">
                 <span className="text-sm font-medium">Total</span>
-                <span className="text-xl font-bold tabular-nums">{so.total?.toLocaleString()} {so.currency}</span>
+                <span className="text-xl font-bold tabular-nums">{formatCurrency(so.total ?? 0, so.currency)}</span>
               </div>
             </div>
           </div>

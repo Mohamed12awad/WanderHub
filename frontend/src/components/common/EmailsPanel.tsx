@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function EmailsPanel({ linkedTo, linkedModel, defaultTo }: Props) {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const em = tr.tools.emails;
   const qc = useQueryClient();
   const key = ["emails", linkedModel, linkedTo];
@@ -68,7 +68,7 @@ export function EmailsPanel({ linkedTo, linkedModel, defaultTo }: Props) {
             <div key={e.id} className="rounded-md border border-border/60 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-sm truncate">{e.subject}</span>
-                <span className="text-[11px] text-muted-foreground shrink-0">{new Date(e.createdAt).toLocaleString()}</span>
+                <span className="text-[11px] text-muted-foreground shrink-0">{formatDate(e.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">{em.toAddr(e.to)} · {e.deliveryStatus ?? e.status}</div>
               <div className="flex items-center gap-3 mt-1.5 text-xs">

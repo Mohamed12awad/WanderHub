@@ -22,7 +22,7 @@ export interface Deal {
 const CURRENCY_CODES = ["USD", "EUR", "GBP", "EGP", "AED", "SAR"];
 
 export function Deals() {
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate } = useLanguage();
   const d = tr.deals;
 
   // Deal statuses reuse the shared pipeline stage labels so the same wording
@@ -68,8 +68,8 @@ export function Deals() {
           status={item.status}
           priority={item.priority}
           owner={item.owner?.name}
-          value={`${item.price?.toLocaleString()} ${item.currency}`}
-          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          value={formatCurrency(item.price ?? 0, item.currency)}
+          date={formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}
@@ -103,7 +103,7 @@ export function Deals() {
           [d.exportColumns.price]: deal.price,
           [d.exportColumns.currency]: deal.currency,
           [d.exportColumns.source]: deal.source,
-          [d.exportColumns.createdAt]: new Date(deal.createdAt).toLocaleDateString(),
+          [d.exportColumns.createdAt]: new Date(deal.createdAt).toISOString().slice(0, 10),
         }),
       }}
     />

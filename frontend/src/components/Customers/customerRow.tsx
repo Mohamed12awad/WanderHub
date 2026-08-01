@@ -38,9 +38,9 @@ interface CustomerRowProps {
 
 const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete, selectionCell }) => {
   const { user } = useAuth();
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const navigate = useNavigate();
-  const date = new Date(item.createdAt).toLocaleString(undefined, {
+  const date = formatDate(item.createdAt, {
     year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 

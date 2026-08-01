@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getAllActivities, updateActivity, deleteActivity } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -12,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { GenericTable } from "@/components/common/GenericTable";
 import { ActivityDetailDialog } from "@/components/Activities/ActivityDetailDialog";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const TYPE_EMOJIS: Record<ActivityType, string> = {
   call: "📞",
@@ -60,6 +60,7 @@ function entityLink(a: Activity): { label: string; href: string } | null {
 }
 
 export function ActivitiesPage() {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -134,7 +135,7 @@ export function ActivitiesPage() {
                 )}
               </TableCell>
               <TableCell className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
-                {format(new Date(a.date), "dd MMM yyyy")}
+                {formatDate(a.date, { day: "2-digit", month: "short", year: "numeric" })}
                 {a.createdBy && <span className="block text-[10px]">by {a.createdBy.name}</span>}
               </TableCell>
               <TableCell>

@@ -1,5 +1,6 @@
 import { InfoRow } from "@/components/common/InfoRow";
 import { MetaField } from "@/components/common/MetaGrid";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface UserRef {
   _id?: string;
@@ -17,8 +18,6 @@ export interface AuditFields {
 
 const name = (u: AuditFields["createdBy"]): string | null =>
   u && typeof u === "object" ? u.name ?? null : null;
-
-const dt = (v?: string | null) => (v ? new Date(v).toLocaleString() : null);
 
 /**
  * Shared "Created by / Created at / Modified by / Last updated" rows for any
@@ -38,6 +37,8 @@ export function AuditRows({
   /** "rows" → InfoRow (160px label grid); "meta" → MetaField (for MetaGrid layouts). */
   variant?: "rows" | "meta";
 }) {
+  const { formatDate } = useLanguage();
+  const dt = (v?: string | null) => v ? formatDate(v, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : null;
   const creator = name(createdByField ?? record.createdBy);
   const editor = name(record.updatedBy);
   const Row = variant === "meta" ? MetaField : InfoRow;

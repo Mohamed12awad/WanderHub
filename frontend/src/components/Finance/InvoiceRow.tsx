@@ -7,6 +7,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { FinanceStatusBadge } from "@/components/Finance/FinanceStatusBadge";
 import { Invoice } from "@/types/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const InvoiceRow: React.FC<{
   item: Invoice;
@@ -14,6 +15,7 @@ const InvoiceRow: React.FC<{
   canDelete: boolean;
 }> = ({ item: inv, handleDelete, canDelete }) => {
   const navigate = useNavigate();
+  const { formatCurrency, formatDate } = useLanguage();
   const outstanding = inv.total - inv.totalPaid;
   const isOverdue = inv.status === "overdue";
 
@@ -37,15 +39,13 @@ const InvoiceRow: React.FC<{
         <FinanceStatusBadge status={inv.status} type="invoice" />
       </TableCell>
       <TableCell dir="auto" className="text-right font-medium tabular-nums">
-        {inv.total.toLocaleString()}{" "}
-        <span className="text-xs text-muted-foreground">{inv.currency}</span>
+        {formatCurrency(inv.total, inv.currency)}
       </TableCell>
       <TableCell dir="auto" className={`text-right font-medium tabular-nums ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
-        {outstanding.toLocaleString()}{" "}
-        <span className="text-xs opacity-70">{inv.currency}</span>
+        {formatCurrency(outstanding, inv.currency)}
       </TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">
-        {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "—"}
+        {inv.dueDate ? formatDate(inv.dueDate) : "—"}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

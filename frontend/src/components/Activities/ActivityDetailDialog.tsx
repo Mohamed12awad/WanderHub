@@ -12,12 +12,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Circle, Pencil, Trash2, ExternalLink, X, Save } from "lucide-react";
-import { format } from "date-fns";
 import { updateActivity, deleteActivity, getUsers } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const TYPE_EMOJIS: Record<ActivityType, string> = {
   call: "📞", meeting: "🤝", task: "✅", note: "📝", email: "📧",
@@ -65,6 +65,7 @@ interface Props {
 }
 
 export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateKeys = [] }: Props) {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -205,7 +206,7 @@ export function ActivityDetailDialog({ activity, open, onOpenChange, invalidateK
             {editing ? (
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-7 text-sm" />
             ) : (
-              <span className="text-sm">{format(new Date(activity.date), "EEE, dd MMM yyyy")}</span>
+              <span className="text-sm">{formatDate(activity.date, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</span>
             )}
           </div>
 

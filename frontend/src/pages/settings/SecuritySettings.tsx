@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { KeyRound, Monitor, History, Laptop, Smartphone, Globe, CheckCircle, XCircle } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -29,13 +30,6 @@ function parseBrowser(ua: string | null | undefined): string {
   if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
   if (ua.includes("Edg")) return "Edge";
   return "";
-}
-
-function formatTs(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }
 
 // ── Change Password card ───────────────────────────────────────────────────────
@@ -146,6 +140,7 @@ interface Session {
 }
 
 function ActiveSessionsCard() {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -201,7 +196,7 @@ function ActiveSessionsCard() {
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {session.ipAddress ? `${session.ipAddress} · ` : ""}
-                      Signed in {formatTs(session.createdAt)}
+                      Signed in {formatDate(session.createdAt, { dateStyle: "medium", timeStyle: "short" })}
                     </p>
                   </div>
                   <Button
@@ -233,6 +228,7 @@ interface LogEntry {
 }
 
 function LoginHistoryCard() {
+  const { formatDate } = useLanguage();
   const { data, isLoading } = useQuery<LogEntry[]>({
     queryKey: ["me-login-history"],
     queryFn: () => getLoginHistory().then((r) => r.data),
@@ -270,7 +266,7 @@ function LoginHistoryCard() {
                 }
                 <span className="flex-1 text-sm">{entry.action}</span>
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {formatTs(entry.timestamp)}
+                  {formatDate(entry.timestamp, { dateStyle: "medium", timeStyle: "short" })}
                 </span>
                 {!entry.success && (
                   <Badge variant="destructive" className="text-[10px] h-4 px-1.5">Failed</Badge>

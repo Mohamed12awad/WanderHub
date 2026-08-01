@@ -17,7 +17,7 @@ interface Props {
 
 export function NotesPanel({ linkedTo, linkedModel }: Props) {
   const { user } = useAuth();
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const t = tr.notes;
@@ -180,7 +180,7 @@ export function NotesPanel({ linkedTo, linkedModel }: Props) {
                   <p className="text-xs text-muted-foreground mt-1.5">
                     <span className="font-medium">{note.createdBy.name}</span>
                     {" · "}
-                    <span title={new Date(note.createdAt).toLocaleString()}>
+                    <span title={formatDate(note.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}>
                       {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
                     </span>
                     {note.updatedAt !== note.createdAt && " · edited"}

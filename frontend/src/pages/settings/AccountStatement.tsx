@@ -8,6 +8,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Landmark, Wallet, Lock } from "lucide-react";
 import { getAccountStatement } from "@/utils/api";
 import type { AccountType } from "@/types/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const TYPE_ICONS: Record<string, ElementType> = { bank: Landmark, cash: Wallet, safe: Lock };
 
@@ -34,6 +35,7 @@ interface AccountInfo {
 }
 
 export default function AccountStatement() {
+  const { formatCurrency, formatDate } = useLanguage();
   const { id = "" } = useParams();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
@@ -68,7 +70,7 @@ export default function AccountStatement() {
         {account && (
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Current balance</p>
-            <p className="text-xl font-bold tabular-nums">{account.balance.toLocaleString()} {account.currency}</p>
+            <p className="text-xl font-bold tabular-nums">{formatCurrency(account.balance, account.currency)}</p>
           </div>
         )}
       </div>
@@ -101,7 +103,7 @@ export default function AccountStatement() {
                       : null;
                     return (
                       <TableRow key={t._id ?? t.id ?? i}>
-                        <TableCell className="text-sm">{new Date(t.date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-sm">{formatDate(t.date)}</TableCell>
                         <TableCell dir="auto">
                           <Badge variant="outline" className={isIn ? "border-green-300 text-green-600" : "border-red-300 text-red-600"}>
                             {isIn ? <ArrowDownLeft className="h-3 w-3 me-1" /> : <ArrowUpRight className="h-3 w-3 me-1" />}
@@ -117,7 +119,7 @@ export default function AccountStatement() {
                         </TableCell>
                         <TableCell className="text-sm capitalize text-muted-foreground">{t.method?.replace(/_/g, " ")}</TableCell>
                         <TableCell dir="auto" className={`text-right font-medium tabular-nums ${isIn ? "text-green-600" : "text-red-600"}`}>
-                          {isIn ? "+" : "−"}{t.amount.toLocaleString()} {t.currency}
+                          {isIn ? "+" : "−"}{formatCurrency(t.amount, t.currency)}
                         </TableCell>
                       </TableRow>
                     );

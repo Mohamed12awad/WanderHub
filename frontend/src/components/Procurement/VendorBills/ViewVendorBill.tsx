@@ -34,6 +34,7 @@ import { ApprovalBadge } from "@/components/Finance/FinanceStatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 function PaymentDialog({ billId, currency, outstanding, onDone }: { billId: string; currency: string; outstanding: number; onDone: () => void }) {
+  const { formatCurrency } = useLanguage();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(outstanding);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -77,7 +78,7 @@ function PaymentDialog({ billId, currency, outstanding, onDone }: { billId: stri
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
               <SelectContent>
-                {accounts.map((a: any) => <SelectItem key={a._id} value={a._id}>{a.name} ({a.currency} {a.balance?.toLocaleString()})</SelectItem>)}
+                {accounts.map((a: any) => <SelectItem key={a._id} value={a._id}>{a.name} ({formatCurrency(a.balance ?? 0, a.currency)})</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -92,7 +93,7 @@ export default function ViewVendorBill() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -235,10 +236,10 @@ export default function ViewVendorBill() {
             <MetaField label="Supplier" value={supplierName} />
             {bill.purchaseOrder && <MetaField label="PO" value={bill.purchaseOrder.poNumber} />}
             <MetaField label="Cost Center" value={bill.costCenter ? `${bill.costCenter.code} — ${bill.costCenter.name}` : "—"} />
-            <MetaField label="Total" value={`${bill.total?.toLocaleString()} ${bill.currency}`} />
+            <MetaField label="Total" value={formatCurrency(bill.total ?? 0, bill.currency)} />
             <MetaField label="Outstanding">
               <span className={outstanding > 0 ? "text-destructive font-medium" : "text-emerald-600"}>
-                {outstanding.toLocaleString()} {bill.currency}
+                {formatCurrency(outstanding, bill.currency)}
               </span>
             </MetaField>
             <AuditRows record={bill} createdByField={bill.createdBy} variant="meta" />
@@ -253,7 +254,7 @@ export default function ViewVendorBill() {
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>
               {(bill.items ?? []).map((it: any, i: number) => (
-                <TableRow key={it.id ?? it._id ?? i}><TableCell dir="auto">{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell><TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell></TableRow>
+                <TableRow key={it.id ?? it._id ?? i}><TableCell dir="auto">{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice != null ? formatNumber(it.unitPrice) : "—"}</TableCell><TableCell className="text-right tabular-nums">{it.total != null ? formatNumber(it.total) : "—"}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
@@ -261,15 +262,15 @@ export default function ViewVendorBill() {
             <div className="w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="tabular-nums text-foreground">{bill.subtotal?.toLocaleString()} {bill.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(bill.subtotal ?? 0, bill.currency)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Tax ({bill.taxRate ?? 0}%)</span>
-                <span className="tabular-nums text-foreground">{bill.tax?.toLocaleString()} {bill.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(bill.tax ?? 0, bill.currency)}</span>
               </div>
               <div className="flex items-baseline justify-between border-t pt-2">
                 <span className="text-sm font-medium">Total</span>
-                <span className="text-xl font-bold tabular-nums">{bill.total?.toLocaleString()} {bill.currency}</span>
+                <span className="text-xl font-bold tabular-nums">{formatCurrency(bill.total ?? 0, bill.currency)}</span>
               </div>
             </div>
           </div>
@@ -285,9 +286,9 @@ export default function ViewVendorBill() {
               {(bill.payments ?? []).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No payments yet</TableCell></TableRow>}
               {(bill.payments ?? []).map((p: any) => (
                 <TableRow key={p._id}>
-                  <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDate(p.date)}</TableCell>
                   <TableCell className="capitalize">{p.method?.replace("_", " ")}</TableCell>
-                  <TableCell dir="auto" className="text-right tabular-nums">{p.amount?.toLocaleString()} {p.currency}</TableCell>
+                  <TableCell dir="auto" className="text-right tabular-nums">{formatCurrency(p.amount ?? 0, p.currency)}</TableCell>
                   <TableCell className="text-right">
                     {((user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete')) && (
                       <button type="button" aria-label={`Delete payment ${p.reference ?? p._id}`} onClick={() => handleDeletePayment(p._id)} className="text-destructive opacity-60 hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>

@@ -19,6 +19,7 @@ import LoadingSpinner from "@/components/common/spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InfoRow } from "@/components/common/InfoRow";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function oneWeekFromNow() {
   const d = new Date();
@@ -68,6 +69,7 @@ interface DealData {
 }
 
 const ViewDeal = () => {
+  const { formatCurrency } = useLanguage();
   const { id: dealId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -286,19 +288,19 @@ const ViewDeal = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Deal Value</p>
-                  <p className="text-base font-semibold tabular-nums">{formData.price.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                  <p className="text-base font-semibold tabular-nums">{formatCurrency(formData.price, formData.currency)}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Invoiced</p>
-                  <p className="text-base font-semibold tabular-nums text-foreground">{invoicedTotal.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                  <p className="text-base font-semibold tabular-nums text-foreground">{formatCurrency(invoicedTotal, formData.currency)}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Collected</p>
-                  <p className="text-base font-semibold tabular-nums text-emerald-600">{invoicesPaid.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                  <p className="text-base font-semibold tabular-nums text-emerald-600">{formatCurrency(invoicesPaid, formData.currency)}</p>
                 </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Outstanding</p>
-                  <p className={`text-base font-semibold tabular-nums ${invoicesOutstanding > 0 ? "text-red-500" : "text-emerald-600"}`}>{invoicesOutstanding.toLocaleString()} <span className="text-xs font-normal">{formData.currency}</span></p>
+                  <p className={`text-base font-semibold tabular-nums ${invoicesOutstanding > 0 ? "text-red-500" : "text-emerald-600"}`}>{formatCurrency(invoicesOutstanding, formData.currency)}</p>
                 </div>
               </div>
             </div>

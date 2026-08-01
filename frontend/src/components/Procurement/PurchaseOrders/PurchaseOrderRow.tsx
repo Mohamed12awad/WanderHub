@@ -2,7 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { RowActions } from "@/components/common/RowActions";
 import { PurchaseOrder } from "@/types/types";
-import { format } from "date-fns";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
@@ -10,16 +9,14 @@ interface Props {
   handleDelete: (id: string) => void;
 }
 
-/** Formats a date, returning "-" for missing or invalid values (avoids date-fns "Invalid time value" crashes). */
-function fmtDate(value?: string | Date | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? "-" : format(d, "MMM d, yyyy");
-}
-
 export default function PurchaseOrderRow({ po, handleDelete }: Props) {
   const navigate = useNavigate();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate } = useLanguage();
+  const fmtDate = (value?: string | Date | null) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? "-" : formatDate(d, { month: "short", day: "numeric", year: "numeric" });
+  };
   const expected = (po as any).expectedDeliveryDate ?? (po as any).expectedDate;
   const orderDate = (po as any).issueDate ?? (po as any).createdAt;
 
@@ -44,7 +41,7 @@ export default function PurchaseOrderRow({ po, handleDelete }: Props) {
         </span>
       </TableCell>
       <TableCell dir="auto" className="font-medium">
-        {po.total.toLocaleString()} {po.currency}
+        {formatCurrency(po.total, po.currency)}
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">
         {fmtDate(expected)}

@@ -17,10 +17,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface TBRow { accountId: string; code: string; name: string; type: string; debit: string; credit: string }
 interface TB { asOf: string | null; rows: TBRow[]; totalDebit: string; totalCredit: string; balanced: boolean }
 
-const num = (v: string) => (parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
 export default function TrialBalance() {
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
+  const num = (v: string) => formatNumber(parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const a = tr.accounting;
   const [asOf, setAsOf] = useState("");
   const { data, isLoading, isError, refetch } = useQuery({

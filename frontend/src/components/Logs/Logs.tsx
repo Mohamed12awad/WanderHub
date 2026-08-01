@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { Search, UserCircle, ChevronLeft, ChevronRight, CalendarRange, Inbox, ExternalLink } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -55,9 +55,10 @@ function initials(name?: string): string {
 }
 
 function RelativeTime({ ts }: { ts: string }) {
+  const { formatDate } = useLanguage();
   const date = new Date(ts);
   return (
-    <span title={format(date, "dd MMM yyyy, HH:mm:ss")} className="text-xs text-muted-foreground whitespace-nowrap cursor-default tabular-nums">
+    <span title={formatDate(date, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })} className="text-xs text-muted-foreground whitespace-nowrap cursor-default tabular-nums">
       {formatDistanceToNow(date, { addSuffix: true })}
     </span>
   );
@@ -77,7 +78,7 @@ const PAGE_SIZE = 50;
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function Logs() {
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
 
   const [startDate,      setStartDate]      = useState("");
   const [endDate,        setEndDate]        = useState("");
@@ -310,7 +311,7 @@ export function Logs() {
             <div className="flex items-center justify-between px-6 py-3 border-t text-sm text-muted-foreground">
               <span className="text-xs">
                 Page {page} of {totalPages}
-                {paginationInfo?.total != null && ` · ${paginationInfo.total.toLocaleString()} entries`}
+                {paginationInfo?.total != null && ` · ${formatNumber(paginationInfo.total)} entries`}
               </span>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>

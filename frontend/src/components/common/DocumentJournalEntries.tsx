@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { format } from "date-fns";
 import { BookText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDocumentJournalEntries } from "@/utils/api";
@@ -22,16 +21,15 @@ interface JEntry {
   lines: JLine[];
 }
 
-const fmt = (v: string | number) =>
-  (typeof v === "number" ? v : parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
 /**
  * The GL footprint of a document — its own posting plus any payment postings.
  * Renders nothing when the document has no journal entries (e.g. a draft, or
  * GL posting disabled), so it never clutters a document that hasn't posted.
  */
 export function DocumentJournalEntries({ model, id }: { model: "Invoice" | "VendorBill" | "ExpenseReport"; id: string }) {
-  const { tr } = useLanguage();
+  const { tr, formatDate, formatNumber } = useLanguage();
+  const fmt = (v: string | number) =>
+    formatNumber(typeof v === "number" ? v : parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const a = tr.accounting;
   const { data } = useQuery({
     queryKey: ["doc-journal", model, id],
@@ -62,7 +60,7 @@ export function DocumentJournalEntries({ model, id }: { model: "Invoice" | "Vend
                 </span>
                 {e.memo && <span className="text-xs text-muted-foreground truncate">{e.memo}</span>}
               </div>
-              <span className="text-xs text-muted-foreground shrink-0">{format(new Date(e.date), "dd MMM yyyy")}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{formatDate(e.date, { day: "2-digit", month: "short", year: "numeric" })}</span>
             </div>
             <table className="w-full mt-2 text-xs">
               <tbody>

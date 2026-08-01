@@ -30,7 +30,7 @@ interface Props {
 
 const ProjectRow: React.FC<Props> = ({ _id, name, customer, manager, status, budget, currency, endDate, handleDelete }) => {
   const navigate = useNavigate();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate } = useLanguage();
   const { user } = useAuth();
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'projects:delete');
 
@@ -40,8 +40,8 @@ const ProjectRow: React.FC<Props> = ({ _id, name, customer, manager, status, bud
       <TableCell dir="auto" className="text-muted-foreground">{customer?.name ?? "—"}</TableCell>
       <TableCell dir="auto" className="text-muted-foreground">{manager?.name ?? "—"}</TableCell>
       <TableCell><Badge variant="outline" className={`${STATUS_COLORS[status] ?? ""} capitalize`}>{status?.replace("_", " ")}</Badge></TableCell>
-      <TableCell dir="auto" className="tabular-nums">{budget ? `${budget.toLocaleString()} ${currency}` : "—"}</TableCell>
-      <TableCell className="text-muted-foreground text-xs">{endDate ? new Date(endDate).toLocaleDateString() : "—"}</TableCell>
+      <TableCell dir="auto" className="tabular-nums">{budget ? formatCurrency(budget, currency) : "—"}</TableCell>
+      <TableCell className="text-muted-foreground text-xs">{endDate ? formatDate(endDate) : "—"}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

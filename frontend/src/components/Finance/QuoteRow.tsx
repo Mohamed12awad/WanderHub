@@ -8,6 +8,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, Edit, ArrowRightLeft, Trash2 } from "lucide-react";
 import { FinanceStatusBadge } from "@/components/Finance/FinanceStatusBadge";
 import { Quote } from "@/types/types";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const QuoteRow: React.FC<{
   item: Quote;
@@ -16,6 +17,7 @@ const QuoteRow: React.FC<{
   canDelete: boolean;
 }> = ({ item: q, handleDelete, handleConvert, canDelete }) => {
   const navigate = useNavigate();
+  const { formatCurrency, formatDate } = useLanguage();
 
   return (
     <TableRow
@@ -46,14 +48,13 @@ const QuoteRow: React.FC<{
         )}
       </TableCell>
       <TableCell dir="auto" className="text-right font-medium tabular-nums">
-        {q.total.toLocaleString()}{" "}
-        <span className="text-xs text-muted-foreground">{q.currency}</span>
+        {formatCurrency(q.total, q.currency)}
       </TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">
-        {q.validUntil ? new Date(q.validUntil).toLocaleDateString() : "—"}
+        {q.validUntil ? formatDate(q.validUntil) : "—"}
       </TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">
-        {new Date(q.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+        {formatDate(q.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

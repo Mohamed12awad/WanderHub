@@ -77,7 +77,7 @@ export function Customers() {
           Phone: c.phone,
           Location: c.location,
           Status: c.status,
-          "Created At": new Date(c.createdAt).toLocaleDateString(),
+          "Created At": new Date(c.createdAt).toISOString().slice(0, 10),
         }),
       }}
     />

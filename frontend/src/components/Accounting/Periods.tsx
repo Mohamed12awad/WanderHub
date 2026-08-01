@@ -19,7 +19,7 @@ interface ClosedPeriod { period: string; closedAt: string }
 export default function Periods() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const a = tr.accounting;
   const [period, setPeriod] = useState(() => new Date().toISOString().slice(0, 7));
   const [busy, setBusy] = useState(false);
@@ -98,7 +98,7 @@ export default function Periods() {
                 {periods.map((p) => (
                   <TableRow key={p.period}>
                     <TableCell className="font-mono">{p.period}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{new Date(p.closedAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatDate(p.closedAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" onClick={() => setPendingReopen(p.period)}>
                         <LockOpen className="h-3.5 w-3.5 me-1" />{a.reopen}

@@ -84,6 +84,7 @@ interface QuickAddProps {
 }
 
 function QuickAddDialog({ date, open, onOpenChange, onCreated }: QuickAddProps) {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const [type,        setType]        = useState<ActivityType>("call");
   const [title,       setTitle]       = useState("");
@@ -119,7 +120,7 @@ function QuickAddDialog({ date, open, onOpenChange, onCreated }: QuickAddProps) 
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle>
-            New activity {date ? `— ${format(date, "EEE, dd MMM")}` : ""}
+            New activity {date ? `— ${formatDate(date, { weekday: "short", day: "2-digit", month: "short" })}` : ""}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -185,7 +186,7 @@ function QuickAddDialog({ date, open, onOpenChange, onCreated }: QuickAddProps) 
 
 // ── Main calendar ─────────────────────────────────────────────────────────────
 export function ActivityCalendar() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const c = tr.calendar;
@@ -248,7 +249,7 @@ export function ActivityCalendar() {
     <PageShell width="default">
       <PageHeader
         title={c.title}
-        description={format(current, "MMMM yyyy")}
+        description={formatDate(current, { month: "long", year: "numeric" })}
         primaryAction={
           <div className="flex items-center gap-2">
             <Button
@@ -300,7 +301,7 @@ export function ActivityCalendar() {
                     isToday(day) && "bg-primary text-primary-foreground",
                     !inMonth && "text-muted-foreground/40",
                   )}>
-                    {format(day, "d")}
+                    {formatDate(day, { day: "numeric" })}
                   </span>
 
                   <div className="flex flex-col gap-0.5">
@@ -344,7 +345,7 @@ export function ActivityCalendar() {
           {selected ? (
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-sm">{format(selected, "EEE, MMMM d")}</h2>
+                <h2 className="font-semibold text-sm">{formatDate(selected, { weekday: "short", month: "long", day: "numeric" })}</h2>
                 <Button
                   size="sm" variant="ghost" className="h-7 gap-1 text-xs"
                   onClick={() => setAddOpen(true)}
@@ -461,7 +462,7 @@ export function ActivityCalendar() {
         <Dialog open={!!showAllDay} onOpenChange={() => setShowAllDay(null)}>
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
-              <DialogTitle>All activities — {format(showAllDay, "EEE, dd MMM yyyy")}</DialogTitle>
+              <DialogTitle>All activities — {formatDate(showAllDay, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</DialogTitle>
             </DialogHeader>
             <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
               {showAllActivities.map((a) => (

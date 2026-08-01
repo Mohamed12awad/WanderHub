@@ -8,6 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Trash2, Plus } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export const EXPENSE_CATEGORIES = [
   { value: "marketing", label: "Marketing & Advertising" },
@@ -44,6 +45,7 @@ interface Props {
 }
 
 const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
+  const { formatNumber } = useLanguage();
   const update = (idx: number, field: keyof ExpenseLine, value: string | number) => {
     onChange(
       lines.map((row, i) =>
@@ -155,7 +157,7 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
           Add Row
         </Button>
         <p className="text-sm font-semibold">
-          Total: {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          Total: {formatNumber(total, { maximumFractionDigits: 2 })}
         </p>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Badge } from "../ui/badge";
 import { Link } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Customer {
   name: string;
@@ -33,6 +34,7 @@ interface BookingReportProps {
 }
 
 const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
+  const { formatCurrency } = useLanguage();
   useEffect(() => {
     document.body.style.overflow = "auto";
   }, []);
@@ -82,11 +84,11 @@ const BookingReportComponent: React.FC<BookingReportProps> = ({ bookings }) => {
               <strong>Customer Location:</strong> {booking.customer.location}
             </p>
             <p className="mb-1">
-              <strong>Total Price:</strong> {booking.price.toLocaleString()} EGP
+              <strong>Total Price:</strong> {formatCurrency(booking.price, "EGP")}
             </p>
             <p className="mb-1">
               <strong>Remaining:</strong>{" "}
-              {(booking.price - booking.totalPaid).toLocaleString()} EGP
+              {formatCurrency(booking.price - booking.totalPaid, "EGP")}
             </p>
             {booking.endDate && (
               <p className="mb-1">

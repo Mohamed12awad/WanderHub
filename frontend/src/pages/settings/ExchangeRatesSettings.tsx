@@ -14,6 +14,7 @@ import { Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getExchangeRates, upsertExchangeRate, getOrgSettings } from "@/utils/api";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Rate {
   id: string;
@@ -24,6 +25,7 @@ interface Rate {
 }
 
 export default function ExchangeRatesSettings() {
+  const { formatDate } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -96,7 +98,7 @@ export default function ExchangeRatesSettings() {
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.currency}</TableCell>
                     <TableCell className="text-right font-mono">{r.rate}</TableCell>
-                    <TableCell>{new Date(r.asOf).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(r.asOf)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

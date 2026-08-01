@@ -52,7 +52,7 @@ const PAGE_SIZE = 50;
 export function Inventory() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const inv = tr.inventory;
   // Reason options rebuild on language change (labels from `tr`), memoized so
   // unrelated renders don't reallocate.
@@ -239,7 +239,7 @@ export function Inventory() {
                 <TableBody>
                   {movements.map((m) => (
                     <TableRow key={m._id}>
-                      <TableCell className="text-xs">{new Date(m.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-xs">{formatDate(m.createdAt)}</TableCell>
                       <TableCell className="capitalize text-xs">{m.type}</TableCell>
                       <TableCell className={`text-right font-mono text-xs ${m.qty < 0 ? "text-destructive" : "text-emerald-600"}`}>
                         {m.qty > 0 ? `+${m.qty}` : m.qty}

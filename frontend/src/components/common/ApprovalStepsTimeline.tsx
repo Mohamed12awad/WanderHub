@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, Clock } from "lucide-react";
 import { getApprovalSteps } from "@/utils/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Step {
   _id: string;
@@ -48,6 +49,7 @@ export function ApprovalStepsTimeline({
    */
   outcome?: ApprovalOutcome;
 }) {
+  const { formatDate } = useLanguage();
   const { data } = useQuery({
     queryKey: ["approval-steps", entityType, entityId],
     queryFn: () => getApprovalSteps(entityType, entityId),
@@ -64,7 +66,7 @@ export function ApprovalStepsTimeline({
             <p className="text-xs text-muted-foreground mt-0.5">
               {outcome.status === "rejected" ? "Rejected" : "Approved"}
               {outcome.actorName ? ` by ${outcome.actorName}` : ""}
-              {outcome.actedAt ? ` · ${new Date(outcome.actedAt).toLocaleString()}` : ""}
+              {outcome.actedAt ? ` · ${formatDate(outcome.actedAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : ""}
             </p>
           )}
           {outcome.status === "pending" && (
@@ -97,7 +99,7 @@ export function ApprovalStepsTimeline({
                 {s.comment && <p className="text-xs text-muted-foreground mt-0.5">{s.comment}</p>}
                 {s.actedAt && (
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {new Date(s.actedAt).toLocaleString()}
+                    {formatDate(s.actedAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </p>
                 )}
               </div>

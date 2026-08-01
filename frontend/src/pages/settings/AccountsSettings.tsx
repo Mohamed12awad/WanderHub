@@ -23,6 +23,7 @@ import { CURRENCIES } from "@/utils/constants";
 import { useToast } from "@/components/ui/use-toast";
 import { Account, AccountType } from "@/types/types";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const TYPE_ICONS: Record<AccountType, React.ElementType> = {
   bank: Landmark,
@@ -55,6 +56,7 @@ const emptyForm = (): FormState => ({
 });
 
 export default function AccountsSettings() {
+  const { formatNumber } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -187,7 +189,7 @@ export default function AccountsSettings() {
                           ? `${(acc as any).chartOfAccount.code} — ${(acc as any).chartOfAccount.name}`
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right font-mono">{acc.balance.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(acc.balance)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${acc.name}`} onClick={(e) => { e.stopPropagation(); openEdit(acc); }}>

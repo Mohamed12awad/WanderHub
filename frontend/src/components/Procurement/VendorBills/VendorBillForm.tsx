@@ -53,7 +53,7 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
   const location        = useLocation();
   const cloneData       = mode === "add" ? (location.state as any)?.clone : undefined;
   const poParam         = searchParams.get("po");
-  const { tr }          = useLanguage();
+  const { tr, formatCurrency } = useLanguage();
 
   const [items, setItems]               = useState<LineItemRow[]>(
     cloneData?.items?.length ? cloneData.items : [{ description: "", quantity: 1, unitPrice: 0, discount: 0 }],
@@ -270,7 +270,7 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
             <div className="w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="tabular-nums text-foreground">{subtotal.toLocaleString()} {currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(subtotal, currency)}</span>
               </div>
               <FormField control={form.control} name="taxInclusive" render={({ field }) => (
                 <label className="flex items-center justify-between cursor-pointer select-none text-muted-foreground">
@@ -280,11 +280,11 @@ export default function VendorBillForm({ mode }: { mode: "add" | "edit" }) {
               )} />
               <div className="flex justify-between text-muted-foreground">
                 <span>Tax</span>
-                <span className="tabular-nums text-foreground">{tax.toLocaleString()} {currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(tax, currency)}</span>
               </div>
               <div className="flex items-baseline justify-between border-t pt-2">
                 <span className="text-sm font-medium">Total</span>
-                <span className="text-xl font-bold tabular-nums">{total.toLocaleString()} {currency}</span>
+                <span className="text-xl font-bold tabular-nums">{formatCurrency(total, currency)}</span>
               </div>
             </div>
           </div>

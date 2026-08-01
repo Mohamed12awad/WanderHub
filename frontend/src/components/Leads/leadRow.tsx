@@ -48,10 +48,10 @@ interface LeadRowProps {
 
 const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete, selectionCell }) => {
   const { user } = useAuth();
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const navigate = useNavigate();
   const statusLabel = tr.leads.statuses[item.status] ?? item.status;
-  const date = new Date(item.createdAt).toLocaleString(undefined, {
+  const date = formatDate(item.createdAt, {
     year: "numeric", month: "short", day: "numeric",
   });
 

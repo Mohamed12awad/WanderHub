@@ -28,7 +28,7 @@ const QuoteDetail: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const f = tr.finance;
   const [converting, setConverting] = useState(false);
@@ -264,7 +264,7 @@ const QuoteDetail: React.FC = () => {
             </div>
             <div className="text-right text-sm">
               <p className="font-semibold">{quote.customer.name}</p>
-              {quote.validUntil && <p className="text-gray-500">Valid until: {new Date(quote.validUntil).toLocaleDateString()}</p>}
+              {quote.validUntil && <p className="text-gray-500">Valid until: {formatDate(quote.validUntil)}</p>}
             </div>
           </div>
         </div>
@@ -285,7 +285,7 @@ const QuoteDetail: React.FC = () => {
                 ) : "—"
               } />
               <InfoRow label={f.currency} value={quote.currency} />
-              <InfoRow label={f.validUntil} value={quote.validUntil ? new Date(quote.validUntil).toLocaleDateString() : "—"} />
+              <InfoRow label={f.validUntil} value={quote.validUntil ? formatDate(quote.validUntil) : "—"} />
             </section>
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Notes & Terms</h2>
@@ -324,9 +324,9 @@ const QuoteDetail: React.FC = () => {
                   <TableRow key={idx}>
                     <TableCell dir="auto">{item.description}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">{item.unitPrice.toLocaleString()}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(item.unitPrice)}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.discount}%</TableCell>
-                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {quote.currency}</TableCell>
+                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{formatCurrency(item.total, quote.currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -337,7 +337,7 @@ const QuoteDetail: React.FC = () => {
             <div className="w-full max-w-xs space-y-1.5 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.subtotal}</span>
-                <span className="tabular-nums text-foreground">{quote.subtotal.toLocaleString()} {quote.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(quote.subtotal, quote.currency)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.taxRate}</span>
@@ -345,11 +345,11 @@ const QuoteDetail: React.FC = () => {
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>{f.tax}</span>
-                <span className="tabular-nums text-foreground">{quote.tax.toLocaleString()} {quote.currency}</span>
+                <span className="tabular-nums text-foreground">{formatCurrency(quote.tax, quote.currency)}</span>
               </div>
               <div className="flex items-baseline justify-between border-t pt-2">
                 <span className="text-sm font-medium">{f.total}</span>
-                <span className="text-xl font-bold tabular-nums">{quote.total.toLocaleString()} {quote.currency}</span>
+                <span className="text-xl font-bold tabular-nums">{formatCurrency(quote.total, quote.currency)}</span>
               </div>
             </div>
           </div>

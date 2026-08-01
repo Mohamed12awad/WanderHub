@@ -21,7 +21,7 @@ type Props = {
 const groupKey = (g: DuplicateGroup) => `${g.field}:${g.value}`;
 
 export function DedupDialog({ entity, title, open, onOpenChange, onDone }: Props) {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const d = tr.tools.dedup;
   const queryClient = useQueryClient();
   const [survivors, setSurvivors] = useState<Record<string, string>>({});
@@ -93,7 +93,7 @@ export function DedupDialog({ entity, title, open, onOpenChange, onDone }: Props
                         {r.email ?? ""}{r.email && r.phone ? " · " : ""}{r.phone ?? ""}
                       </span>
                       <span className="ms-auto text-[11px] text-muted-foreground">
-                        {new Date(r.createdAt).toLocaleDateString()}
+                        {formatDate(r.createdAt)}
                       </span>
                     </label>
                   ))}

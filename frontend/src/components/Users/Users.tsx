@@ -12,7 +12,7 @@ const USER_FILTERS = [
 ];
 
 export function Users() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const u = tr.users;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function Users() {
             email={item.email}
             role={item.role?.name ?? "—"}
             active={item.active}
-            date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            date={formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
             handleDelete={handleDelete}
             onEdit={openEdit}
           />

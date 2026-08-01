@@ -4,7 +4,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { TimelineItem, TimelineEventType } from "@/types/types";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
+import { formatDistanceToNow, isToday, isYesterday } from "date-fns";
 import {
   Handshake, ArrowRight, Trophy, AlertCircle,
   Banknote, Trash2, CheckSquare, CheckCircle2,
@@ -64,11 +64,11 @@ const ACTIVITY_TYPE_ICON: Record<string, string> = {
   call: "📞", meeting: "🤝", task: "✅", note: "📝", email: "📧",
 };
 
-function groupByDate(items: TimelineItem[]): { label: string; items: TimelineItem[] }[] {
+function groupByDate(items: TimelineItem[], formatDate: ReturnType<typeof useLanguage>["formatDate"]): { label: string; items: TimelineItem[] }[] {
   const groups: Record<string, TimelineItem[]> = {};
   for (const item of items) {
     const d = new Date(item.createdAt);
-    const label = isToday(d) ? "Today" : isYesterday(d) ? "Yesterday" : format(d, "dd MMM yyyy");
+    const label = isToday(d) ? "Today" : isYesterday(d) ? "Yesterday" : formatDate(d, { day: "2-digit", month: "short", year: "numeric" });
     if (!groups[label]) groups[label] = [];
     groups[label].push(item);
   }
@@ -76,7 +76,7 @@ function groupByDate(items: TimelineItem[]): { label: string; items: TimelineIte
 }
 
 export function RecordTimeline({ linkedTo, linkedModel }: Props) {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const t = tr.timeline;
 
   const { data, isPending } = useQuery({
@@ -86,7 +86,7 @@ export function RecordTimeline({ linkedTo, linkedModel }: Props) {
   });
 
   const items: TimelineItem[] = data?.data ?? [];
-  const groups = groupByDate(items);
+  const groups = groupByDate(items, formatDate);
 
   if (isPending) {
     return (
@@ -142,6 +142,7 @@ function TimelineItemRow({
   item: TimelineItem;
   t: { events: Record<string, string>; system: string };
 }) {
+  const { formatDate } = useLanguage();
   const isActivity = item._sourceType === "activity";
   const eventType = item.eventType ?? "custom";
   // Any "<entity>.updated" event shares the generic "updated" treatment when it
@@ -185,7 +186,7 @@ function TimelineItemRow({
         )}
 
         <p className="text-xs text-muted-foreground mt-0.5">
-          <span title={format(new Date(item.createdAt), "dd MMM yyyy, HH:mm")}>
+          <span title={formatDate(item.createdAt, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}>
             {timeAgo}
           </span>
           {" · "}
@@ -211,13 +212,18 @@ const FIELD_LABELS: Record<string, string> = {
   reorderLevel: "Reorder Level", customFields: "Custom Fields", address: "Address",
 };
 
-function formatFieldValue(field: string, value: unknown): string {
+function formatFieldValue(
+  field: string,
+  value: unknown,
+  formatNumber: ReturnType<typeof useLanguage>["formatNumber"],
+  formatDate: ReturnType<typeof useLanguage>["formatDate"],
+): string {
   if (value === null || value === undefined || value === "") return "—";
   if (field === "probability") return `${value}%`;
-  if (field === "price") return Number(value).toLocaleString();
+  if (field === "price") return formatNumber(Number(value));
   if (field === "expectedCloseDate") {
     const d = value instanceof Date ? value : new Date(String(value));
-    return isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    return isNaN(d.getTime()) ? String(value) : formatDate(d, { year: "numeric", month: "short", day: "numeric" });
   }
   return String(value);
 }
@@ -229,6 +235,7 @@ function PayloadChips({
   payload: Record<string, unknown>;
   eventType: string;
 }) {
+  const { formatDate, formatNumber } = useLanguage();
   if (eventType === "deal.stage_changed" || eventType === "deal.won" || eventType === "deal.lost") {
     return (
       <div className="flex items-center gap-1 mt-1 text-xs">
@@ -249,11 +256,11 @@ function PayloadChips({
               {FIELD_LABELS[field] ?? field}:
             </span>
             <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground max-w-[120px] truncate capitalize">
-              {formatFieldValue(field, from)}
+              {formatFieldValue(field, from, formatNumber, formatDate)}
             </span>
             <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
             <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary max-w-[120px] truncate capitalize font-medium">
-              {formatFieldValue(field, to)}
+              {formatFieldValue(field, to, formatNumber, formatDate)}
             </span>
           </div>
         ))}

@@ -22,11 +22,10 @@ interface Ledger {
   totalDebit: string; totalCredit: string; balance: string;
 }
 
-const num = (v: string) => (parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
 export default function AccountLedger() {
   const { id = "" } = useParams();
-  const { tr } = useLanguage();
+  const { tr, formatDate, formatNumber } = useLanguage();
+  const num = (v: string) => formatNumber(parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const a = tr.accounting;
   const [page, setPage] = useState(1);
   const { data, isLoading } = useQuery({
@@ -81,7 +80,7 @@ export default function AccountLedger() {
               <TableBody>
                 {ledger.data.map((l) => (
                   <TableRow key={l._id} className={l.status === "reversed" ? "opacity-60" : ""}>
-                    <TableCell className="text-xs">{new Date(l.date).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-xs">{formatDate(l.date)}</TableCell>
                     <TableCell dir="auto" className="font-mono text-xs">
                       <Link to={`/accounting/journal/${l.entryId}`} className="text-primary hover:underline">{l.entryNumber}</Link>
                     </TableCell>
@@ -101,7 +100,7 @@ export default function AccountLedger() {
 
       {ledger.pages > 1 && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{a.pageInfo(ledger.page, ledger.pages, ledger.total)}</span>
+          <span>{a.pageInfo(ledger.page, ledger.pages, formatNumber(ledger.total))}</span>
           <div className="flex gap-1">
             <Button size="sm" variant="outline" className="h-7" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{a.prev}</Button>
             <Button size="sm" variant="outline" className="h-7" disabled={page >= ledger.pages} onClick={() => setPage((p) => p + 1)}>{a.next}</Button>

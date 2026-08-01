@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, Trash2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export interface VendorPaymentRecord {
   _id: string;
@@ -49,6 +50,7 @@ const VendorPaymentRow: React.FC<{
   canDelete: boolean;
 }> = ({ item: p, handleDelete, canDelete }) => {
   const navigate = useNavigate();
+  const { formatCurrency, formatDate } = useLanguage();
 
   return (
     <TableRow
@@ -56,7 +58,7 @@ const VendorPaymentRow: React.FC<{
       onClick={() => navigate(`/procurement/bills/${p.bill._id}`)}
     >
       <TableCell className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
-        {new Date(p.date).toLocaleDateString()}
+        {formatDate(p.date)}
       </TableCell>
       <TableCell dir="auto">
         <Link
@@ -77,8 +79,7 @@ const VendorPaymentRow: React.FC<{
         </Link>
       </TableCell>
       <TableCell dir="auto" className="text-right font-medium tabular-nums">
-        {p.amount.toLocaleString()}{" "}
-        <span className="text-xs text-muted-foreground">{p.currency}</span>
+        {formatCurrency(p.amount, p.currency)}
       </TableCell>
       <TableCell>
         <Badge variant="outline" className={METHOD_COLORS[p.method] ?? METHOD_COLORS.other}>

@@ -25,6 +25,7 @@ interface BoardProject {
 }
 
 function ProjectCard({ project }: { project: BoardProject }) {
+  const { formatCurrency, formatDate } = useLanguage();
   return (
     <div className="group bg-card border border-border/60 rounded-xl p-3 shadow-sm transition-all hover:shadow-md hover:border-border">
       <Link
@@ -40,7 +41,7 @@ function ProjectCard({ project }: { project: BoardProject }) {
 
       {(project.budget ?? 0) > 0 && (
         <p className="text-sm font-bold tabular-nums mt-2.5">
-          {project.budget!.toLocaleString()} {project.currency ?? "EGP"}
+          {formatCurrency(project.budget!, project.currency ?? "EGP")}
         </p>
       )}
 
@@ -48,7 +49,7 @@ function ProjectCard({ project }: { project: BoardProject }) {
         {project.endDate ? (
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
             <CalendarDays className="h-3 w-3" />
-            {new Date(project.endDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+            {formatDate(project.endDate, { day: "2-digit", month: "short" })}
           </span>
         ) : <span />}
         {project.manager?.name && (

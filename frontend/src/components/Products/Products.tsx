@@ -18,7 +18,7 @@ const PRODUCT_FILTERS = [
 ];
 
 export function Products() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const p = tr.products;
 
   return (
@@ -45,7 +45,7 @@ export function Products() {
           type={item.type}
           capacity={item.capacity}
           location={item.location}
-          date={new Date(item.createdAt).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          date={formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           handleDelete={handleDelete}
         />
       )}

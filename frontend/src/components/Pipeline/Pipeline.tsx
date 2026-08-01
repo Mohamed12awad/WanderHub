@@ -46,10 +46,6 @@ const PRIORITY_COLORS: Record<string, string> = {
   low:    "text-slate-400",
 };
 
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(amount) + " " + currency;
-}
-
 function customerName(c: Deal["customer"]) {
   return typeof c === "object" && c ? c.name : (c ?? "—");
 }
@@ -62,6 +58,7 @@ const dealValue = (d: Deal) => d.value ?? d.price ?? 0;
 
 // ── Deal card ─────────────────────────────────────────────────────────────────
 function DealCard({ deal }: { deal: Deal }) {
+  const { formatCurrency, formatDate } = useLanguage();
   const value = dealValue(deal);
   const priority = deal.priority;
 
@@ -81,7 +78,7 @@ function DealCard({ deal }: { deal: Deal }) {
       {value > 0 && (
         <div className="flex items-center gap-1 mt-2.5">
           <TrendingUp className="h-3 w-3 text-muted-foreground/50 shrink-0" />
-          <span className="text-sm font-bold tabular-nums">{formatCurrency(value, deal.currency)}</span>
+          <span className="text-sm font-bold tabular-nums">{formatCurrency(value, deal.currency, { notation: "compact", maximumFractionDigits: 1 })}</span>
         </div>
       )}
 
@@ -90,7 +87,7 @@ function DealCard({ deal }: { deal: Deal }) {
           {deal.expectedCloseDate && (
             <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0">
               <Calendar className="h-3 w-3" />
-              {new Date(deal.expectedCloseDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+              {formatDate(deal.expectedCloseDate, { day: "2-digit", month: "short" })}
             </span>
           )}
           {priority && priority !== "medium" && (
@@ -114,19 +111,20 @@ function DealCard({ deal }: { deal: Deal }) {
 
 // Ghost shown under the drag overlay.
 function DealCardGhost({ deal }: { deal: Deal }) {
+  const { formatCurrency } = useLanguage();
   const value = dealValue(deal);
   return (
     <div className="bg-card border border-primary/40 rounded-xl p-3 shadow-xl rotate-1 w-64 opacity-95">
       <p className="text-sm font-semibold truncate">{deal.title}</p>
       <p className="text-xs text-muted-foreground truncate">{customerName(deal.customer)}</p>
-      {value > 0 && <p className="text-sm font-bold mt-1">{formatCurrency(value, deal.currency)}</p>}
+      {value > 0 && <p className="text-sm font-bold mt-1">{formatCurrency(value, deal.currency, { notation: "compact", maximumFractionDigits: 1 })}</p>}
     </div>
   );
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 export function Pipeline() {
-  const { tr } = useLanguage();
+  const { tr, formatCurrency } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: wsData } = useWorkspaceSettings();
@@ -173,7 +171,7 @@ export function Pipeline() {
           {deals.length > 0 && (
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Pipeline value</p>
-              <p className="text-base font-bold tabular-nums">{formatCurrency(totalValue, currency)}</p>
+              <p className="text-base font-bold tabular-nums">{formatCurrency(totalValue, currency, { notation: "compact", maximumFractionDigits: 1 })}</p>
             </div>
           )}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -196,7 +194,7 @@ export function Pipeline() {
           renderOverlay={(deal) => <DealCardGhost deal={deal} />}
           columnHeaderExtra={(colDeals) => {
             const total = colDeals.reduce((s, d) => s + dealValue(d), 0);
-            return total > 0 ? formatCurrency(total, colDeals[0]?.currency ?? currency) : null;
+            return total > 0 ? formatCurrency(total, colDeals[0]?.currency ?? currency, { notation: "compact", maximumFractionDigits: 1 }) : null;
           }}
           onAddTo={(status) => navigate(`/deals/add?status=${status}`)}
           addLabel="Add deal"

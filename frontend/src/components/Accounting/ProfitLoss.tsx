@@ -14,12 +14,12 @@ import { useLanguage } from "@/contexts/LanguageContext";
 interface Row { code: string; name: string; amount: string }
 interface PL { income: Row[]; expense: Row[]; totalIncome: string; totalExpense: string; netProfit: string }
 
-const num = (v: string) => (parseFloat(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ProfitLoss() {
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
+  const num = (v: string) => formatNumber(parseFloat(v) || 0, { minimumFractionDigits: 2 });
   const [start, setStart] = useState(yearStart());
   const [end, setEnd] = useState(today());
   const accounting = tr.accounting;

@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/authContext";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { InfoRow as InfoItem } from "@/components/common/InfoRow";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ViewCustomer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -405,6 +406,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const CustomerDealsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const { formatCurrency, formatDate } = useLanguage();
   const { data, isPending } = useQuery({
     queryKey: ["customer-deals", customerId],
     queryFn: () => getDeals({ customerId, page: 1, limit: 50 })
@@ -431,8 +433,8 @@ const CustomerDealsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{deal.title}</p>
             <p className="text-xs text-muted-foreground">
-              {deal.price?.toLocaleString()} {deal.currency}
-              {deal.expectedCloseDate && ` · Close ${new Date(deal.expectedCloseDate).toLocaleDateString()}`}
+              {deal.price != null && formatCurrency(deal.price, deal.currency)}
+              {deal.expectedCloseDate && ` · Close ${formatDate(deal.expectedCloseDate)}`}
             </p>
           </div>
           <Badge className={`${STATUS_COLORS[deal.status] ?? ""} capitalize shrink-0 ml-3`} variant="outline">
@@ -445,6 +447,7 @@ const CustomerDealsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
 };
 
 const CustomerProjectsTab: React.FC<{ customerId: string }> = ({ customerId }) => {
+  const { formatDate } = useLanguage();
   const { data, isPending } = useQuery({
     queryKey: ["customer-projects", customerId],
     queryFn: () => getProjects({ customerId, limit: 50 })
@@ -470,7 +473,7 @@ const CustomerProjectsTab: React.FC<{ customerId: string }> = ({ customerId }) =
         <Link key={project._id} to={`/projects/${project._id}`} className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/50 transition-colors">
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{project.name}</p>
-            {project.endDate && <p className="text-xs text-muted-foreground">Ends {new Date(project.endDate).toLocaleDateString()}</p>}
+            {project.endDate && <p className="text-xs text-muted-foreground">Ends {formatDate(project.endDate)}</p>}
           </div>
           <Badge className="capitalize shrink-0 ml-3" variant="outline">
             {project.status?.replace("_", " ")}

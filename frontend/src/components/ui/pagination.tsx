@@ -15,7 +15,7 @@ interface PaginationProps {
 }
 
 export function Pagination({ page, pages, total, limit, onPageChange, onLimitChange }: PaginationProps) {
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
   const pageSizeId = useId();
 
   if (pages <= 1 && !onLimitChange) return null;
@@ -39,7 +39,7 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
     <div className="flex items-center justify-between px-2 py-3 border-t flex-wrap gap-2">
       <div className="flex items-center gap-3">
         <p className="text-xs text-muted-foreground">
-          {tr.table.pageInfo(total, page, pages)}
+          {tr.table.pageInfo(formatNumber(total), page, pages)}
         </p>
         {onLimitChange && limit !== undefined && (
           <div className="flex items-center gap-1.5">

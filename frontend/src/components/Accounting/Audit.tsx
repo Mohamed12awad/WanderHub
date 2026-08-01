@@ -18,11 +18,10 @@ interface Report {
   alerts: string[];
 }
 
-const fmt = (n: number) => (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
 export default function Audit() {
   const { toast } = useToast();
-  const { tr } = useLanguage();
+  const { tr, formatNumber } = useLanguage();
+  const fmt = (n: number) => formatNumber(n ?? 0, { minimumFractionDigits: 2 });
   const [report, setReport] = useState<Report | null>(null);
   const [busy, setBusy] = useState(false);
   const accounting = tr.accounting;

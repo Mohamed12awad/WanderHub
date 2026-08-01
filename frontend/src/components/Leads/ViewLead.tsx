@@ -39,7 +39,7 @@ const RATING_BADGE: Record<string, { label: string; className: string; icon: Rea
 };
 
 export function ViewLead() {
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate, formatNumber } = useLanguage();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -198,13 +198,13 @@ export function ViewLead() {
               <InfoRow label="Campaign" value={lead.campaign} />
               <InfoRow label="Owner" value={lead.owner?.name} />
               <InfoRow label="Created By" value={lead.createdBy?.name} />
-              <InfoRow label="Expected Close" value={lead.expectedCloseDate ? new Date(lead.expectedCloseDate).toLocaleDateString() : undefined} />
-              <InfoRow label="Budget" value={lead.budget != null ? `${lead.budget.toLocaleString()} ${lead.currency ?? ""}`.trim() : undefined} />
-              <InfoRow label="Created" value={new Date(lead.createdAt).toLocaleDateString()} />
+              <InfoRow label="Expected Close" value={lead.expectedCloseDate ? formatDate(lead.expectedCloseDate) : undefined} />
+              <InfoRow label="Budget" value={lead.budget != null ? (lead.currency ? formatCurrency(lead.budget, lead.currency) : formatNumber(lead.budget)) : undefined} />
+              <InfoRow label="Created" value={formatDate(lead.createdAt)} />
               {lead.updatedBy?.name && <InfoRow label="Modified by" value={lead.updatedBy.name} />}
-              {lead.updatedAt && <InfoRow label="Last updated" value={new Date(lead.updatedAt).toLocaleString()} />}
+              {lead.updatedAt && <InfoRow label="Last updated" value={formatDate(lead.updatedAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })} />}
               {isConverted && (
-                <InfoRow label="Converted" value={lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : undefined} />
+                <InfoRow label="Converted" value={lead.convertedAt ? formatDate(lead.convertedAt) : undefined} />
               )}
               {isConverted && lead.convertedTo && (
                 <InfoRow label="Contact">

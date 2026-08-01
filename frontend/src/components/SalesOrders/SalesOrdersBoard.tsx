@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { KanbanBoardPage } from "@/components/common/KanbanBoardPage";
 import type { KanbanColumn } from "@/components/common/GenericKanban";
 import { getSalesOrders, updateSalesOrderStatus } from "@/utils/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SO { _id: string; orderNumber: string; title: string; status: string; total?: number; currency?: string; customer?: { name: string } | null }
 
@@ -15,11 +16,12 @@ const COLUMNS: KanbanColumn[] = [
 ];
 
 function Card({ so }: { so: SO }) {
+  const { formatCurrency } = useLanguage();
   return (
     <div className="bg-card border border-border/60 rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
       <Link to={`/sales-orders/${so._id}`} onClick={(e) => e.stopPropagation()} className="block text-sm font-semibold hover:text-primary truncate">{so.orderNumber}</Link>
       <p className="text-xs text-muted-foreground truncate mt-0.5">{so.title}{so.customer?.name ? ` · ${so.customer.name}` : ""}</p>
-      {(so.total ?? 0) > 0 && <p className="text-sm font-bold tabular-nums mt-2">{so.total!.toLocaleString()} {so.currency ?? "EGP"}</p>}
+      {(so.total ?? 0) > 0 && <p className="text-sm font-bold tabular-nums mt-2">{formatCurrency(so.total!, so.currency ?? "EGP")}</p>}
     </div>
   );
 }

@@ -2,17 +2,11 @@ import { useNavigate } from "react-router-dom";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { RowActions } from "@/components/common/RowActions";
 import { SalesOrder } from "@/types/types";
-import { format } from "date-fns";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   order: SalesOrder;
   handleDelete: (id: string) => void;
-}
-
-function fmtDate(value?: string | Date | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? "-" : format(d, "MMM d, yyyy");
 }
 
 function getStatusColor(status: string) {
@@ -28,6 +22,12 @@ function getStatusColor(status: string) {
 
 export default function SalesOrderRow({ order, handleDelete }: Props) {
   const navigate = useNavigate();
+  const { formatCurrency, formatDate } = useLanguage();
+  const fmtDate = (value?: string | Date | null) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? "-" : formatDate(d, { month: "short", day: "numeric", year: "numeric" });
+  };
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/sales-orders/${order._id}`)}>
@@ -39,7 +39,7 @@ export default function SalesOrderRow({ order, handleDelete }: Props) {
         </span>
       </TableCell>
       <TableCell dir="auto" className="font-medium">
-        {order.total.toLocaleString()} {order.currency}
+        {formatCurrency(order.total, order.currency)}
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">
         {fmtDate(order.expectedDate)}

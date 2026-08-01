@@ -30,7 +30,7 @@ const QuoteForm: React.FC = () => {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency } = useLanguage();
   const f = tr.finance;
 
   const dealParam = searchParams.get("deal");
@@ -232,7 +232,7 @@ const QuoteForm: React.FC = () => {
               <div className="flex gap-8">
                 <span className="text-muted-foreground">{f.subtotal}</span>
                 <span className="font-medium w-32 text-right">
-                  {subtotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
+                  {formatCurrency(subtotal, currency, { maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex gap-8 items-center">
@@ -242,13 +242,13 @@ const QuoteForm: React.FC = () => {
               <div className="flex gap-8">
                 <span className="text-muted-foreground">{f.tax}</span>
                 <span className="font-medium w-32 text-right">
-                  {tax.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
+                  {formatCurrency(tax, currency, { maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-baseline gap-8 border-t pt-1">
                 <span className="font-medium">{f.total}</span>
                 <span className="w-32 text-right text-xl font-bold tabular-nums">
-                  {total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency}
+                  {formatCurrency(total, currency, { maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

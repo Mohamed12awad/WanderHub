@@ -46,6 +46,7 @@ function TaskCard({
   statuses: Record<string, string>;
   priorities: Record<string, string>;
 }) {
+  const { formatDate } = useLanguage();
   const isOverdue =
     task.dueDate && task.status !== "done" && task.status !== "cancelled" &&
     new Date(task.dueDate) < new Date();
@@ -95,7 +96,7 @@ function TaskCard({
             {task.dueDate && (
               <span className={cn("inline-flex items-center gap-1 text-xs", isOverdue ? "text-destructive font-medium" : "text-muted-foreground")}>
                 <CalendarDays className="h-3 w-3" />
-                {new Date(task.dueDate).toLocaleDateString()}
+                {formatDate(task.dueDate)}
               </span>
             )}
 

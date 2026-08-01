@@ -37,17 +37,16 @@ interface Entry {
   reversedBy?: { _id: string; entryNumber: string } | null;
 }
 
-const fmt = (v: string) => {
-  const n = parseFloat(v) || 0;
-  return n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "";
-};
-
 export default function JournalEntryDetail() {
   const { id = "" } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { tr } = useLanguage();
+  const { tr, formatDate, formatNumber } = useLanguage();
+  const fmt = (v: string) => {
+    const n = parseFloat(v) || 0;
+    return n ? formatNumber(n, { minimumFractionDigits: 2 }) : "";
+  };
   const a = tr.accounting;
   const [confirmReverse, setConfirmReverse] = useState(false);
   const [reversing, setReversing] = useState(false);
@@ -94,7 +93,7 @@ export default function JournalEntryDetail() {
         <div>
           <h1 className="text-xl font-bold font-mono">{entry.entryNumber}</h1>
           <p className="text-sm text-muted-foreground">
-            {new Date(entry.date).toLocaleDateString()} · {a.sources[entry.sourceType] ?? entry.sourceType}
+            {formatDate(entry.date)} · {a.sources[entry.sourceType] ?? entry.sourceType}
             {entry.createdBy ? ` · ${a.byUser(entry.createdBy.name)}` : ""}
           </p>
           {entry.memo && <p className="mt-1 text-sm">{entry.memo}</p>}
@@ -151,10 +150,10 @@ export default function JournalEntryDetail() {
               <TableRow>
                 <TableCell colSpan={3} className="font-medium">{tr.finance.total}</TableCell>
                 <TableCell className="text-right font-mono font-semibold">
-                  {totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatNumber(totalDebit, { minimumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell className="text-right font-mono font-semibold">
-                  {totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatNumber(totalCredit, { minimumFractionDigits: 2 })}
                 </TableCell>
               </TableRow>
             </TableFooter>

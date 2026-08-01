@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Customer {
   name: string;
@@ -48,6 +49,7 @@ interface ReportData {
 const ReportComponent: React.FC<{ reportData: ReportData }> = ({
   reportData,
 }) => {
+  const { formatDate } = useLanguage();
   useEffect(() => {
     document.body.style.overflow = "auto";
   }, []);
@@ -98,7 +100,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
         <p>
           Amount: {payment.amount} {payment.currency}
         </p>
-        <p>Date: {new Date(payment.date).toLocaleString()}</p>
+        <p>Date: {formatDate(payment.date, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
       </div>
     </div>
   );
@@ -118,7 +120,7 @@ const ReportComponent: React.FC<{ reportData: ReportData }> = ({
       <h5 className="text-lg font-medium">Expense Details</h5>
       <p>Description: {expense.description}</p>
       <p>Amount: {expense.amount}</p>
-      <p>Date: {new Date(expense.date).toLocaleString()}</p>
+      <p>Date: {formatDate(expense.date, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
       <p>Category: {expense.category}</p>
     </div>
   );

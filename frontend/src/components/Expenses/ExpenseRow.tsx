@@ -14,6 +14,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { approveExpenseReport } from "@/utils/api";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ExpenseRowProps {
   id: string;
@@ -35,6 +36,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { formatNumber } = useLanguage();
 
   const handleApprove = async () => {
     await approveExpenseReport(id);
@@ -45,7 +47,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/expenses/${id}`)}>
       <TableCell dir="auto" className="font-medium">{title}</TableCell>
       <TableCell className="font-medium tabular-nums">
-        {total.toLocaleString()}
+        {formatNumber(total)}
       </TableCell>
       <TableCell>
         <Badge

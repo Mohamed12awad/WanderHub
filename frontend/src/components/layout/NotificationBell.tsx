@@ -21,7 +21,7 @@ interface Notification {
 }
 
 export function NotificationBell() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
@@ -99,7 +99,7 @@ export function NotificationBell() {
                     <p className={cn("text-xs leading-snug", !n.read && "font-medium")}>{n.title}</p>
                     {n.body && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.body}</p>}
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      {new Date(n.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {formatDate(n.createdAt, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                   <div className="flex gap-0.5 shrink-0">

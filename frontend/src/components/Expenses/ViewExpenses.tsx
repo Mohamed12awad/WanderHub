@@ -26,6 +26,7 @@ import { InfoRow } from "@/components/common/InfoRow";
 import { AuditRows } from "@/components/common/AuditRows";
 import { DocumentJournalEntries } from "@/components/common/DocumentJournalEntries";
 import { ErrorState } from "@/components/common/ErrorState";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ExpenseItem {
   _id: string;
@@ -54,6 +55,7 @@ interface ExpenseData {
 }
 
 const ViewExpense = () => {
+  const { formatDate, formatNumber } = useLanguage();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -313,7 +315,7 @@ const ViewExpense = () => {
                       <span className="text-sm">
                         {typeof formData.approvedBy === "object" ? formData.approvedBy.name : "—"}
                         {formData.approvedAt && (
-                          <span className="text-muted-foreground ms-1">· {new Date(formData.approvedAt).toLocaleDateString()}</span>
+                          <span className="text-muted-foreground ms-1">· {formatDate(formData.approvedAt)}</span>
                         )}
                       </span>
                     </InfoRow>
@@ -322,7 +324,7 @@ const ViewExpense = () => {
               )}
               <InfoRow label="Total">
                 <span className="text-sm font-semibold">
-                  {formData.expenses.reduce((t, i) => t + i.amount, 0).toLocaleString()}
+                  {formatNumber(formData.expenses.reduce((t, i) => t + i.amount, 0))}
                 </span>
               </InfoRow>
               <AuditRows record={formData} createdByField={formData.userId} />
@@ -350,9 +352,9 @@ const ViewExpense = () => {
                 {formData.expenses.map((expense) => (
                   <TableRow key={expense._id}>
                     <TableCell dir="auto">{expense.description}</TableCell>
-                    <TableCell className="tabular-nums">{expense.amount.toLocaleString()}</TableCell>
+                    <TableCell className="tabular-nums">{formatNumber(expense.amount)}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(expense.date).toLocaleDateString()}
+                      {formatDate(expense.date)}
                     </TableCell>
                     <TableCell className="capitalize">{expense.category}</TableCell>
                     <TableCell dir="auto">{expense.beneficiary}</TableCell>

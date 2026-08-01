@@ -54,7 +54,7 @@ export default function JournalEntries() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { tr } = useLanguage();
+  const { tr, formatDate, formatNumber } = useLanguage();
   const a = tr.accounting;
   const headers = useMemo(
     () => [a.headers.entryNumber, a.headers.date, a.headers.memo, a.headers.source, a.headers.status, a.headers.amount],
@@ -156,14 +156,14 @@ export default function JournalEntries() {
                   {e.entryNumber}
                 </Link>
               </TableCell>
-              <TableCell className="text-xs">{new Date(e.date).toLocaleDateString()}</TableCell>
+              <TableCell className="text-xs">{formatDate(e.date)}</TableCell>
               <TableCell className="text-sm">{e.memo ?? <span className="text-muted-foreground">—</span>}</TableCell>
               <TableCell className="text-xs text-muted-foreground">{a.sources[e.sourceType] ?? e.sourceType}</TableCell>
               <TableCell>
                 <Badge variant="outline" className={`capitalize border-0 ${STATUS_BADGE[e.status] ?? ""}`}>{a.statuses[e.status] ?? e.status}</Badge>
               </TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
-                {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatNumber(amount, { minimumFractionDigits: 2 })}
               </TableCell>
               <TableCell />
             </TableRow>
@@ -230,8 +230,8 @@ export default function JournalEntries() {
             <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm">
               <span className="font-medium">{a.totals}</span>
               <div className="flex items-center gap-4 font-mono">
-                <span>{a.debitShort} {totals.debit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                <span>{a.creditShort} {totals.credit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span>{a.debitShort} {formatNumber(totals.debit, { minimumFractionDigits: 2 })}</span>
+                <span>{a.creditShort} {formatNumber(totals.credit, { minimumFractionDigits: 2 })}</span>
                 <Badge variant="outline" className={totals.balanced
                   ? "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                   : "border-0 bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"}>
