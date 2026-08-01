@@ -286,3 +286,46 @@ What is left is new work and configuration, not remediation:
    effort that can surprise an existing deployment.
 6. Re-run `npm --prefix backend run verify:gl` after any accounting change — fastest end-to-end signal.
    It needs a live database; the Docker Postgres used here is `nawahub-pg` on port 5433.
+
+---
+
+## UI/UX roadmap — status at 2026-08-01
+
+Section 3.5 of the audit is now largely delivered. What landed after the accounting remediation:
+
+| Item | Commit | Notes |
+|---|---|---|
+| Server-side pagination (payments/invoices/quotes) | `6af0f15` | Payments silently lost record 101+; sort keys are now validated server-side and an unknown key 400s |
+| Date/number localisation | `f564f78` | 228 sites routed through the app locale |
+| Column contract | `d687375`, `655254f` | All 27 callers migrated; 16 `*Row.tsx` deleted; `headers[]`/`renderRow()` now has zero users |
+| Clickable-row affordance | `1df0e86` | The migration silently dropped `cursor-pointer` app-wide; `TableRow` now derives it from `onClick`, plus `rowClassName` |
+| Row density | `0f816dc` | 10 → 25/50 per page; `data-density` on `<html>` drives cell padding |
+| Enter no longer submits a document | `2395f33`, `d622cec` | Affected invoice, quote, PO, vendor bill, sales order and expense forms |
+| Column visibility + ordering | `39b6457` | Versioned; per-table localStorage and named saved views kept separate |
+| Payment dialog dismissal guard | `d5b1141` | Also labelled two fields that had no programmatic label |
+| Visual evidence page | `8856e92` | `docs/interface-audit-evidence.html` |
+
+**Dropped deliberately: virtualisation.** `GenericTable` renders at most 100 rows per page, so there
+was nothing to virtualise, and it would have collided with the `max-md:` card layout. This was Codex's
+catch against the first draft of the plan, not a reversal after the fact.
+
+### Still open
+
+1. **Fully conformant row links** — a real link in each row's primary cell (~21 components). The
+   current focusable-row pattern is a deliberate compromise, documented in `ui/table.tsx`: giving a
+   `<tr>` `role="link"` strips it from the table structure for assistive tech, costing the "row 3 of
+   10, column Customer" context that matters most in a dense grid.
+2. **Unsaved-input guards on the other dialogs.** `d5b1141` covers the money-entry path only. No other
+   dialog in the app guards unsaved input, and three stack dialogs more than two deep:
+   `ActivityCalendar.tsx`, `Inventory.tsx`, `Roles.tsx`.
+3. **`AppearanceSettings` is largely untranslated.** Its Theme, Accent, Font Size and new Row Density
+   sections use hardcoded English while the rest of the app is fully bilingual. Pre-existing; the
+   density section matched the local convention rather than half-fixing the page.
+4. **7 pre-existing lint warnings** (`react-hooks/exhaustive-deps`) in `TasksList.tsx`,
+   `useModuleFieldLayout.ts` and `Finance.tsx`. All predate this work; none were added.
+
+### Verification note
+
+Gates at the end of this run: frontend **12 files / 77 tests**, backend **30 suites / 199 tests**,
+both typechecks clean, lint **0 errors**, `verify:gl` 5/5. Frontend counts were re-run by the
+orchestrator rather than taken from Codex's self-report.
