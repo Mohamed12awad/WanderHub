@@ -133,8 +133,8 @@ export default function ChartOfAccounts() {
             <TableCell className="text-xs text-muted-foreground">{row.cashAccount?.name ?? "—"}</TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(row._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${tr.common.edit} ${row.code} ${row.name}`} onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`${tr.common.delete} ${row.code} ${row.name}`} onClick={() => handleDelete(row._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </TableCell>
           </TableRow>

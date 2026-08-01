@@ -1,5 +1,7 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 
 /**
@@ -11,7 +13,8 @@ import { describe, it, expect } from "vitest";
  * rather than shipping.
  */
 
-const css = readFileSync(join(__dirname, "../../index.css"), "utf8");
+const here = dirname(fileURLToPath(import.meta.url));
+const css = readFileSync(join(here, "../../index.css"), "utf8");
 
 /** Pulls a custom property's HSL triple from a given CSS block. */
 function token(selector: string, name: string): [number, number, number] {

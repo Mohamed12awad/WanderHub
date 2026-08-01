@@ -742,16 +742,31 @@ export function GenericTable<T extends DataItem>({
                     }
                     className={cn(
                       "h-9 text-[11px] font-semibold uppercase tracking-wider text-foreground/50 whitespace-nowrap",
-                      isSortable && "cursor-pointer select-none hover:text-foreground/80 transition-colors",
+                      isSortable &&
+                        "cursor-pointer select-none hover:text-foreground/80 transition-colors " +
+                          "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
                     )}
                     onClick={isSortable ? () => toggleSort(header) : undefined}
                   >
-                    <span className="inline-flex items-center gap-1">
-                      {header}
-                      {isSortable && (
+                    {/* Sorting was mouse-only: the handler sat on the <th>, which is
+                        not focusable and has no key handler (SC 2.1.1 / 4.1.2). The
+                        inner control carries the semantics so screen readers announce
+                        a button and the existing aria-sort on the <th> still applies. */}
+                    {isSortable ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSort(header);
+                        }}
+                        className="inline-flex items-center gap-1 uppercase tracking-wider focus:outline-none"
+                      >
+                        {header}
                         <SortIcon className={cn("h-3 w-3 shrink-0", isActive ? "text-foreground/70" : "opacity-30")} />
-                      )}
-                    </span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">{header}</span>
+                    )}
                   </TableHead>
                 );
               })}

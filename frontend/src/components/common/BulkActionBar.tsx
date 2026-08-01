@@ -101,7 +101,7 @@ export function BulkActionBar({ entity, ids, statusOptions, queryKey, onClear }:
           <Trash2 className="h-3.5 w-3.5" /> {b.delete}
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClear}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Clear selection" onClick={onClear}>
           <X className="h-4 w-4" />
         </Button>
       </div>

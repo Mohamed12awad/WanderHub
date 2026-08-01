@@ -15,6 +15,7 @@
     "seed": "tsx utils/seed.ts",
     "seed:accounting": "tsx utils/seed-accounting.ts",
     "seed:clear": "tsx utils/unseed.ts",
+    "verify:gl": "tsx utils/verify-gl.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
