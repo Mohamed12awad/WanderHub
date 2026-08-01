@@ -1,5 +1,5 @@
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useTheme, AccentColor, ColorMode, FontSize } from "@/contexts/ThemeProvider";
+import { useTheme, AccentColor, ColorMode, Density, DENSITY_PAGE_SIZE, FontSize } from "@/contexts/ThemeProvider";
 import { LANGUAGES, Lang } from "@/i18n/translations";
 import { cn } from "@/lib/utils";
 import { Sun, Moon, Monitor, Check } from "lucide-react";
@@ -9,6 +9,11 @@ const FONT_SIZES: { value: FontSize; label: string; px: string }[] = [
   { value: "base", label: "Default",     px: "16px" },
   { value: "lg",   label: "Large",       px: "18px" },
   { value: "xl",   label: "Extra Large", px: "20px" },
+];
+
+const DENSITIES: { value: Density; label: string; rows: number; gap: string }[] = [
+  { value: "comfortable", label: "Comfortable", rows: 4, gap: "0.375rem" },
+  { value: "compact",     label: "Compact",     rows: 6, gap: "0.125rem" },
 ];
 
 const THEMES: { value: ColorMode; icon: React.ElementType; label: string }[] = [
@@ -29,7 +34,7 @@ const ACCENTS: { value: AccentColor; label: string; color: string; dark: string 
 
 export default function AppearanceSettings() {
   const { tr, lang, setLang } = useLanguage();
-  const { theme, accent, fontSize, setTheme, setAccent, setFontSize } = useTheme();
+  const { theme, accent, fontSize, density, setTheme, setAccent, setFontSize, setDensity } = useTheme();
   const s = tr.settings;
 
   const isDark =
@@ -152,6 +157,45 @@ export default function AppearanceSettings() {
               )}
               <span className="font-semibold leading-none" style={{ fontSize: px }}>Aa</span>
               <span className="text-xs font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="border-t" />
+
+      {/* Row density */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">Row Density</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Sets row height and how many records each page of a list shows.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {DENSITIES.map(({ value, label, rows, gap }) => (
+            <button
+              key={value}
+              onClick={() => setDensity(value)}
+              aria-pressed={density === value}
+              className={cn(
+                "relative flex flex-col items-center gap-2.5 rounded-xl border-2 p-4 transition-all hover:bg-muted/50",
+                density === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+              )}
+            >
+              {density === value && (
+                <span className="absolute top-2 end-2"><Check className="h-3.5 w-3.5 text-primary" /></span>
+              )}
+              {/* Shows the actual trade-off — the same width, more rows, tighter. */}
+              <span className="flex w-16 flex-col" style={{ gap }} aria-hidden="true">
+                {Array.from({ length: rows }, (_, i) => (
+                  <span key={i} className="h-1 rounded-full bg-current opacity-60" />
+                ))}
+              </span>
+              <span className="text-xs font-medium">{label}</span>
+              <span className="text-[10px] tabular-nums opacity-70">
+                {DENSITY_PAGE_SIZE[value]} per page
+              </span>
             </button>
           ))}
         </div>

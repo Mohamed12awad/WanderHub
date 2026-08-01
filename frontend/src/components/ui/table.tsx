@@ -135,7 +135,13 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("px-4 py-2.5 align-middle [&:has([role=checkbox])]:p-0", className)}
+    className={cn(
+      "px-4 py-2.5 align-middle [&:has([role=checkbox])]:p-0",
+      // Compact trims vertical padding only. Horizontal padding is what keeps
+      // adjacent numeric columns from reading as one figure, so it stays put.
+      "[[data-density=compact]_&]:py-1",
+      className
+    )}
     {...props}
   />
 ))

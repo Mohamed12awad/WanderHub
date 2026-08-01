@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { toast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { DENSITY_PAGE_SIZE, useTheme } from "@/contexts/ThemeProvider";
 import { downloadCSV, saveBlob } from "@/utils/csv";
 import { exportEntity } from "@/utils/api";
 import { ImportDialog } from "@/components/common/ImportDialog";
@@ -233,6 +234,7 @@ export function GenericTable<T extends DataItem>({
   transformClientData,
 }: GenericTableProps<T>) {
   const { tr, isRTL } = useLanguage();
+  const { density } = useTheme();
   const queryClient = useQueryClient();
   const { getFilterableCustomFields } = useWorkspaceSettings();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -259,7 +261,10 @@ export function GenericTable<T extends DataItem>({
 
   const committedQ    = searchParams.get("q") ?? "";
   const page          = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const limit         = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "10")));
+  // An explicit ?limit in the URL always wins — a shared or saved link must
+  // resolve to the same page of rows for whoever opens it, regardless of the
+  // density they happen to prefer. Density only supplies the default.
+  const limit         = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? String(DENSITY_PAGE_SIZE[density]))));
   const sortBy        = searchParams.get("sort") ?? "";
   const sortDir       = (searchParams.get("dir") ?? "asc") as "asc" | "desc";
 
