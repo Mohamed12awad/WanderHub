@@ -45,14 +45,67 @@ export type FilterConfig = {
   options?: { label: string; value: string }[];
 };
 
+/**
+ * What a column IS, rather than a header string and a positionally-matched cell.
+ *
+ * The legacy `headers[] + renderRow()` pair could not support column reordering,
+ * hiding or persistence, because the two were only related by array position:
+ * `withMobileLabels` matched a row's Nth child to `headers[N]`, and the
+ * *translated* header string doubled as the sort key — so a column's identity
+ * changed with the UI language. Anything built on that would have been a hack.
+ *
+ * With this, one definition drives the header, the cell, mobile labelling,
+ * alignment, truncation and sort identity together.
+ */
+export type ColumnKind = "text" | "number" | "status" | "date" | "actions";
+
+export type TableColumn<T> = {
+  /** Stable, untranslated. The sort/persistence identity — never a display string. */
+  id: string;
+  /** Translated label for the header and the mobile card's field name. */
+  header: string;
+  /** API sort field. Omit for a column that cannot be sorted. */
+  sortKey?: string;
+  /** Drives alignment, numeric glyphs and whether the column may flex. */
+  kind?: ColumnKind;
+  cell: (item: T) => ReactNode;
+  /** False pins the column visible (e.g. the record's identifier). Default true. */
+  hideable?: boolean;
+  /** Overrides `header` on the mobile card when the full label is too long. */
+  mobileLabel?: string;
+};
+
+/**
+ * Per-kind cell presentation. `text` is the only kind allowed to flex and
+ * truncate — `min-w-0` is required for truncation to work inside a flex/grid
+ * ancestor. Numerics get tabular figures so digits line up down the column.
+ */
+const COLUMN_KIND_CLASS: Record<ColumnKind, string> = {
+  text: "min-w-0 max-w-0 w-full truncate",
+  number: "text-end tabular-nums whitespace-nowrap w-px",
+  date: "whitespace-nowrap w-px",
+  status: "whitespace-nowrap w-px",
+  actions: "w-px",
+};
+
 type GenericTableProps<T extends DataItem> = {
   queryKey: string;
   fetchData: (params: { page: number; limit: number; q: string; filters?: Record<string, string>; sort?: string; dir?: "asc" | "desc" }) => Promise<{ data: T[] | PagedPayload<T> }>;
   /** Omit for read-only tables (e.g. inventory) that have no per-row delete. */
   deleteData?: (id: string) => Promise<void>;
-  headers: string[];
+  /**
+   * Preferred. When set, the table owns header and cell rendering, and
+   * `headers`/`sortableHeaders`/`renderRow` are ignored. Callers not yet
+   * migrated keep working through the legacy props below.
+   */
+  columns?: TableColumn<T>[];
+  /** Row-level click target, used only with `columns`. */
+  onRowClick?: (item: T) => void;
+  /** Trailing per-row actions cell, used only with `columns`. */
+  renderActions?: (item: T, handleDelete: (id: string) => void) => ReactNode;
+  headers?: string[];
   sortableHeaders?: string[];
-  renderRow: (item: T, handleDelete: (id: string) => void, selectionCell?: React.ReactNode) => JSX.Element;
+  renderRow?: (item: T, handleDelete: (id: string) => void, selectionCell?: React.ReactNode) => JSX.Element;
   title: string;
   description: string;
   /** Omit both to hide the "Add" affordance for tables with no create flow. */
@@ -147,7 +200,10 @@ export function GenericTable<T extends DataItem>({
   queryKey,
   fetchData,
   deleteData,
-  headers,
+  columns,
+  onRowClick,
+  renderActions,
+  headers: legacyHeaders,
   sortableHeaders,
   renderRow,
   title,
@@ -198,6 +254,11 @@ export function GenericTable<T extends DataItem>({
   const limit         = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "10")));
   const sortBy        = searchParams.get("sort") ?? "";
   const sortDir       = (searchParams.get("dir") ?? "asc") as "asc" | "desc";
+
+  // `columns` supersedes the legacy props. Header labels are derived from the
+  // definitions so the two can never drift apart.
+  const usingColumns = Boolean(columns?.length);
+  const headers = usingColumns ? columns!.map((c) => c.header) : (legacyHeaders ?? []);
 
   const toggleSort = (header: string) => {
     setSearchParams((prev) => {
@@ -734,13 +795,17 @@ export function GenericTable<T extends DataItem>({
                   </div>
                 </TableHead>
               )}
-              {headers.map((header) => {
-                const isSortable = sortableHeaders?.includes(header);
-                const isActive   = sortBy === header;
+              {headers.map((header, hi) => {
+                const col = usingColumns ? columns![hi] : undefined;
+                // With `columns`, sort identity is the stable `sortKey` — not the
+                // translated label, which changes with the UI language.
+                const sortId    = col ? col.sortKey : header;
+                const isSortable = col ? Boolean(col.sortKey) : sortableHeaders?.includes(header);
+                const isActive   = Boolean(sortId) && sortBy === sortId;
                 const SortIcon   = isActive ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
                 return (
                   <TableHead
-                    key={header}
+                    key={col?.id ?? header}
                     aria-sort={
                       isSortable
                         ? isActive
@@ -752,11 +817,12 @@ export function GenericTable<T extends DataItem>({
                     }
                     className={cn(
                       "h-9 text-[11px] font-semibold uppercase tracking-wider text-foreground/50 whitespace-nowrap",
+                      col?.kind === "number" && "text-end",
                       isSortable &&
                         "cursor-pointer select-none hover:text-foreground/80 transition-colors " +
                           "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
                     )}
-                    onClick={isSortable ? () => toggleSort(header) : undefined}
+                    onClick={isSortable && sortId ? () => toggleSort(sortId) : undefined}
                   >
                     {/* Sorting was mouse-only: the handler sat on the <th>, which is
                         not focusable and has no key handler (SC 2.1.1 / 4.1.2). The
@@ -767,7 +833,7 @@ export function GenericTable<T extends DataItem>({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleSort(header);
+                          if (sortId) toggleSort(sortId);
                         }}
                         className="inline-flex items-center gap-1 uppercase tracking-wider focus:outline-none"
                       >
@@ -829,7 +895,49 @@ export function GenericTable<T extends DataItem>({
               </TableRow>
             )}
 
-            {!isPending && filtered.map((item) => withMobileLabels(
+            {/* `columns` path: the table renders its own cells, so a cell's mobile
+                label comes from its own definition instead of being matched to
+                `headers[N]` by child index. That index matching is what made
+                column reordering and hiding impossible. */}
+            {!isPending && usingColumns && filtered.map((item) => (
+              <TableRow
+                key={item._id}
+                onClick={onRowClick ? () => onRowClick(item) : undefined}
+                className="max-md:block max-md:border max-md:rounded-md max-md:mb-2 max-md:bg-card max-md:shadow-sm max-md:overflow-hidden"
+              >
+                {bulkConfig && (
+                  <TableCell onClick={(e) => e.stopPropagation()} className={cn(SELECTION_CELL_CLASS, "max-md:py-2 max-md:px-3")}>
+                    <div className={SELECTION_CHECKBOX_WRAP_CLASS}>
+                      <Checkbox checked={selected.has(item._id)} onCheckedChange={() => toggleSelected(item._id)} aria-label="Select row" />
+                    </div>
+                  </TableCell>
+                )}
+                {columns!.map((col) => (
+                  <TableCell
+                    key={col.id}
+                    data-label={col.mobileLabel ?? col.header}
+                    // Mixed-direction user content (an English title inside an
+                    // Arabic table) truncates at the wrong end without this.
+                    dir={col.kind === "text" ? "auto" : undefined}
+                    className={cn(
+                      COLUMN_KIND_CLASS[col.kind ?? "text"],
+                      "max-md:grid max-md:grid-cols-[7.5rem_1fr] max-md:items-start max-md:gap-3 max-md:px-3 max-md:py-2 max-md:w-auto max-md:max-w-none",
+                      "max-md:before:content-[attr(data-label)] max-md:before:text-xs max-md:before:font-medium max-md:before:text-muted-foreground",
+                    )}
+                  >
+                    {col.cell(item)}
+                  </TableCell>
+                ))}
+                {renderActions && (
+                  <TableCell onClick={(e) => e.stopPropagation()} data-label="Actions" className="w-px max-md:px-3 max-md:py-2">
+                    {renderActions(item, handleDelete)}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+
+            {/* Legacy path — callers not yet migrated to `columns`. */}
+            {!isPending && !usingColumns && renderRow && filtered.map((item) => withMobileLabels(
               renderRow(item, handleDelete,
                 bulkConfig ? (
                   <TableCell onClick={(e) => e.stopPropagation()} className={SELECTION_CELL_CLASS}>
