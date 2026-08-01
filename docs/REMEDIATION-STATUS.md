@@ -1,6 +1,6 @@
 # NawaHub Remediation — Status Handover
 
-**Branch:** `fix/audit-2026-08-batch-0-1` (3 commits, not pushed, not merged)
+**Branch:** `fix/audit-2026-08-batch-0-1` (6 commits, not pushed, not merged)
 **Baseline audit:** [`docs/AUDIT-2026-08.md`](./AUDIT-2026-08.md)
 **Date:** 2026-08-01
 
@@ -11,13 +11,20 @@ backend + frontend typecheck clean · backend lint 0 errors (2 pre-existing warn
 
 ## TL;DR
 
-Batches 0 and 1 are **done**. The exploitable data-leak is closed, accessibility is at AA, and there is
-now a safety net that makes the remaining accounting work verifiable.
+Batches 0 and 1 are **done**, and **Batch 2 is underway**: the two period-close P0s and the two
+reversal/numbering P1s are fixed and verified against the running app.
 
-**Batch 2 — the deep accounting P0s — has not been started.** That was deliberate: it needed the test
-net first. 11 tests are already written and waiting for those fixes.
+**Closing accounting periods is now safe.** That was the headline defect and it is fixed — re-verified
+end-to-end, not just by unit test.
 
-**The system is not yet safe to close accounting periods in.** That defect is untouched.
+**Still open: multi-currency and document/journal atomicity.** 4 of the original 11 documented-failing
+tests remain red, and they mark exactly what is left.
+
+> **Verification caveat worth knowing about.** During this work a stale backend process from an earlier
+> session held port 3000, so a restart silently failed with `EADDRINUSE` and several live checks were
+> hitting old code — including one that briefly looked like a pass. The process was killed and every
+> claim below was re-verified against a confirmed-fresh server. If you do live checks, confirm the
+> backend you are talking to is the one you started.
 
 ---
 
@@ -100,61 +107,71 @@ the moment it's fixed — which forces flipping them to `it()`. This is the work
 | rejecting an invoice restores stock, no net COGS | `finance/invoices.payments.spec.ts` |
 | `nextNumber` uses the supplied transaction client | `number-sequence/number-sequence.service.spec.ts` |
 
+**7 of these 11 have since been fixed and flipped to active tests** (see 5 and 6 below). 4 remain red.
+
+### 5. `aa8ad46` — Period close (both P0s), verified live
+
+- **Carry-forward across gaps.** `openingBalances()` now takes the most recent snapshot at or before the
+  prior period and adds the movement since; with no snapshot it sums everything prior. Still incremental.
+  **Verified:** closing 2026-06 with 2026-01 left open used to collapse the balance sheet from 694,144 to
+  194,144 assets (equity 211,400 → −288,600); it now holds at 694,144 / 211,400.
+- **Empty periods lock.** New `AccountingPeriod` table holds lock state independently of account
+  snapshots (migration `20260801074243_accounting_period_lock_state`).
+  **Verified:** closing empty 2027-06 now lists it closed and a journal dated into it is rejected.
+- Re-closing an earlier period now cascades forward and refreshes later snapshots.
+
+### 6. `db41742` — Reversal lock + journal numbering (both P1s)
+
+- The period-lock check moved into `reverseEntry()`, so all eleven automated reversal paths inherit it
+  instead of only the manual `reverseById`.
+- `nextNumber()` accepts a transaction client and `PostingService` passes its own — rollbacks and
+  serializable retries no longer burn journal numbers.
+
 ---
 
-## Not done — Batch 2 and beyond
+## Not done — remaining Batch 2
 
-Ordered by severity. Every item has a failing test waiting except where noted.
+Ordered by severity. The 4 remaining `it.failing` tests cover items **1, 2 and 5**; everything else here
+has no test yet and needs one written alongside the fix.
 
-### P0 — accounting correctness (blocks safe production use)
+### P0 — accounting correctness
 
-1. **Period-close carry-forward chain.** `period-close.service.ts:54-59` seeds opening balances only from
-   `priorPeriod(period)`; any gap — *including a zero-activity month* — silently zeroes the carry-forward
-   and erases all prior history from every statement, while still reporting `balanced: true`.
-   **Until fixed, do not let anyone close accounting periods.** Also: reopening an earlier period never
-   recomputes later snapshots.
-2. **Empty periods don't lock.** Closed state is inferred from the existence of `AccountBalance` rows,
-   so a period with no activity creates none and never locks. Needs its own period state table/row.
-3. **Cross-currency payments relieve AR/AP with the wrong quantity.** `posting.service.ts:390-392`,
+1. **Cross-currency payments relieve AR/AP with the wrong quantity.** `posting.service.ts:390-392`,
    `:592-594` use one numeric amount as both payment-currency and document-currency units. A USD 100
    invoice paid with EGP 5,000 credits AR **EGP 250,000** and books a fabricated 245,000 FX loss.
-4. **Missing FX rate posts 1:1.** `currency.service.ts:42` passes the amount through unconverted, so a
+2. **Missing FX rate posts 1:1.** `currency.service.ts:42` passes the amount through unconverted, so a
    USD 1,000 invoice with no rate on file posts as EGP 1,000. Split the API: keep pass-through for
    dashboards, add a strict `toBaseOrThrow()` for the posting path.
-5. **Document↔journal atomicity.** Approval commits, then posting is invoked without that transaction
+3. **Document↔journal atomicity.** Approval commits, then posting is invoked without that transaction
    (`invoices.service.ts:367,385`; `vendor-bills.service.ts:160,187,246,277,422,455`;
    `expenses.service.ts:113,145,198,217`). Posting failure leaves an approved document with no journal,
    permanently — retry returns early because it's already approved.
-6. **Quote→invoice conversion posts nothing.** `quotes.service.ts:235-285` creates an **approved**
+4. **Quote→invoice conversion posts nothing.** `quotes.service.ts:235-285` creates an **approved**
    invoice with no AR, revenue, tax, stock movement or COGS.
-7. **Pending invoices deplete stock and post COGS before approval**, and rejection reverses only the
+5. **Pending invoices deplete stock and post COGS before approval**, and rejection reverses only the
    `Invoice` journal — the stock movement and `StockCogs` entry are never touched.
-8. **Editing/deleting approved documents leaves postings live.** Edit + re-approve double-posts AR;
+6. **Editing/deleting approved documents leaves postings live.** Edit + re-approve double-posts AR;
    soft-delete performs no reversal at all.
-9. **PO receipt: two divergent paths.** `updateStatus` (`purchase-orders.service.ts:210-229`) creates
+7. **PO receipt: two divergent paths.** `updateStatus` (`purchase-orders.service.ts:210-229`) creates
    uncosted stock with no GRNI under a different `refType`, so `receive()` doesn't see it → double
    receipt. `receive()` itself is non-atomic and can leave a PO permanently unreceivable.
 
 ### P1
 
-10. **Reversals bypass the period lock.** `reverseEntry()` has no check; `reverse()`/`reverseLive()`
-    (11 call sites) inherit that. `reverseById()` *does* check — move the check into `reverseEntry()`.
-11. **JE numbering gaps.** `nextNumber()` runs on the root connection, never the caller's `tx`; every
-    serializable retry burns a number. Statutory issue in many jurisdictions.
-12. **Manual stock adjustments post no GL at all.** `defaultInventoryAdjustment` is declared, seeded and
+8. **Manual stock adjustments post no GL at all.** `defaultInventoryAdjustment` is declared, seeded and
     exposed in Settings but referenced by no posting code. Inventory Asset drifts from the subledger
     with every recount.
-13. **Stock return / COGS reversal not atomic** (`inventory.service.ts:48-63`).
-14. **No three-way match** in procurement — no partial receipt, no over-receipt tolerance, no check that
+9. **Stock return / COGS reversal not atomic** (`inventory.service.ts:48-63`).
+10. **No three-way match** in procurement — no partial receipt, no over-receipt tolerance, no check that
     a bill matches what was received.
-15. **Vendor-bill self-approval** is gated on `enabled` (`vendor-bills.service.ts:263`), which defaults
+11. **Vendor-bill self-approval** is gated on `enabled` (`vendor-bills.service.ts:263`), which defaults
     to false — PO does the same check unconditionally. Also `*` bypasses SoD everywhere.
-16. **IDOR on mutation handlers** — `expenses:152`, `sales-orders:154`, `purchase-orders:163`,
+12. **IDOR on mutation handlers** — `expenses:152`, `sales-orders:154`, `purchase-orders:163`,
     `vendor-bills:195`, `tasks:153`, `projects:129` fetch by raw id without caller scope. Fail-closed
     scoping fixed *reads*; these mutations remain unscoped.
-17. **Payment mutations reuse document permissions** — recording an invoice payment needs only
+13. **Payment mutations reuse document permissions** — recording an invoice payment needs only
     `invoices:create`; deleting a bill payment only `vendor-bills:edit`.
-18. **Conversion endpoints check the source, not the target, permission** — `quotes:create` can mint
+14. **Conversion endpoints check the source, not the target, permission** — `quotes:create` can mint
     invoices.
 
 ### P2 / P3
@@ -202,8 +219,14 @@ Ordered by severity. Every item has a failing test waiting except where noted.
 
 ## Suggested next session
 
-1. Fix (1) and (2) — period close. Highest severity, and the 3 waiting tests make it verifiable.
-2. Fix (10) and (11) — reversal lock and JE numbering; both small and both have tests.
-3. Then (3) and (4) — multi-currency, which needs a schema decision about storing the applied amount in
-   document currency.
-4. Re-run `npm --prefix backend run verify:gl` after each — it is the fastest end-to-end signal.
+1. **Item (2), missing FX rate** — smallest of the remaining P0s and has a waiting test. Split
+   `CurrencyService`: keep pass-through for dashboard aggregates, add a strict `toBaseOrThrow()` that
+   the posting path uses, so a foreign-currency document with no rate fails loudly instead of booking
+   base-currency units.
+2. **Item (1), cross-currency AR/AP relief** — 2 waiting tests. Needs a decision first: where to store
+   the applied amount in *document* currency (a column on `InvoicePayment`/`VendorBillPayment`, versus
+   deriving it at post time). Do (2) before this; a strict rate lookup makes the arithmetic tractable.
+3. **Item (3), document↔journal atomicity** — mechanical but broad: thread the caller's `tx` through
+   every approve/create path listed. No test yet; write one per module as you go.
+4. Re-run `npm --prefix backend run verify:gl` after each — it is the fastest end-to-end signal, and
+   `npm --prefix backend test` should show the `it.failing` count dropping toward zero.
