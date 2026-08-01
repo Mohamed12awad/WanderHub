@@ -215,6 +215,11 @@ export class VendorBillsService {
 
     const bill = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (items !== undefined) {
+        if (existing.approvalStatus === 'approved') {
+          // Editing approved lines must unrecognize the old AP before the bill
+          // returns to pending; otherwise re-approval posts a second liability.
+          await this.posting.reverseLive('VendorBill', id, { createdById: userId }, tx);
+        }
         await tx.vendorBillItem.deleteMany({ where: { billId: id } });
         const tr = taxRate ?? existing.taxRate;
         const inclusive = taxInclusive ?? existing.taxInclusive;
@@ -272,7 +277,7 @@ export class VendorBillsService {
 
     const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
-    if (enabled && bill.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot approve your own bill');
+    if (bill.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot approve your own bill');
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const changed = await tx.vendorBill.update({
@@ -319,6 +324,7 @@ export class VendorBillsService {
 
     const { enabled, approverRoles } = await this.getApprovalConfig();
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to reject');
+    if (bill.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot reject your own bill');
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.posting.reverseLive('VendorBill', id, { createdById: userId }, tx);
@@ -478,7 +484,7 @@ export class VendorBillsService {
     return toClient(bill);
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId?: string) {
     const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
     if (!existing) return null;
     // Deleting a bill that has recorded payments would hide the document while
@@ -488,7 +494,10 @@ export class VendorBillsService {
     if (paymentCount > 0) {
       throw new BadRequestException('Cannot delete a vendor bill that has payments. Delete its payments first.');
     }
-    await this.prisma.vendorBill.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('VendorBill', id, { createdById: userId ?? null }, tx);
+      await tx.vendorBill.update({ where: { id }, data: { deletedAt: new Date() } });
+    });
     return true;
   }
 

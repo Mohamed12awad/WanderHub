@@ -36,8 +36,8 @@ export class ExpensesController {
 
   @Put(':id')
   @RequirePermission('expenses:edit')
-  update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto) {
-    return this.expenses.update(id, body);
+  update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto, @CurrentUser() user: AuthUser) {
+    return this.expenses.update(id, body, user.id);
   }
 
   @Patch(':id/approve')
@@ -56,7 +56,7 @@ export class ExpensesController {
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('expenses:delete')
-  remove(@Param('id') id: string) {
-    return this.expenses.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.expenses.remove(id, user.id);
   }
 }

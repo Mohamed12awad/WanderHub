@@ -77,7 +77,7 @@ export class VendorBillsController {
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('vendor-bills:delete')
-  remove(@Param('id') id: string) {
-    return this.bills.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.bills.remove(id, user.id);
   }
 }

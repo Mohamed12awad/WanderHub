@@ -72,6 +72,33 @@ function buildAtomicExpenseApproval() {
   };
 }
 
+function buildExpenseLifecycle() {
+  const existing = {
+    id: 'expense-lifecycle',
+    title: 'Lifecycle expense',
+    userId: 'creator-1',
+    approvalStatus: 'approved',
+    deletedAt: null,
+  };
+  const tx: any = {
+    expenseItem: { deleteMany: jest.fn(async () => ({ count: 1 })) },
+    expenseReport: {
+      update: jest.fn(async ({ data }: any) => ({ ...existing, ...data })),
+    },
+  };
+  const prisma: any = {
+    expenseReport: {
+      findUnique: jest.fn(async () => existing),
+      findFirst: jest.fn(async () => existing),
+      update: jest.fn(),
+    },
+    expenseItem: { deleteMany: jest.fn() },
+    $transaction: jest.fn(async (callback: any) => callback(tx)),
+  };
+  const svc = makeService(prisma);
+  return { svc, prisma, tx, posting: (svc as any).posting };
+}
+
 describe('ExpensesService — document/journal atomicity', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -103,5 +130,38 @@ describe('ExpensesService — document/journal atomicity', () => {
       'approver-1',
       undefined,
     );
+  });
+});
+
+describe('ExpensesService — postings follow the document lifecycle', () => {
+  it('reverses the live entry when an approved expense report is edited', async () => {
+    const { svc, prisma, tx, posting } = buildExpenseLifecycle();
+
+    await svc.update('expense-lifecycle', {
+      expenses: [{
+        description: 'Replacement', amount: 75, date: '2026-08-01', category: 'Travel', beneficiary: 'Vendor',
+      }],
+    } as any, 'editor-1');
+
+    // The reversal must be attributed, or the journal cannot say who un-issued it.
+    expect(posting.reverseLive).toHaveBeenCalledWith('ExpenseReport', 'expense-lifecycle', { createdById: 'editor-1' }, tx);
+    expect(tx.expenseReport.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ approvalStatus: 'pending' }),
+    }));
+    expect(tx.expenseItem.deleteMany).toHaveBeenCalledWith({ where: { expenseReportId: 'expense-lifecycle' } });
+    expect(prisma.expenseItem.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('reverses the live entry when an approved expense report is deleted', async () => {
+    const { svc, prisma, tx, posting } = buildExpenseLifecycle();
+
+    await svc.remove('expense-lifecycle', 'deleter-1');
+
+    expect(posting.reverseLive).toHaveBeenCalledWith('ExpenseReport', 'expense-lifecycle', { createdById: 'deleter-1' }, tx);
+    expect(tx.expenseReport.update).toHaveBeenCalledWith({
+      where: { id: 'expense-lifecycle' },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(prisma.expenseReport.update).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
-import { PostingService } from '../accounting/posting.service';
+import { POST_TOLERANCE, PostingService } from '../accounting/posting.service';
 import { toClient } from '../common/serialize';
 import { paginate } from '../common/paginate';
 
@@ -385,19 +385,68 @@ export class InventoryService {
     if (!product) throw new NotFoundException('Product not found');
     if (!body.qty) throw new BadRequestException('qty is required and must be non-zero');
     const warehouseId = await this.resolveWarehouseId(this.prisma, body.warehouseId);
-    await this.applyMovement({
-      productId,
-      warehouseId,
-      qty: body.qty,
-      type: 'adjustment',
-      unitCost: body.unitCost,
-      refType: 'manual',
-      note: body.note,
-      adjustmentReason: body.reason,
-      userId,
+    await this.prisma.$transaction(async (tx) => {
+      const move = await this.applyMovement({
+        productId,
+        warehouseId,
+        qty: body.qty,
+        type: 'adjustment',
+        unitCost: body.unitCost,
+        refType: 'manual',
+        note: body.note,
+        adjustmentReason: body.reason,
+        userId,
+      }, tx);
+      if (move) await this.postAdjustment(move, tx, userId);
     });
     return toClient(
       await this.prisma.stockItem.findUnique({ where: { productId_warehouseId: { productId, warehouseId } } }),
+    );
+  }
+
+  /** Mirrors a manual stock value change in the Inventory Asset GL account. */
+  private async postAdjustment(move: StockMovementRow, tx: Prisma.TransactionClient, userId: string) {
+    const amount = Math.abs(move.qty) * Number(move.unitCost ?? 0);
+    if (amount < POST_TOLERANCE || !(await this.posting.shouldPost(move.createdAt))) return;
+
+    const gl = await this.posting.getGlConfig();
+    const inventory = await this.posting.coaIdByCode(gl.defaultInventoryAsset, tx);
+    if (!inventory) {
+      throw new BadRequestException(
+        `GL posting failed: no account mapped for "Inventory Asset" (code ${gl.defaultInventoryAsset ?? 'unset'}). ` +
+          'Set it in Settings → GL / Account Mapping.',
+      );
+    }
+    const adjustment = await this.posting.coaIdByCode(gl.defaultInventoryAdjustment, tx);
+    if (!adjustment) {
+      throw new BadRequestException(
+        `GL posting failed: no account mapped for "Inventory Adjustment" (code ${gl.defaultInventoryAdjustment ?? 'unset'}). ` +
+          'Set it in Settings → GL / Account Mapping.',
+      );
+    }
+
+    const dimensions = {
+      productId: move.productId,
+      warehouseId: move.warehouseId ?? undefined,
+    };
+    await this.posting.post(
+      {
+        sourceType: 'StockAdjustment',
+        sourceId: move.id,
+        date: move.createdAt,
+        memo: move.adjustmentReason ? `Inventory adjustment: ${move.adjustmentReason}` : 'Inventory adjustment',
+        createdById: userId,
+        lines: move.qty > 0
+          ? [
+              { accountId: inventory, debit: amount, ...dimensions },
+              { accountId: adjustment, credit: amount, ...dimensions },
+            ]
+          : [
+              { accountId: adjustment, debit: amount, ...dimensions },
+              { accountId: inventory, credit: amount, ...dimensions },
+            ],
+      },
+      tx,
     );
   }
 

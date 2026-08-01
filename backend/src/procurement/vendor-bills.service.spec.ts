@@ -95,6 +95,39 @@ function buildAtomicBillApproval() {
   };
 }
 
+function buildBillLifecycle() {
+  const existing = {
+    id: 'bill-lifecycle',
+    billNumber: 'BILL-LIFECYCLE',
+    title: 'Lifecycle bill',
+    approvalStatus: 'approved',
+    taxRate: 0,
+    taxInclusive: false,
+    total: 100,
+    createdById: 'creator-1',
+    deletedAt: null,
+  };
+  const tx: any = {
+    vendorBillItem: {
+      deleteMany: jest.fn(async () => ({ count: 1 })),
+      createMany: jest.fn(async () => ({ count: 1 })),
+    },
+    vendorBill: {
+      update: jest.fn(async ({ data }: any) => ({ ...existing, ...data })),
+    },
+  };
+  const prisma: any = {
+    vendorBill: {
+      findFirst: jest.fn(async () => existing),
+      update: jest.fn(),
+    },
+    vendorBillPayment: { count: jest.fn(async () => 0) },
+    $transaction: jest.fn(async (callback: any) => callback(tx)),
+  };
+  const svc = makeService(prisma);
+  return { svc, prisma, tx, posting: (svc as any).posting };
+}
+
 describe('VendorBillsService — document/journal atomicity', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -127,5 +160,70 @@ describe('VendorBillsService — document/journal atomicity', () => {
       { useGrni: false },
       undefined,
     );
+  });
+});
+
+describe('VendorBillsService — segregation of duties', () => {
+  it('blocks self-approval when the approval workflow is disabled', async () => {
+    const bill = {
+      id: 'bill-self', createdById: 'user-1', approvalStatus: 'pending', deletedAt: null,
+    };
+    const prisma: any = {
+      vendorBill: { findFirst: jest.fn(async () => bill) },
+      workspaceConfig: { findFirst: jest.fn(async () => null) },
+      $transaction: jest.fn(),
+    };
+    const svc = makeService(prisma);
+
+    await expect(svc.approve('bill-self', 'user-1', 'admin')).rejects.toThrow('Cannot approve your own bill');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks self-rejection when the approval workflow is disabled', async () => {
+    const bill = {
+      id: 'bill-self', createdById: 'user-1', approvalStatus: 'pending', deletedAt: null,
+    };
+    const prisma: any = {
+      vendorBill: { findFirst: jest.fn(async () => bill) },
+      workspaceConfig: { findFirst: jest.fn(async () => null) },
+      $transaction: jest.fn(),
+    };
+    const svc = makeService(prisma);
+
+    await expect(svc.reject('bill-self', 'user-1', 'admin', 'no')).rejects.toThrow('Cannot reject your own bill');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('VendorBillsService — postings follow the document lifecycle', () => {
+  it('reverses the live entry when an approved bill is edited', async () => {
+    const { svc, tx, posting } = buildBillLifecycle();
+
+    await svc.update(
+      'bill-lifecycle',
+      { items: [{ description: 'Replacement', quantity: 1, unitPrice: 75 }] } as any,
+      'editor-1',
+    );
+
+    expect(posting.reverseLive).toHaveBeenCalledWith(
+      'VendorBill', 'bill-lifecycle', { createdById: 'editor-1' }, tx,
+    );
+    expect(tx.vendorBill.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ approvalStatus: 'pending', total: 75 }),
+    }));
+  });
+
+  it('reverses the live entry when an approved bill is deleted', async () => {
+    const { svc, prisma, tx, posting } = buildBillLifecycle();
+
+    await svc.remove('bill-lifecycle', 'deleter-1');
+
+    // The reversal must be attributed, or the journal records who deleted nothing.
+    expect(posting.reverseLive).toHaveBeenCalledWith('VendorBill', 'bill-lifecycle', { createdById: 'deleter-1' }, tx);
+    expect(tx.vendorBill.update).toHaveBeenCalledWith({
+      where: { id: 'bill-lifecycle' },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(prisma.vendorBill.update).not.toHaveBeenCalled();
   });
 });

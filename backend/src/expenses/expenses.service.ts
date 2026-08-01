@@ -154,7 +154,7 @@ export class ExpensesService {
     return toClient(report);
   }
 
-  async update(id: string, body: UpdateExpenseReportDto) {
+  async update(id: string, body: UpdateExpenseReportDto, userId?: string) {
     const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('expense report not found');
     const { expenses, project, ...rest } = body;
@@ -172,22 +172,29 @@ export class ExpensesService {
     }
     if (existing.approvalStatus === 'rejected') data.approvalStatus = 'pending';
     if (expenses && existing.approvalStatus === 'approved') data.approvalStatus = 'pending';
-    if (expenses) {
-      await this.prisma.expenseItem.deleteMany({ where: { expenseReportId: id } });
-      data.expenses = {
-        create: expenses.map((e) => ({
-          description: e.description,
-          amount: Number(e.amount),
-          date: new Date(e.date),
-          category: e.category,
-          beneficiary: e.beneficiary,
-        })),
-      };
-    }
-    const report = await this.prisma.expenseReport.update({
-      where: { id },
-      data: data as Prisma.ExpenseReportUncheckedUpdateInput,
-      include: EXPENSE_REPORT_INCLUDE,
+    const report = await this.prisma.$transaction(async (tx) => {
+      if (expenses) {
+        if (existing.approvalStatus === 'approved') {
+          // Unrecognize the old expense/AP entry before the edited report goes
+          // back to pending, so re-approval cannot double-post it.
+          await this.posting.reverseLive('ExpenseReport', id, { createdById: userId ?? null }, tx);
+        }
+        await tx.expenseItem.deleteMany({ where: { expenseReportId: id } });
+        data.expenses = {
+          create: expenses.map((e) => ({
+            description: e.description,
+            amount: Number(e.amount),
+            date: new Date(e.date),
+            category: e.category,
+            beneficiary: e.beneficiary,
+          })),
+        };
+      }
+      return tx.expenseReport.update({
+        where: { id },
+        data: data as Prisma.ExpenseReportUncheckedUpdateInput,
+        include: EXPENSE_REPORT_INCLUDE,
+      });
     });
     return toClient(report);
   }
@@ -273,10 +280,13 @@ export class ExpensesService {
     return toClient(updated);
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId?: string) {
     const existing = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('expense report not found');
-    await this.prisma.expenseReport.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('ExpenseReport', id, { createdById: userId ?? null }, tx);
+      await tx.expenseReport.update({ where: { id }, data: { deletedAt: new Date() } });
+    });
     return true;
   }
 }
