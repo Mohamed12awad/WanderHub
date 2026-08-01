@@ -1,34 +1,33 @@
 # NawaHub Remediation — Status Handover
 
-**Branch:** `main` — 16 commits merged from `fix/audit-2026-08-batch-0-1` (fast-forward). **Not pushed** to origin.
+**Branch:** `main` — 18 commits merged from `fix/audit-2026-08-batch-0-1` (fast-forward). **Not pushed** to origin.
 **Baseline audit:** [`docs/AUDIT-2026-08.md`](./AUDIT-2026-08.md)
 **Date:** 2026-08-01
 
-**Gates, re-run at handover:** backend **20 suites / 153 tests pass** · frontend **3 files / 33 tests pass** ·
+**Gates, re-run at handover:** backend **21 suites / 155 tests pass** · frontend **3 files / 33 tests pass** ·
 backend + frontend typecheck clean · backend lint 0 errors (3 pre-existing warnings) ·
-**0 `it.failing` remain** · working tree clean.
+**0 it.failing remain** · **verify:gl 5/5 against a live DB** · working tree clean.
 
 ---
 
 ## TL;DR
 
-All **11** documented-failing tests are green — **0 `it.failing` remain** — and **all but one** of the
-original P0s are closed.
+**Every P0 from the original audit is closed.** All 11 documented-failing tests are green —
+**0 `it.failing` remain**.
 
 Closed this effort: record-level authorization, WCAG AA contrast, shared-primitive accessibility,
 period close (carry-forward + empty-period lock), reversal period locks, gapless journal numbering,
 missing-FX-rate rejection, cross-currency AR/AP relief, document↔journal atomicity (including the
 approval-step residual), the two divergent PO receipt paths, quote→invoice conversion posting nothing,
-and stock restoration on invoice reject.
+and postings now following the whole invoice lifecycle — reject, edit and delete all reverse the live
+entry and return the stock.
 
 The headline defects were verified **end-to-end against the running app**, not only by unit test:
 closing a period no longer erases prior history, and an empty period now genuinely locks.
 
-> **One P0 is still open** — editing or deleting an *approved* document leaves its postings live.
-> Editing an approved invoice resets it to `pending` without reversing the issued entry, so
-> re-approval posts a second time and AR doubles; soft-delete performs no reversal at all, leaving AR,
-> revenue, tax, stock depletion and COGS in the ledger for a document nobody can see. It is item 1
-> under "Not done" and has no test yet.
+What remains is **P1 and below** — see "Not done". Nothing there silently corrupts money in the way the
+P0s did, though item 1 (manual stock adjustments posting no GL) does cause steady, invisible drift
+between the Inventory Asset account and the stock subledger.
 
 > **Verification caveat worth knowing about.** During this work a stale backend process from an earlier
 > session held port 3000, so a restart silently failed with `EADDRINUSE` and several live checks were
@@ -117,7 +116,7 @@ the moment it's fixed — which forces flipping them to `it()`. This is the work
 | rejecting an invoice restores stock, no net COGS | `finance/invoices.payments.spec.ts` |
 | `nextNumber` uses the supplied transaction client | `number-sequence/number-sequence.service.spec.ts` |
 
-**All 11 have since been fixed and flipped to active tests** (see 5–11 below). Zero remain red.
+**All 11 have since been fixed and flipped to active tests** (see 5–12 below). Zero remain red.
 
 ### 5. `aa8ad46` — Period close (both P0s), verified live
 
@@ -171,6 +170,20 @@ Extracted  so conversion performs the same approval chain,
 stock draw, COGS and issued GL posting as normal creation, on the conversion transaction — which
 preserves the  race guard that a plain  call would have broken.
 
+### 12. `923eab9` — Postings follow the invoice lifecycle (the last P0)
+
+Editing an approved invoice's lines reset it to `pending` but left the issued entry standing, so
+re-approval posted a second time — 114 edited to 228 ended with AR at **342**. Deleting was worse: a
+plain soft-delete with no reversal, leaving AR, revenue, tax, stock depletion and COGS live for a
+document that had vanished from every listing.
+
+Both paths now un-issue inside their transaction — edit reverses and swaps stock (old lines back, new
+lines drawn); delete reverses and returns stock. The creation draw and the reject restore were
+refactored into one pair of inverse helpers (`drawInvoiceStock` / `restoreInvoiceStock`) so creation,
+reject, edit and delete share them rather than hand-rolling four loops. Distinct refTypes
+(`InvoiceEdited`, `InvoiceDeleted`, `InvoiceRejected`) keep these distinguishable from a sale or a
+customer return in the stock ledger.
+
 ### 11. `f3b8f11` — Stock restored and COGS reversed on invoice reject
 
 Both reject paths now mirror the draw performed at creation.
@@ -182,19 +195,9 @@ Both reject paths now mirror the draw performed at creation.
 Ordered by severity. Every item below needs a test written alongside its fix — the 11-test safety net
 is fully consumed.
 
-### P0 — accounting correctness
+### P0 — none remaining
 
-1. **Editing or deleting an approved document leaves its postings live.** The only P0 still open.
-   - `updateInvoice` resets an approved invoice to `pending` when its items change
-     (`invoices.service.ts`, the `items && approvalStatus === 'approved'` branch) but never calls
-     `reverseLive`. Re-approval then posts again under a versioned `sourceId`, so AR is recognised
-     twice: an invoice edited from 114 to 228 leaves AR at 342.
-   - `deleteInvoice` soft-deletes with `deletedAt` and performs **no** reversal, so AR, revenue, tax,
-     stock depletion and COGS all remain in the ledger for a document that has vanished from the UI.
-   - The same shape exists on `vendor-bills` and `expenses` delete paths.
-   - Fix direction: reverse the live entry (and restore stock, as `restoreStockForRejectedInvoice`
-     now does on reject) inside the same transaction as the edit/delete — or refuse to delete a
-     posted document outright and require an explicit void.
+All original P0 items are closed. The last one (`923eab9`) is recorded under "Done".
 
 ### P1
 
@@ -259,19 +262,18 @@ is fully consumed.
 
 ## Suggested next session
 
-1. **The last P0 — edit/delete of an approved document.** Reverse the live entry and restore stock
-   inside the same transaction as the edit or delete. `restoreStockForRejectedInvoice` plus the reject
-   paths in `invoices.service.ts` are the pattern to copy. A defensible alternative is to refuse to
-   delete a posted document at all and require an explicit void. Write the test first — this is the
-   one remaining P0 with no coverage.
-2. **Manual stock adjustments post no GL** (P1). `defaultInventoryAdjustment` is declared, seeded and
+1. **Manual stock adjustments post no GL** (P1). `defaultInventoryAdjustment` is declared, seeded and
    exposed in Settings but referenced by no posting code, so Inventory Asset drifts from the stock
    subledger with every recount or write-off. `verify:gl` check 3 will start catching this once there
    is real valued stock in the database.
-3. **Vendor-bill self-approval** (P1). Gated on `enabled`, which defaults to false, while the PO path
+2. **Vendor-bill self-approval** (P1). Gated on `enabled`, which defaults to false, while the PO path
    applies the same check unconditionally — so with approvals off, one user can raise a bill and
    approve it.
+3. **Edit/delete posting parity for vendor bills and expenses** (P1). `invoices.service.ts` now
+   reverses on edit and delete; those two modules have the same shape and the same gap.
 4. **IDOR on mutation handlers** (P1). Fail-closed scoping fixed *reads*; six mutation paths still
    fetch by raw id without caller scope.
 5. Re-run `npm --prefix backend run verify:gl` after each — fastest end-to-end signal. Note it needs a
    live database; the Docker Postgres used during this work is `nawahub-pg` on port 5433.
+
+> Items 1–3 are currently dispatched to Codex; check `git log` before starting them.
