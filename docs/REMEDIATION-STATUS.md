@@ -1,24 +1,30 @@
 # NawaHub Remediation — Status Handover
 
-**Branch:** `fix/audit-2026-08-batch-0-1` (6 commits, not pushed, not merged)
+**Branch:** `fix/audit-2026-08-batch-0-1` (10 commits, not pushed, not merged)
 **Baseline audit:** [`docs/AUDIT-2026-08.md`](./AUDIT-2026-08.md)
 **Date:** 2026-08-01
 
-**Gates, re-run at handover:** backend **16 suites / 141 tests pass** · frontend **3 files / 33 tests pass** ·
-backend + frontend typecheck clean · backend lint 0 errors (2 pre-existing warnings) · working tree clean.
+**Gates, re-run at handover:** backend **18 suites / 147 tests pass** · frontend **3 files / 33 tests pass** ·
+backend + frontend typecheck clean · backend lint 0 errors (3 pre-existing warnings) ·
+`verify:gl` **5/5** · working tree clean.
 
 ---
 
 ## TL;DR
 
-Batches 0 and 1 are **done**, and **Batch 2 is underway**: the two period-close P0s and the two
-reversal/numbering P1s are fixed and verified against the running app.
+Batches 0 and 1 are **done**, and **Batch 2 is most of the way through**: period close, reversal locks,
+journal numbering, missing-FX-rate rejection, cross-currency AR/AP relief, and document↔journal
+atomicity are all fixed.
 
 **Closing accounting periods is now safe.** That was the headline defect and it is fixed — re-verified
 end-to-end, not just by unit test.
 
-**Still open: multi-currency and document/journal atomicity.** 4 of the original 11 documented-failing
-tests remain red, and they mark exactly what is left.
+**Multi-currency and document/journal atomicity are now also fixed.** **10 of the original 11**
+documented-failing tests are green; **1 remains red** (stock is not restored when an invoice is
+rejected).
+
+**All P0s from the original audit are now closed** except the invoice-reject stock path and the two
+procurement/quote-conversion posting gaps. See "Not done" for the exact remainder.
 
 > **Verification caveat worth knowing about.** During this work a stale backend process from an earlier
 > session held port 3000, so a restart silently failed with `EADDRINUSE` and several live checks were
@@ -107,7 +113,8 @@ the moment it's fixed — which forces flipping them to `it()`. This is the work
 | rejecting an invoice restores stock, no net COGS | `finance/invoices.payments.spec.ts` |
 | `nextNumber` uses the supplied transaction client | `number-sequence/number-sequence.service.spec.ts` |
 
-**7 of these 11 have since been fixed and flipped to active tests** (see 5 and 6 below). 4 remain red.
+**10 of these 11 have since been fixed and flipped to active tests** (see 5–9 below). One remains red:
+*rejecting an invoice restores stock, no net COGS*.
 
 ### 5. `aa8ad46` — Period close (both P0s), verified live
 
@@ -127,32 +134,50 @@ the moment it's fixed — which forces flipping them to `it()`. This is the work
 - `nextNumber()` accepts a transaction client and `PostingService` passes its own — rollbacks and
   serializable retries no longer burn journal numbers.
 
+### 7. `94e8090` — Missing exchange rate no longer posts 1:1
+
+`CurrencyService` split by intent: `toBase()` stays lenient (correct for dashboard aggregates, where a
+missing rate should not zero a total); new **`toBaseOrThrow()`** is strict and is what `post()` uses. A
+foreign-currency document with no rate on file is now refused instead of booking base-currency units.
+
+### 8. `9a1fc9b` — Cross-currency AR/AP relief
+
+`payment.amount` is in the *payment* currency but was reused as the AR/AP quantity and re-priced at the
+document's rate. An EGP 5,000 payment against a USD 100 invoice booked at 50 credited AR **EGP 250,000**
+and invented an **EGP 245,000** FX loss to balance. The payment is now converted into document currency
+first, and that applied amount relieves the control account. Same-currency payments are unchanged —
+`convert()` returns the amount untouched, so existing realized-FX behaviour still holds.
+
+### 9. `f32a10b` — Document approval atomic with its GL posting (Codex, reviewed)
+
+Approval/creation and posting now share one transaction across invoices (both branches), vendor bills
+(create, both branches, create-from-PO) and expenses (create, both branches). The private posting
+helpers now **require** a transaction client, so a non-atomic call site is a compile error. Timeline
+logging stays outside the transaction. Six new rollback/commit tests.
+
+> **Known residual, deliberately not fixed here.** `ApprovalService.act()` still writes the step advance
+> on its own connection *before* the transaction opens (`approval.service.ts:127`). If posting then
+> fails, the document correctly rolls back but the approval step stays advanced, so a retry may be
+> rejected as already-acted. Strictly better than before — the document no longer ends up
+> approved-with-no-journal — but incomplete. Closing it means threading a `tx` through `act()` and
+> restructuring the six call sites that use its result to decide what to write.
+
 ---
 
 ## Not done — remaining Batch 2
 
-Ordered by severity. The 4 remaining `it.failing` tests cover items **1, 2 and 5**; everything else here
-has no test yet and needs one written alongside the fix.
+Ordered by severity. Only **1**  test remains (invoice-reject stock, item 2); everything
+else here needs a test written alongside the fix.
 
 ### P0 — accounting correctness
 
-1. **Cross-currency payments relieve AR/AP with the wrong quantity.** `posting.service.ts:390-392`,
-   `:592-594` use one numeric amount as both payment-currency and document-currency units. A USD 100
-   invoice paid with EGP 5,000 credits AR **EGP 250,000** and books a fabricated 245,000 FX loss.
-2. **Missing FX rate posts 1:1.** `currency.service.ts:42` passes the amount through unconverted, so a
-   USD 1,000 invoice with no rate on file posts as EGP 1,000. Split the API: keep pass-through for
-   dashboards, add a strict `toBaseOrThrow()` for the posting path.
-3. **Document↔journal atomicity.** Approval commits, then posting is invoked without that transaction
-   (`invoices.service.ts:367,385`; `vendor-bills.service.ts:160,187,246,277,422,455`;
-   `expenses.service.ts:113,145,198,217`). Posting failure leaves an approved document with no journal,
-   permanently — retry returns early because it's already approved.
-4. **Quote→invoice conversion posts nothing.** `quotes.service.ts:235-285` creates an **approved**
+1. **Quote→invoice conversion posts nothing.** `quotes.service.ts:235-285` creates an **approved**
    invoice with no AR, revenue, tax, stock movement or COGS.
-5. **Pending invoices deplete stock and post COGS before approval**, and rejection reverses only the
+2. **Pending invoices deplete stock and post COGS before approval**, and rejection reverses only the
    `Invoice` journal — the stock movement and `StockCogs` entry are never touched.
-6. **Editing/deleting approved documents leaves postings live.** Edit + re-approve double-posts AR;
+3. **Editing/deleting approved documents leaves postings live.** Edit + re-approve double-posts AR;
    soft-delete performs no reversal at all.
-7. **PO receipt: two divergent paths.** `updateStatus` (`purchase-orders.service.ts:210-229`) creates
+4. **PO receipt: two divergent paths.** `updateStatus` (`purchase-orders.service.ts:210-229`) creates
    uncosted stock with no GRNI under a different `refType`, so `receive()` doesn't see it → double
    receipt. `receive()` itself is non-atomic and can leave a PO permanently unreceivable.
 
@@ -219,14 +244,14 @@ has no test yet and needs one written alongside the fix.
 
 ## Suggested next session
 
-1. **Item (2), missing FX rate** — smallest of the remaining P0s and has a waiting test. Split
-   `CurrencyService`: keep pass-through for dashboard aggregates, add a strict `toBaseOrThrow()` that
-   the posting path uses, so a foreign-currency document with no rate fails loudly instead of booking
-   base-currency units.
-2. **Item (1), cross-currency AR/AP relief** — 2 waiting tests. Needs a decision first: where to store
-   the applied amount in *document* currency (a column on `InvoicePayment`/`VendorBillPayment`, versus
-   deriving it at post time). Do (2) before this; a strict rate lookup makes the arithmetic tractable.
-3. **Item (3), document↔journal atomicity** — mechanical but broad: thread the caller's `tx` through
-   every approve/create path listed. No test yet; write one per module as you go.
-4. Re-run `npm --prefix backend run verify:gl` after each — it is the fastest end-to-end signal, and
-   `npm --prefix backend test` should show the `it.failing` count dropping toward zero.
+1. **Item (2), pending-invoice stock** — the last red test. Invoice creation moves stock and posts COGS
+   unconditionally; rejection reverses only the `Invoice` journal. Either defer the stock movement to
+   approval, or reverse the movement and `StockCogs` on reject. The waiting test asserts the latter.
+2. **Item (1), quote→invoice conversion** — route conversion through the same transactional creation
+   path `InvoicesService` uses, rather than writing the invoice directly.
+3. **Item (4), PO receipt** — remove stock mutation from the generic `updateStatus` so `receive()` is
+   the single idempotent receipt path, and wrap that path in one transaction.
+4. **The `ApprovalService.act()` residual** (noted under 9 above) — thread a `tx` through `act()` so the
+   step advance rolls back with the document.
+5. Re-run `npm --prefix backend run verify:gl` after each — fastest end-to-end signal — and watch the
+   `it.failing` count reach zero.
