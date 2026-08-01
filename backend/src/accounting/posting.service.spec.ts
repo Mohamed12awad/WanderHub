@@ -1,4 +1,5 @@
 import { PostingService } from './posting.service';
+import { CurrencyService } from '../common/currency.service';
 
 interface MakeOpts {
   existing?: { id: string } | null;
@@ -31,6 +32,17 @@ function make(opts: MakeOpts = {}) {
   const currency: any = {
     getBaseCurrency: jest.fn().mockResolvedValue('EGP'),
     toBase: jest.fn().mockImplementation((a: number, c: string, r?: number | null) => Promise.resolve(toBase(a, c, r))),
+    convert: jest.fn().mockImplementation(async (
+      amount: number,
+      from: string,
+      to: string,
+      fromRate?: number | null,
+      toRate?: number | null,
+    ) => {
+      if (from === to) return amount;
+      const inBase = toBase(amount, from, fromRate);
+      return to === 'EGP' ? inBase : inBase / (toRate ?? 50);
+    }),
   };
   const workspaceConfig: any = {
     get: jest.fn().mockResolvedValue({ glConfig: opts.glConfig ?? { glEnabled: true } }),
@@ -38,7 +50,20 @@ function make(opts: MakeOpts = {}) {
   const numbers: any = { nextNumber: jest.fn().mockResolvedValue('JE-0001') };
   const periods: any = { isDateLocked: jest.fn().mockResolvedValue(false) };
   const svc = new PostingService(prisma, currency, workspaceConfig, numbers, periods);
-  return { svc, prisma, created };
+  return { svc, prisma, created, currency, periods };
+}
+
+function postedEntry() {
+  return {
+    id: 'orig',
+    entryNumber: 'JE-0001',
+    status: 'posted',
+    sourceType: 'Invoice',
+    lines: [
+      { accountId: 'a', debit: 100, credit: 0, currency: 'EGP', baseAmount: 100 },
+      { accountId: 'b', debit: 0, credit: 100, currency: 'EGP', baseAmount: -100 },
+    ],
+  };
 }
 
 describe('PostingService.post', () => {
@@ -143,6 +168,24 @@ describe('PostingService.postInvoicePayment — realized FX', () => {
     );
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });
+
+  // Audit P0: payment units are reused as document-currency units (posting.service.ts:390-392).
+  it.failing('cross-currency invoice payment relieves AR by the document amount without an FX line', async () => {
+    const { svc, created } = make({
+      glConfig: { glEnabled: true, defaultArAccount: '1200', defaultFxGainLossAccount: '4900' },
+    });
+
+    await svc.postInvoicePayment(
+      { id: 'p-egp', amount: 5_000, currency: 'EGP', date: new Date('2026-08-01'), accountId: 'acc1' },
+      { id: 'inv-usd', invoiceNumber: 'INV-USD', currency: 'USD', exchangeRate: 50, customerId: 'c1' },
+    );
+
+    const lines = created[0].lines.create;
+    expect({
+      arBaseAmount: lines.find((line: any) => line.accountId === 'coa-1200')?.baseAmount,
+      fxLineCount: lines.filter((line: any) => line.accountId === 'coa-4900').length,
+    }).toEqual({ arBaseAmount: -5_000, fxLineCount: 0 });
+  });
 });
 
 describe('PostingService.reverse', () => {
@@ -161,5 +204,78 @@ describe('PostingService.reverse', () => {
     expect(mirror.lines.create[0]).toMatchObject({ debit: 0, credit: 100, baseAmount: -100 });
     expect(mirror.lines.create[1]).toMatchObject({ debit: 100, credit: 0, baseAmount: 100 });
     expect(prisma.journalEntry.update).toHaveBeenCalledWith({ where: { id: 'orig' }, data: { status: 'reversed' } });
+  });
+
+  // Audit P1: reverse() bypasses the reversal-date lock (posting.service.ts:275).
+  it.failing('reverse rejects a reversal dated in a closed period', async () => {
+    const { svc, prisma, periods } = make();
+    prisma.journalEntry.findUnique.mockResolvedValueOnce(postedEntry());
+    periods.isDateLocked.mockResolvedValue(true);
+
+    await expect(
+      svc.reverse('Invoice', 'inv1', { date: new Date('2026-01-15T00:00:00.000Z') }),
+    ).rejects.toThrow(/closed/i);
+    expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+  });
+
+  // Audit P1: reverseLive() bypasses the reversal-date lock (posting.service.ts:312).
+  it.failing('reverseLive rejects a reversal dated in a closed period', async () => {
+    const { svc, prisma, periods } = make();
+    prisma.journalEntry.findFirst.mockResolvedValueOnce(postedEntry());
+    periods.isDateLocked.mockResolvedValue(true);
+
+    await expect(
+      svc.reverseLive('Invoice', 'inv1', { date: new Date('2026-01-15T00:00:00.000Z') }),
+    ).rejects.toThrow(/closed/i);
+    expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostingService.postVendorBillPayment — cross-currency settlement', () => {
+  // Audit P0: payment units are reused as document-currency units (posting.service.ts:592-594).
+  it.failing('cross-currency vendor payment relieves AP by the document amount without an FX line', async () => {
+    const { svc, created } = make({
+      glConfig: { glEnabled: true, defaultApAccount: '2100', defaultFxGainLossAccount: '4900' },
+    });
+
+    await svc.postVendorBillPayment(
+      { id: 'p-egp', amount: 5_000, currency: 'EGP', date: new Date('2026-08-01'), accountId: 'acc1' },
+      { id: 'bill-usd', billNumber: 'BILL-USD', currency: 'USD', exchangeRate: 50, supplierId: 's1' },
+    );
+
+    const lines = created[0].lines.create;
+    expect({
+      apBaseAmount: lines.find((line: any) => line.accountId === 'coa-2100')?.baseAmount,
+      fxLineCount: lines.filter((line: any) => line.accountId === 'coa-4900').length,
+    }).toEqual({ apBaseAmount: 5_000, fxLineCount: 0 });
+  });
+});
+
+describe('PostingService.postInvoiceIssued — exchange-rate validation', () => {
+  // Audit P0: a missing rate silently falls back to 1:1 (currency.service.ts:42).
+  it.failing('foreign-currency invoice posting rejects a missing exchange rate', async () => {
+    const { svc, prisma } = make({
+      glConfig: { glEnabled: true, defaultArAccount: '1200', defaultIncomeAccount: '4100' },
+    });
+    prisma.exchangeRate = { findMany: jest.fn().mockResolvedValue([]) };
+    (svc as any).currency = new CurrencyService(
+      prisma,
+      { get: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) } as any,
+    );
+
+    await expect(
+      svc.postInvoiceIssued({
+        id: 'inv-no-rate',
+        invoiceNumber: 'INV-NO-RATE',
+        issueDate: new Date('2026-08-01'),
+        currency: 'USD',
+        exchangeRate: null,
+        subtotal: 100,
+        tax: 0,
+        total: 100,
+        customerId: 'c1',
+      }),
+    ).rejects.toThrow(/exchange rate|rate.*USD/i);
+    expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });
 });

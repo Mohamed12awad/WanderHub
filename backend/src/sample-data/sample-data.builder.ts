@@ -66,6 +66,11 @@ const ALL_PERMISSIONS = [
   'vendor-bills:view', 'vendor-bills:create', 'vendor-bills:edit', 'vendor-bills:delete', 'vendor-bills:approve',
   'projects:view', 'projects:create', 'projects:edit', 'projects:delete',
   'tasks:view', 'tasks:create', 'tasks:edit', 'tasks:delete',
+  // Audit 2026-08: activities/notes mutations and email sending are now
+  // distinct permissions rather than being covered by the resource's `:view`.
+  'activities:view', 'activities:create', 'activities:edit', 'activities:delete',
+  'notes:view', 'notes:create', 'notes:edit', 'notes:delete',
+  'emails:view', 'emails:send',
   'reports:view', 'reports:export', 'logs:view',
   'accounting:view', 'accounting:manage',
   'warehouses:view', 'warehouses:manage',
@@ -91,6 +96,9 @@ const MANAGER_PERMISSIONS = [
   'reports:view', 'users:view',
   'accounting:view', 'accounting:manage',
   'warehouses:view', 'warehouses:manage', 'product-categories:view',
+  'activities:view', 'activities:create', 'activities:edit', 'activities:delete',
+  'notes:view', 'notes:create', 'notes:edit', 'notes:delete',
+  'emails:view', 'emails:send',
 ];
 
 const SALES_PERMISSIONS = [
@@ -103,12 +111,17 @@ const SALES_PERMISSIONS = [
   'expenses:view', 'expenses:create',
   'suppliers:view', 'purchase-orders:view', 'vendor-bills:view',
   'projects:view', 'tasks:view', 'tasks:create', 'tasks:edit',
+  'activities:view', 'activities:create', 'activities:edit',
+  'notes:view', 'notes:create', 'notes:edit',
+  'emails:view', 'emails:send',
 ];
 
 const VIEWER_PERMISSIONS = [
   'contacts:view', 'deals:view', 'leads:view', 'products:view', 'quotes:view',
   'invoices:view', 'sales-orders:view', 'expenses:view', 'suppliers:view',
   'purchase-orders:view', 'vendor-bills:view', 'projects:view', 'tasks:view', 'reports:view',
+  // Read-only by design: no create/edit/delete, and no email send.
+  'activities:view', 'notes:view', 'emails:view',
 ];
 
 const ROLES = [

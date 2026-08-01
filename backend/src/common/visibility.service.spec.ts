@@ -21,14 +21,26 @@ describe('resolveScope', () => {
     expect(resolveScope(['deals:view', 'deals:view:own'], 'deals')).toBe('all');
   });
 
-  it('defaults to "all" when no scope is specified (guard already authorised)', () => {
-    expect(resolveScope([], 'deals')).toBe('all');
+  it('fails closed when no view permission is present', () => {
+    expect(resolveScope([], 'deals')).toBe('none');
   });
 
   it('scopes per-resource independently', () => {
     const perms = ['deals:view:own', 'contacts:view'];
     expect(resolveScope(perms, 'deals')).toBe('own');
     expect(resolveScope(perms, 'contacts')).toBe('all');
+  });
+
+  // Audit P0: unknown resource names previously failed open (visibility.service.ts:15-22).
+  it('resolveScope fails closed on an unknown resource', () => {
+    expect(resolveScope(['invoices:view:own'], 'finance' as never)).not.toBe('all');
+  });
+
+  it('keeps legitimate wildcard and deals scopes unchanged', () => {
+    expect(resolveScope(['*'], 'deals')).toBe('all');
+    expect(resolveScope(['deals:view'], 'deals')).toBe('all');
+    expect(resolveScope(['deals:view:own'], 'deals')).toBe('own');
+    expect(resolveScope(['deals:view:team'], 'deals')).toBe('team');
   });
 });
 
@@ -100,5 +112,28 @@ describe('VisibilityService.ownershipWhere', () => {
     expect(await svc.ownershipWhere(user(['deals:view:team']), 'deals', 'ownerId')).toEqual({
       ownerId: { in: ['u1', 'u2'] },
     });
+  });
+
+  // Audit P0: a resource-name mismatch previously returned an unrestricted filter
+  // (visibility.service.ts:63-72), so `invoices:view:own` saw every invoice.
+  //
+  // This test originally asserted the mismatch should degrade to the caller's OWN
+  // records. Resolved deliberately in favour of match-nothing instead: now that
+  // the alias call sites are canonicalised, the only way to reach an unmatched
+  // resource is that the user genuinely holds no `view` permission for it — and
+  // "no permission for this resource" must mean "see none of it", not "see the
+  // ones you happen to own". Degrading to `own` would still grant records in a
+  // resource the user was never given access to.
+  it('ownershipWhere matches nothing when the user has no view permission for the resource', async () => {
+    const svc = makeService();
+
+    const where = await svc.ownershipWhere(
+      user(['invoices:view:own']),
+      'deals',
+      'ownerId',
+    );
+
+    expect(where).not.toEqual({});
+    expect(where).toEqual({ ownerId: { in: [] } });
   });
 });

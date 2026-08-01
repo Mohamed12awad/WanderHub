@@ -31,12 +31,12 @@ export class SearchService {
       can(user, 'contacts:view')   ? this.visibility.ownershipWhere(user, 'contacts',   'ownerId')      : Promise.resolve({}),
       can(user, 'deals:view')      ? this.visibility.ownershipWhere(user, 'deals',       'ownerId')      : Promise.resolve({}),
       can(user, 'expenses:view')   ? this.visibility.ownershipWhere(user, 'expenses',    'userId')       : Promise.resolve({}),
-      can(user, 'finance:view')    ? this.visibility.ownershipWhere(user, 'finance',     'createdById')  : Promise.resolve({}),
+      can(user, 'invoices:view')   ? this.visibility.ownershipWhere(user, 'invoices',    'createdById')  : Promise.resolve({}),
       can(user, 'leads:view')      ? this.visibility.ownershipWhere(user, 'leads',       'ownerId')      : Promise.resolve({}),
       can(user, 'quotes:view')     ? this.visibility.ownershipWhere(user, 'quotes',      'createdById')  : Promise.resolve({}),
-      can(user, 'sales:view')      ? this.visibility.ownershipWhere(user, 'sales',       'createdById')  : Promise.resolve({}),
-      can(user, 'procurement:view') ? this.visibility.ownershipWhere(user, 'procurement', 'createdById') : Promise.resolve({}),
-      can(user, 'procurement:view') ? this.visibility.ownershipWhere(user, 'procurement', 'createdById') : Promise.resolve({}),
+      can(user, 'sales-orders:view') ? this.visibility.ownershipWhere(user, 'sales-orders', 'createdById') : Promise.resolve({}),
+      can(user, 'purchase-orders:view') ? this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById') : Promise.resolve({}),
+      can(user, 'vendor-bills:view') ? this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById') : Promise.resolve({}),
       can(user, 'projects:view')   ? this.visibility.ownershipWhere(user, 'projects',   'managerId')    : Promise.resolve({}),
       can(user, 'tasks:view')      ? this.visibility.ownershipWhere(user, 'tasks',       'assignedToId') : Promise.resolve({}),
     ]);
@@ -79,7 +79,7 @@ export class SearchService {
             take: LIMIT,
           })
         : Promise.resolve([]),
-      can(user, 'finance:view')
+      can(user, 'invoices:view')
         ? this.prisma.invoice.findMany({
             where: { deletedAt: null, ...invoiceScope, OR: [{ invoiceNumber: contains }, { title: contains }] },
             select: { id: true, invoiceNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
@@ -93,21 +93,21 @@ export class SearchService {
             take: LIMIT,
           })
         : Promise.resolve([]),
-      can(user, 'sales:view')
+      can(user, 'sales-orders:view')
         ? this.prisma.salesOrder.findMany({
             where: { deletedAt: null, ...salesOrderScope, OR: [{ orderNumber: contains }, { title: contains }] },
             select: { id: true, orderNumber: true, title: true, status: true, total: true, currency: true, customer: { select: { id: true, name: true } } },
             take: LIMIT,
           })
         : Promise.resolve([]),
-      can(user, 'procurement:view')
+      can(user, 'purchase-orders:view')
         ? this.prisma.purchaseOrder.findMany({
             where: { deletedAt: null, ...poScope, OR: [{ poNumber: contains }, { title: contains }] },
             select: { id: true, poNumber: true, title: true, status: true, total: true, currency: true, supplier: { select: { id: true, name: true } } },
             take: LIMIT,
           })
         : Promise.resolve([]),
-      can(user, 'procurement:view')
+      can(user, 'vendor-bills:view')
         ? this.prisma.vendorBill.findMany({
             where: { deletedAt: null, ...billScope, OR: [{ billNumber: contains }, { title: contains }] },
             select: { id: true, billNumber: true, title: true, status: true, total: true, currency: true, supplier: { select: { id: true, name: true } } },

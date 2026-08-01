@@ -30,7 +30,7 @@ export class ReportsService {
     const end = new Date(endDate);
     const [dealScope, purchaseScope, expenseScope] = await Promise.all([
       this.visibility.ownershipWhere(user, 'deals', 'ownerId'),
-      this.visibility.ownershipWhere(user, 'procurement', 'createdById'),
+      this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById'),
       this.visibility.ownershipWhere(user, 'expenses', 'userId'),
     ]);
     const [deals, purchases, expenses] = await Promise.all([
@@ -72,7 +72,7 @@ export class ReportsService {
         ? Prisma.sql`AND p.date >= ${range.gte}::timestamp AND p.date <= ${range.lte}::timestamp`
         : Prisma.sql``;
     const currencyClause = currency ? Prisma.sql`AND p.currency = ${currency}` : Prisma.sql``;
-    const scope = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scope = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const ownerClause = ownerScopeSql(scope, 'createdById', Prisma.sql`i."createdById"`);
     const ownerEq = ownerEqSql(ownerId, Prisma.sql`i."createdById"`);
 
@@ -173,7 +173,7 @@ export class ReportsService {
     const { range, ownerId, status } = params;
     const allowed = ['sent', 'partially_paid', 'overdue'];
     const statusFilter = status && allowed.includes(status) ? [status] : allowed;
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const invoices = await this.prisma.invoice.findMany({
       where: {
         deletedAt: null,
@@ -389,7 +389,7 @@ export class ReportsService {
 
   /** Outstanding invoice balances bucketed by how overdue they are. */
   async getArAging(params: ReportParams, user: AuthUser) {
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const invoices = await this.prisma.invoice.findMany({
       where: {
         deletedAt: null,
@@ -426,7 +426,7 @@ export class ReportsService {
       range?.gte && range?.lte
         ? Prisma.sql`AND p.date >= ${range.gte}::timestamp AND p.date <= ${range.lte}::timestamp`
         : Prisma.sql``;
-    const scope = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scope = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const ownerClause = ownerScopeSql(scope, 'createdById', Prisma.sql`i."createdById"`);
     const rows = await this.prisma.$queryRaw<{ customerId: string; name: string; currency: string; revenue: number }[]>(
       Prisma.sql`
@@ -493,7 +493,7 @@ export class ReportsService {
       range?.gte && range?.lte
         ? Prisma.sql`AND i."issueDate" >= ${range.gte}::timestamp AND i."issueDate" <= ${range.lte}::timestamp`
         : Prisma.sql``;
-    const scope = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scope = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const ownerClause = ownerScopeSql(scope, 'createdById', Prisma.sql`i."createdById"`);
     const rows = await this.prisma.$queryRaw<{ productId: string; name: string; currency: string; qty: number; revenue: number }[]>(
       Prisma.sql`

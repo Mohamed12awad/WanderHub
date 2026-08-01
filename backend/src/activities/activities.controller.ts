@@ -21,19 +21,25 @@ export class ActivitiesController {
     return this.activities.findAll(query);
   }
 
+  // Audit 2026-08 (P0): these three routes inherited the class-level
+  // `activities:view`, so a read-only role could create, edit and delete
+  // activities. Each mutation now requires its own permission.
   @Post()
   @HttpCode(201)
+  @RequirePermission('activities:create')
   create(@Body() body: CreateActivityDto, @CurrentUser() user: AuthUser) {
     return this.activities.create(body, user.id);
   }
 
   @Put(':id')
+  @RequirePermission('activities:edit')
   update(@Param('id') id: string, @Body() body: UpdateActivityDto) {
     return this.activities.update(id, body);
   }
 
   @Delete(':id')
   @HttpCode(204)
+  @RequirePermission('activities:delete')
   remove(@Param('id') id: string) {
     return this.activities.remove(id);
   }

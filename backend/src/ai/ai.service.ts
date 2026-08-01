@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Resource } from '../common/resources';
 import { PrismaService } from '../prisma/prisma.service';
 import { VisibilityService } from '../common/visibility.service';
 import { WorkspaceConfigService } from '../common/workspace-config.service';
@@ -6,7 +7,7 @@ import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { AiKeyService, AiConfig } from './ai-key.service';
 import { AiProvider, DEFAULT_MODELS, callProvider } from './providers';
 
-const ENTITY_BASE: Record<string, { base: string; model: 'Customer' | 'Deal' | 'Lead' }> = {
+const ENTITY_BASE: Record<string, { base: Resource; model: 'Customer' | 'Deal' | 'Lead' }> = {
   customers: { base: 'contacts', model: 'Customer' },
   deals: { base: 'deals', model: 'Deal' },
   leads: { base: 'leads', model: 'Lead' },

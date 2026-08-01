@@ -140,7 +140,7 @@ export class InvoicesService {
 
   async getInvoices(query: Record<string, string>, user: AuthUser) {
     const { status, customer, deal, page, limit: limitRaw, q } = query;
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const where: Prisma.InvoiceWhereInput = { deletedAt: null, ...scopeWhere };
     if (status) where.status = status as Prisma.InvoiceWhereInput['status'];
     if (customer) where.customerId = customer;
@@ -161,7 +161,7 @@ export class InvoicesService {
   }
 
   async getInvoiceById(id: string, user?: AuthUser) {
-    const scopeWhere = user ? await this.visibility.ownershipWhere(user, 'finance', 'createdById') : {};
+    const scopeWhere = user ? await this.visibility.ownershipWhere(user, 'invoices', 'createdById') : {};
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere }, include: INVOICE_INCLUDE });
     if (!invoice) throw new NotFoundException('Invoice not found');
     const payments = await this.prisma.invoicePayment.findMany({
@@ -243,7 +243,7 @@ export class InvoicesService {
   }
 
   async updateInvoice(id: string, body: UpdateInvoiceDto, user: AuthUser) {
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     const { items, taxRate, customer: _customer, deal: _deal, issueDate, dueDate, taxInclusive, ...rest } = body;
@@ -337,7 +337,7 @@ export class InvoicesService {
   }
 
   async deleteInvoice(id: string, user: AuthUser) {
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     // Deleting an invoice that has recorded payments would hide the document
@@ -426,7 +426,7 @@ export class InvoicesService {
 
   async recordPayment(invoiceId: string, body: RecordPaymentDto, user: AuthUser) {
     const userId = user.id;
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null, ...scopeWhere } });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus !== 'approved') throw new BadRequestException('Invoice must be approved before recording payment');
@@ -473,7 +473,7 @@ export class InvoicesService {
   }
 
   async deleteInvoicePayment(invoiceId: string, paymentId: string, user: AuthUser) {
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId, invoice: { deletedAt: null, ...scopeWhere } } });
     if (!payment) throw new NotFoundException('Payment not found');
 
@@ -489,7 +489,7 @@ export class InvoicesService {
   }
 
   async editPayment(invoiceId: string, paymentId: string, body: EditPaymentDto, user: AuthUser) {
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     const payment = await this.prisma.invoicePayment.findFirst({ where: { id: paymentId, invoiceId, invoice: { deletedAt: null, ...scopeWhere } } });
     if (!payment) throw new NotFoundException('Payment not found');
     const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null, ...scopeWhere } });
@@ -547,7 +547,7 @@ export class InvoicesService {
   async getPayments(query: Record<string, string>, user: AuthUser) {
     const p = Math.max(1, parseInt(query.page) || 1);
     const limit = Math.min(100, parseInt(query.limit) || 25);
-    const scopeWhere = await this.visibility.ownershipWhere(user, 'finance', 'createdById');
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
     // Exclude payments whose invoice has been (soft) deleted; scope to user's visible invoices.
     const where = { invoice: { deletedAt: null, ...scopeWhere } };
     const [data, total] = await Promise.all([

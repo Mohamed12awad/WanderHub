@@ -1,3 +1,4 @@
+import { Resource } from '../common/resources';
 /**
  * Registry of entities that support full-dataset CSV export.
  *
@@ -27,7 +28,7 @@ export interface ExportEntityConfig {
    * the user may see (own / team / all) exactly like the module's list endpoint.
    * Omit for shared catalog/finance models that aren't owner-scoped.
    */
-  scope?: { base: string; ownerField: string };
+  scope?: { base: Resource; ownerField: string };
   /** Whether the model has a `deletedAt` soft-delete column (default true). */
   softDelete?: boolean;
   /** Prisma `include` for related records referenced by columns. */

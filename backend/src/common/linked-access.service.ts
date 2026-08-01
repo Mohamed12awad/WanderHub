@@ -2,9 +2,10 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { VisibilityService } from './visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
+import { Resource } from './resources';
 
 interface ModelConfig {
-  resource: string;
+  resource: Resource;
   ownerField: string;
   prismaModel: string;
 }
@@ -13,11 +14,11 @@ const MODEL_CONFIG: Record<string, ModelConfig> = {
   Customer:      { resource: 'contacts',   ownerField: 'ownerId',      prismaModel: 'customer' },
   Deal:          { resource: 'deals',       ownerField: 'ownerId',      prismaModel: 'deal' },
   Lead:          { resource: 'leads',       ownerField: 'ownerId',      prismaModel: 'lead' },
-  Invoice:       { resource: 'finance',     ownerField: 'createdById',  prismaModel: 'invoice' },
-  Quote:         { resource: 'quotes',      ownerField: 'createdById',  prismaModel: 'quote' },
-  SalesOrder:    { resource: 'sales',       ownerField: 'createdById',  prismaModel: 'salesOrder' },
-  PurchaseOrder: { resource: 'procurement', ownerField: 'createdById',  prismaModel: 'purchaseOrder' },
-  VendorBill:    { resource: 'procurement', ownerField: 'createdById',  prismaModel: 'vendorBill' },
+  Invoice:       { resource: 'invoices',        ownerField: 'createdById',  prismaModel: 'invoice' },
+  Quote:         { resource: 'quotes',          ownerField: 'createdById',  prismaModel: 'quote' },
+  SalesOrder:    { resource: 'sales-orders',    ownerField: 'createdById',  prismaModel: 'salesOrder' },
+  PurchaseOrder: { resource: 'purchase-orders', ownerField: 'createdById',  prismaModel: 'purchaseOrder' },
+  VendorBill:    { resource: 'vendor-bills',    ownerField: 'createdById',  prismaModel: 'vendorBill' },
   Project:       { resource: 'projects',    ownerField: 'managerId',    prismaModel: 'project' },
   Task:          { resource: 'tasks',       ownerField: 'assignedToId', prismaModel: 'task' },
   Product:       { resource: 'products',    ownerField: 'createdById',  prismaModel: 'product' },

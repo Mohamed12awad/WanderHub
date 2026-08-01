@@ -18,20 +18,25 @@ interface Role { _id: string; name: string; permissions: string[] }
 
 const LOCKED_ROLES = ["super admin", "admin"];
 
+// Keyed by Resource, so adding a grantable resource to PERMISSION_REGISTRY
+// without a label here is a compile error rather than a blank row in the matrix.
 const RESOURCE_LABELS: Record<Resource, string> = {
-  contacts: "Contacts", deals: "Deals", products: "Products",
-  expenses: "Expenses", tasks: "Tasks",
+  contacts: "Contacts", leads: "Leads", deals: "Deals", products: "Products",
+  expenses: "Expenses", tasks: "Tasks", activities: "Activities",
+  notes: "Notes", emails: "Emails",
   quotes: "Quotes", invoices: "Invoices",
   "sales-orders": "Sales Orders",
   reports: "Reports", users: "Users", roles: "Roles",
   settings: "Settings", accounting: "Accounting", logs: "Logs",
   suppliers: "Suppliers", "purchase-orders": "Purchase Orders", "vendor-bills": "Vendor Bills",
+  warehouses: "Warehouses", "product-categories": "Product Categories",
   projects: "Projects",
 };
 
 const ACTION_LABELS: Record<string, string> = {
   view: "View", create: "Create", edit: "Edit",
   delete: "Delete", export: "Export", approve: "Approve", manage: "Manage",
+  send: "Send",
 };
 
 function PermissionMatrix({

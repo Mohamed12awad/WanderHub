@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Resource } from '../common/resources';
 import { PrismaService } from '../prisma/prisma.service';
 import { VisibilityService } from '../common/visibility.service';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -13,7 +14,7 @@ import { TasksService } from '../tasks/tasks.service';
 export type BulkAction = 'delete' | 'assignOwner' | 'setStatus';
 
 interface BulkEntityConfig {
-  base: string; // permission base
+  base: Resource; // permission base
   model: string; // prisma delegate name
   /** Owner column. Present only on owner-scoped entities; enables assignOwner + visibility scoping. */
   ownerField?: string;

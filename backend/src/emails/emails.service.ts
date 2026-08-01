@@ -16,6 +16,13 @@ export class EmailsService {
 
   /** Records a tracked email and enqueues the instrumented HTML for delivery. */
   async send(dto: SendEmailDto, user: AuthUser) {
+    // Audit 2026-08 (P1): a linked send must prove access to the record it
+    // claims to be about, otherwise the linked entity is an unchecked handle
+    // onto data the caller may not read.
+    if (dto.linkedToId && dto.linkedModel) {
+      await this.linkedAccess.assertCanAccess(user, dto.linkedModel, dto.linkedToId);
+    }
+
     const tracked = await this.prisma.trackedEmail.create({
       data: {
         to: dto.to,

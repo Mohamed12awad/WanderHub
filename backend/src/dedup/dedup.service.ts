@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Resource } from '../common/resources';
 import { PrismaService } from '../prisma/prisma.service';
 import { VisibilityService } from '../common/visibility.service';
 import { TimelineService } from '../timeline/timeline.service';
@@ -6,7 +7,7 @@ import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 interface DedupEntityConfig {
   /** Permission base, e.g. 'contacts' or 'leads'. */
-  base: string;
+  base: Resource;
   /** linkedModel value used by polymorphic children (Activity/Note/Timeline/Attachment). */
   linkedModel: string;
 }
