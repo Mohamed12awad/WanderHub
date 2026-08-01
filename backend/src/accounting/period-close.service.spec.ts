@@ -64,8 +64,35 @@ function makeLedger(initialMovements: LedgerMovement[] = []) {
     }),
   };
 
+  // Period lock state lives in its own table so a period with no account
+  // movement can still be closed (see AccountingPeriod in schema.prisma).
+  const periods = new Map<string, { period: string; closedAt: Date | null }>();
+  const accountingPeriod = {
+    findUnique: jest.fn(async ({ where }: any) => periods.get(where.period) ?? null),
+    findMany: jest.fn(async ({ where = {} }: any) =>
+      [...periods.values()].filter((r) => (where.closedAt?.not === null ? r.closedAt !== null : true)),
+    ),
+    upsert: jest.fn(async ({ where, create, update }: any) => {
+      const existing = periods.get(where.period);
+      const row = existing ? Object.assign(existing, update) : { ...create };
+      periods.set(where.period, row);
+      return row;
+    }),
+    updateMany: jest.fn(async ({ where, data }: any) => {
+      let count = 0;
+      for (const row of periods.values()) {
+        if (row.period !== where.period) continue;
+        if (where.closedAt?.not === null && row.closedAt === null) continue;
+        Object.assign(row, data);
+        count += 1;
+      }
+      return { count };
+    }),
+  };
+
   const prisma: any = {
     accountBalance,
+    accountingPeriod,
     $queryRaw: jest.fn(async (query: { values?: unknown[] }) => {
       const dates = (query.values ?? []).filter((value): value is Date => value instanceof Date);
       const [start, end] = dates;
@@ -99,7 +126,7 @@ function makeLedger(initialMovements: LedgerMovement[] = []) {
 
 describe('PeriodCloseService', () => {
   // Audit P0: prior-period-only seeding drops history across gaps (period-close.service.ts:54-59).
-  it.failing('closePeriod carries opening balances across a gap in the closed-period chain', async () => {
+  it('closePeriod carries opening balances across a gap in the closed-period chain', async () => {
     const { svc, balance } = makeLedger([
       { accountId: 'capital', date: new Date('2026-01-15T00:00:00.000Z'), debit: 500_000, credit: 0 },
     ]);
@@ -110,7 +137,7 @@ describe('PeriodCloseService', () => {
   });
 
   // Audit P0: closure inferred from balance rows leaves empty periods unlocked (period-close.service.ts:21-24).
-  it.failing('closePeriod locks an empty period', async () => {
+  it('closePeriod locks an empty period', async () => {
     const { svc } = makeLedger();
 
     await svc.closePeriod('2027-06');
@@ -122,7 +149,7 @@ describe('PeriodCloseService', () => {
   });
 
   // Audit P0: re-closing an earlier period leaves later snapshots stale (period-close.service.ts:99-106).
-  it.failing('reclosing an earlier period refreshes later closing-balance snapshots', async () => {
+  it('reclosing an earlier period refreshes later closing-balance snapshots', async () => {
     const { svc, movements, balance } = makeLedger([
       { accountId: 'cash', date: new Date('2026-01-10T00:00:00.000Z'), debit: 100, credit: 0 },
       { accountId: 'cash', date: new Date('2026-02-10T00:00:00.000Z'), debit: 20, credit: 0 },

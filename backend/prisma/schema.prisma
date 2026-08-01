@@ -104,6 +104,7 @@ model User {
   approvedSalesOrders    SalesOrder[]        @relation("SalesOrderApprovedBy")
   createdVendorBills     VendorBill[]        @relation("BillCreatedBy")
   approvedVendorBills    VendorBill[]        @relation("BillApprovedBy")
+  closedPeriods          AccountingPeriod[]  @relation("PeriodClosedBy")
   vendorBillPayments     VendorBillPayment[]
   managedProjects        Project[]           @relation("ProjectManager")
   createdProjects        Project[]           @relation("ProjectCreatedBy")
@@ -1447,6 +1448,24 @@ model AccountBalance {
 // A reportable analytic dimension attached to financial documents (Invoice,
 // VendorBill, ExpenseReport) and propagated onto their GL postings (JournalLine).
 // Hierarchical via parent/children. Soft-deleted like other aggregate roots.
+// Lock state for an accounting period (`YYYY-MM`).
+//
+// Audit 2026-08 (P0): closure used to be *inferred* from the existence of
+// `AccountBalance` rows for the month. A period with no prior balances and no
+// activity produces no rows, so closing it silently no-opped — it never
+// appeared in the closed list and postings dated into it were accepted. Lock
+// state now lives in its own row, independent of whether any account moved.
+model AccountingPeriod {
+  period     String    @id // YYYY-MM
+  closedAt   DateTime?
+  closedById String?
+  closedBy   User?     @relation("PeriodClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([closedAt])
+}
+
 model CostCenter {
   id        String       @id @default(cuid())
   code      String       @unique
