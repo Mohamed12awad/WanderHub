@@ -4,18 +4,24 @@ import { InvoicesService } from './invoices.service';
 // Builds a fake interactive-transaction client and a prisma mock whose
 // $transaction simply runs the callback against that client.
 function buildMocks() {
+  const invoiceFindFirst = jest.fn();
+  const invoiceUpdate = jest.fn();
+  const journalEntry = {
+    // No prior issued entry by default ⇒ first approval posts under the base id.
+    findFirst: jest.fn().mockResolvedValue(null),
+  };
   const tx = {
-    invoice: { findUnique: jest.fn(), update: jest.fn() },
+    invoice: { findFirst: invoiceFindFirst, findUnique: jest.fn(), update: invoiceUpdate },
     invoicePayment: { create: jest.fn(), aggregate: jest.fn(), update: jest.fn(), delete: jest.fn() },
     account: { findFirst: jest.fn(), update: jest.fn() },
     deal: { update: jest.fn() },
+    journalEntry,
   };
   const prisma: any = {
-    invoice: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    invoice: { findFirst: invoiceFindFirst, findUnique: jest.fn(), update: invoiceUpdate },
     invoicePayment: { findFirst: jest.fn() },
     quote: { findFirst: jest.fn() },
-    // No prior issued entry by default ⇒ first approval posts under the base id.
-    journalEntry: { findFirst: jest.fn().mockResolvedValue(null) },
+    journalEntry,
     workspaceConfig: { findFirst: jest.fn().mockResolvedValue({}) },
     $transaction: jest.fn((cb: any) => cb(tx)),
   };
@@ -52,6 +58,66 @@ function makeService(prisma: any) {
 }
 
 const mockUser: any = { id: 'user1', role: 'admin', roleId: 'role-admin', permissions: ['*'] };
+
+function buildAtomicInvoiceApproval() {
+  let persistedInvoice: any = {
+    id: 'inv-atomic',
+    invoiceNumber: 'INV-ATOMIC',
+    issueDate: new Date('2026-08-01'),
+    currency: 'EGP',
+    exchangeRate: 1,
+    subtotal: 100,
+    tax: 0,
+    total: 100,
+    customerId: 'customer-1',
+    createdById: 'creator-1',
+    approvalStatus: 'pending',
+    deletedAt: null,
+  };
+  let persistedJournals: any[] = [];
+  let stagedInvoice: any;
+  let stagedJournals: any[];
+
+  const tx: any = {
+    invoice: {
+      update: jest.fn(async ({ data }: any) => {
+        stagedInvoice = { ...stagedInvoice, ...data };
+        return stagedInvoice;
+      }),
+      findFirst: jest.fn(async () => stagedInvoice),
+    },
+    journalEntry: {
+      findFirst: jest.fn(async () => stagedJournals[0] ?? null),
+      create: jest.fn(async ({ data }: any) => {
+        stagedJournals.push(data);
+        return data;
+      }),
+    },
+  };
+  const prisma: any = {
+    invoice: { findFirst: jest.fn(async () => persistedInvoice) },
+    journalEntry: { findFirst: jest.fn() },
+    workspaceConfig: {
+      findFirst: jest.fn().mockResolvedValue({
+        approvals: [{ module: 'invoices', enabled: true, approverRoles: ['admin'] }],
+      }),
+    },
+    $transaction: jest.fn(async (callback: any) => {
+      stagedInvoice = { ...persistedInvoice };
+      stagedJournals = [...persistedJournals];
+      const result = await callback(tx);
+      persistedInvoice = stagedInvoice;
+      persistedJournals = stagedJournals;
+      return result;
+    }),
+  };
+
+  return {
+    prisma,
+    tx,
+    state: () => ({ invoice: persistedInvoice, journals: persistedJournals }),
+  };
+}
 
 describe('InvoicesService — approval separation of duties', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -125,6 +191,36 @@ describe('InvoicesService — approval separation of duties', () => {
 
     const sourceIdArg = (svc as any).posting.postInvoiceIssued.mock.calls[0][3];
     expect(sourceIdArg).toMatch(/^inv1#r\d+$/);
+  });
+
+  it('a failed GL post rolls back invoice approval', async () => {
+    const { prisma, state } = buildAtomicInvoiceApproval();
+    const svc = makeService(prisma);
+    (svc as any).posting.postInvoiceIssued.mockRejectedValue(new Error('missing AR mapping'));
+
+    await expect(svc.approveInvoice('inv-atomic', 'approver-1', 'admin')).rejects.toThrow('missing AR mapping');
+
+    expect(state().invoice.approvalStatus).toBe('pending');
+    expect(state().journals).toHaveLength(0);
+  });
+
+  it('a successful GL post commits invoice approval and its journal entry', async () => {
+    const { prisma, tx, state } = buildAtomicInvoiceApproval();
+    const svc = makeService(prisma);
+    (svc as any).posting.postInvoiceIssued.mockImplementation(async (_invoice: any, postingTx: any) => {
+      await postingTx.journalEntry.create({ data: { sourceType: 'Invoice', sourceId: 'inv-atomic' } });
+    });
+
+    await svc.approveInvoice('inv-atomic', 'approver-1', 'admin');
+
+    expect(state().invoice.approvalStatus).toBe('approved');
+    expect(state().journals).toEqual([{ sourceType: 'Invoice', sourceId: 'inv-atomic' }]);
+    expect((svc as any).posting.postInvoiceIssued).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'inv-atomic' }),
+      tx,
+      'approver-1',
+      undefined,
+    );
   });
 });
 

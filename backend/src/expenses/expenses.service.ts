@@ -35,18 +35,18 @@ export class ExpensesService {
    * No-op when GL posting is disabled, before the cutover date, or already
    * posted (idempotent on the report id).
    */
-  private async postExpenseIssued(id: string, userId: string) {
-    const report = await this.prisma.expenseReport.findFirst({
+  private async postExpenseIssued(id: string, userId: string, tx: Prisma.TransactionClient) {
+    const report = await tx.expenseReport.findFirst({
       where: { id, deletedAt: null },
       include: { expenses: true },
     });
     if (!report) return;
     // Re-post under a versioned sourceId when a prior (reversed) entry exists, so
     // re-approval after a reject re-recognizes the expense instead of no-opping.
-    const prior = await this.prisma.journalEntry.findFirst({
+    const prior = await tx.journalEntry.findFirst({
       where: { sourceType: 'ExpenseReport', sourceId: { startsWith: id } }, select: { id: true },
     });
-    await this.posting.postExpenseReport(report, undefined, userId, prior ? `${id}#r${Date.now()}` : undefined);
+    await this.posting.postExpenseReport(report, tx, userId, prior ? `${id}#r${Date.now()}` : undefined);
   }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -110,40 +110,46 @@ export class ExpensesService {
     const total = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
     const enabled = await this.approvals.isEnabled('expenses');
     const customFields = await this.customFields.validateAndClean('expenses', body.customFields);
-    const report = await this.prisma.expenseReport.create({
-      data: {
-        title,
-        userId,
-        ...(project ? { projectId: project } : {}),
-        ...(costCenterId ? { costCenterId } : {}),
-        approvalStatus: enabled ? 'pending' : 'approved',
-        ...(customFields !== undefined ? { customFields: customFields as Prisma.InputJsonValue } : {}),
-        expenses: {
-          create: (expenses ?? []).map((e) => ({
-            description: e.description,
-            amount: Number(e.amount),
-            date: new Date(e.date),
-            category: e.category,
-            beneficiary: e.beneficiary,
-            ...(e.taskId ? { taskId: e.taskId } : {}),
-            ...(e.milestoneId ? { milestoneId: e.milestoneId } : {}),
-          })),
+    const report = await this.prisma.$transaction(async (tx) => {
+      let created = await tx.expenseReport.create({
+        data: {
+          title,
+          userId,
+          ...(project ? { projectId: project } : {}),
+          ...(costCenterId ? { costCenterId } : {}),
+          approvalStatus: enabled ? 'pending' : 'approved',
+          ...(customFields !== undefined ? { customFields: customFields as Prisma.InputJsonValue } : {}),
+          expenses: {
+            create: (expenses ?? []).map((e) => ({
+              description: e.description,
+              amount: Number(e.amount),
+              date: new Date(e.date),
+              category: e.category,
+              beneficiary: e.beneficiary,
+              ...(e.taskId ? { taskId: e.taskId } : {}),
+              ...(e.milestoneId ? { milestoneId: e.milestoneId } : {}),
+            })),
+          },
         },
-      },
-      include: EXPENSE_REPORT_INCLUDE,
-    });
-    if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'ExpenseReport', report.id, 'expenses', total);
-      if (overall === 'approved') {
-        await this.prisma.expenseReport.update({ where: { id: report.id }, data: { approvalStatus: 'approved' } });
-        (report as { approvalStatus: string }).approvalStatus = 'approved';
+        include: EXPENSE_REPORT_INCLUDE,
+      });
+      if (enabled) {
+        const overall = await this.approvals.initSteps(tx, 'ExpenseReport', created.id, 'expenses', total);
+        if (overall === 'approved') {
+          created = await tx.expenseReport.update({
+            where: { id: created.id },
+            data: { approvalStatus: 'approved' },
+            include: EXPENSE_REPORT_INCLUDE,
+          });
+        }
       }
-    }
-    // Auto-approved (approvals disabled, or no step applied) → post now, since
-    // approve() won't be called for this report.
-    if (report.approvalStatus === 'approved') {
-      await this.posting.postExpenseReport(report, undefined, userId);
-    }
+      // Auto-approved (approvals disabled, or no step applied) → post now, since
+      // approve() won't be called for this report.
+      if (created.approvalStatus === 'approved') {
+        await this.posting.postExpenseReport(created, tx, userId);
+      }
+      return created;
+    });
     await this.timeline.log('expense.created', `Expense report "${report.title}" created`, report.id, 'Expense', { total }, userId);
     return toClient(report);
   }
@@ -195,12 +201,15 @@ export class ExpensesService {
     if (steps.length) {
       const result = await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'approve');
       const finalApproved = result.status === 'approved';
-      const updated = await this.prisma.expenseReport.update({
-        where: { id },
-        data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
-        include: EXPENSE_REPORT_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.expenseReport.update({
+          where: { id },
+          data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
+          include: EXPENSE_REPORT_INCLUDE,
+        });
+        if (finalApproved) await this.postExpenseIssued(id, userId, tx);
+        return changed;
       });
-      if (finalApproved) await this.postExpenseIssued(id, userId);
       await this.timeline.log('expense.approved', `Expense report "${report.title}" approval advanced (${result.status})`, id, 'Expense', {}, userId);
       return toClient(updated);
     }
@@ -209,12 +218,15 @@ export class ExpensesService {
     if (!this.canUserApprove(approverRoles, userRole)) throw new ForbiddenException('You are not authorized to approve expense reports');
     // Separation of duties: the report owner cannot approve their own report.
     if (report.userId === userId && userRole !== 'super admin') throw new ForbiddenException('You cannot approve an expense report you created');
-    const updated = await this.prisma.expenseReport.update({
-      where: { id },
-      data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
-      include: EXPENSE_REPORT_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.expenseReport.update({
+        where: { id },
+        data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
+        include: EXPENSE_REPORT_INCLUDE,
+      });
+      await this.postExpenseIssued(id, userId, tx);
+      return changed;
     });
-    await this.postExpenseIssued(id, userId);
     await this.timeline.log('expense.approved', `Expense report "${report.title}" approved`, id, 'Expense', {}, userId);
     return toClient(updated);
   }

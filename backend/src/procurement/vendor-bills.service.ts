@@ -50,26 +50,27 @@ export class VendorBillsService {
    * received into stock, the goods value clears GRNI (Dr GRNI / Cr AP); otherwise
    * it is expensed (Dr Expense / Cr AP).
    */
-  private async postBillIssued(billId: string, userId: string) {
-    const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
+  private async postBillIssued(billId: string, userId: string, tx: Prisma.TransactionClient) {
+    const bill = await tx.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
     if (!bill) return;
     // Re-post under a versioned sourceId when a prior (reversed) entry exists, so
     // re-approval after a reject re-recognizes AP instead of no-opping. See the
     // identical pattern in invoices.service postInvoiceIssued.
-    const prior = await this.prisma.journalEntry.findFirst({
+    const prior = await tx.journalEntry.findFirst({
       where: { sourceType: 'VendorBill', sourceId: { startsWith: billId } }, select: { id: true },
     });
     await this.posting.postVendorBill(
-      bill, undefined, userId,
-      { useGrni: await this.wasReceived(bill.purchaseOrderId) },
+      bill, tx, userId,
+      { useGrni: await this.wasReceived(bill.purchaseOrderId, tx) },
       prior ? `${billId}#r${Date.now()}` : undefined,
     );
   }
 
   /** True if the linked PO has been received into stock (GRNI was accrued). */
-  private async wasReceived(purchaseOrderId: string | null): Promise<boolean> {
+  private async wasReceived(purchaseOrderId: string | null, tx?: Prisma.TransactionClient): Promise<boolean> {
     if (!purchaseOrderId) return false;
-    const mv = await this.prisma.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: purchaseOrderId } });
+    const db = tx ?? this.prisma;
+    const mv = await db.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: purchaseOrderId } });
     return !!mv;
   }
 
@@ -157,35 +158,41 @@ export class VendorBillsService {
     // historical rate (toBase(1, ccy) yields the rate; 1 for base/unknown).
     const exchangeRate = await this.currency.toBase(1, (data.currency as string) ?? 'EGP');
 
-    const bill = await this.prisma.vendorBill.create({
-      data: {
-        ...data,
-        billNumber,
-        exchangeRate,
-        taxRate,
-        taxInclusive,
-        subtotal: totals.subtotal,
-        tax: totals.tax,
-        total: totals.total,
-        approvalStatus: enabled ? 'pending' : 'approved',
-        createdById: userId,
-        items: {
-          create: totals.items.map((item, idx) => ({ ...item, order: idx })),
-        },
-      } as Prisma.VendorBillUncheckedCreateInput,
-      include: BILL_INCLUDE,
-    });
-    if (enabled) {
-      const overall = await this.approvals.initSteps(this.prisma, 'VendorBill', bill.id, 'vendor_bills', Number(bill.total));
-      if (overall === 'approved') {
-        await this.prisma.vendorBill.update({ where: { id: bill.id }, data: { approvalStatus: 'approved' } });
-        (bill as { approvalStatus: string }).approvalStatus = 'approved';
+    const bill = await this.prisma.$transaction(async (tx) => {
+      let created = await tx.vendorBill.create({
+        data: {
+          ...data,
+          billNumber,
+          exchangeRate,
+          taxRate,
+          taxInclusive,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          total: totals.total,
+          approvalStatus: enabled ? 'pending' : 'approved',
+          createdById: userId,
+          items: {
+            create: totals.items.map((item, idx) => ({ ...item, order: idx })),
+          },
+        } as Prisma.VendorBillUncheckedCreateInput,
+        include: BILL_INCLUDE,
+      });
+      if (enabled) {
+        const overall = await this.approvals.initSteps(tx, 'VendorBill', created.id, 'vendor_bills', Number(created.total));
+        if (overall === 'approved') {
+          created = await tx.vendorBill.update({
+            where: { id: created.id },
+            data: { approvalStatus: 'approved' },
+            include: BILL_INCLUDE,
+          });
+        }
       }
-    }
 
-    if (bill.approvalStatus === 'approved') {
-      await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
-    }
+      if (created.approvalStatus === 'approved') {
+        await this.posting.postVendorBill(created, tx, userId, { useGrni: await this.wasReceived(created.purchaseOrderId, tx) });
+      }
+      return created;
+    });
 
     await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created`, bill.id, 'VendorBill', { billNumber }, userId);
     return toClient(bill);
@@ -243,17 +250,20 @@ export class VendorBillsService {
     if (steps.length) {
       const result = await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'approve');
       const finalApproved = result.status === 'approved';
-      const updated = await this.prisma.vendorBill.update({
-        where: { id },
-        data: {
-          approvalStatus: result.status,
-          ...(finalApproved
-            ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null, status: bill.status === 'draft' ? 'received' : bill.status }
-            : {}),
-        },
-        include: BILL_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.vendorBill.update({
+          where: { id },
+          data: {
+            approvalStatus: result.status,
+            ...(finalApproved
+              ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null, status: bill.status === 'draft' ? 'received' : bill.status }
+              : {}),
+          },
+          include: BILL_INCLUDE,
+        });
+        if (finalApproved) await this.postBillIssued(id, userId, tx);
+        return changed;
       });
-      if (finalApproved) await this.postBillIssued(id, userId);
       await this.timeline.log('bill.approved', `Vendor Bill approval advanced (${result.status})`, id, 'VendorBill', {}, userId);
       return toClient(updated);
     }
@@ -262,19 +272,22 @@ export class VendorBillsService {
     if (enabled && !this.canApprove(approverRoles, userRole)) throw new BadRequestException('Not authorized to approve');
     if (enabled && bill.createdById === userId && userRole !== 'super admin') throw new BadRequestException('Cannot approve your own bill');
 
-    const updated = await this.prisma.vendorBill.update({
-      where: { id },
-      data: {
-        approvalStatus: 'approved',
-        approvedById: userId,
-        approvedAt: new Date(),
-        rejectionReason: null,
-        // Advance the workflow status so the bill is ready for payment.
-        status: bill.status === 'draft' ? 'received' : bill.status,
-      },
-      include: BILL_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.vendorBill.update({
+        where: { id },
+        data: {
+          approvalStatus: 'approved',
+          approvedById: userId,
+          approvedAt: new Date(),
+          rejectionReason: null,
+          // Advance the workflow status so the bill is ready for payment.
+          status: bill.status === 'draft' ? 'received' : bill.status,
+        },
+        include: BILL_INCLUDE,
+      });
+      await this.postBillIssued(id, userId, tx);
+      return changed;
     });
-    await this.postBillIssued(id, userId);
     await this.timeline.log('bill.approved', 'Vendor Bill approved', id, 'VendorBill', {}, userId);
     return toClient(updated);
   }
@@ -418,42 +431,46 @@ export class VendorBillsService {
 
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const { enabled } = await this.getApprovalConfig();
+    const exchangeRate = await this.currency.toBase(1, po.currency ?? 'EGP');
 
-    const bill = await this.prisma.vendorBill.create({
-      data: {
-        billNumber,
-        title: `Bill for ${po.title}`,
-        supplierId: po.supplierId,
-        purchaseOrderId: po.id,
-        currency: po.currency ?? 'EGP',
-        exchangeRate: await this.currency.toBase(1, po.currency ?? 'EGP'),
-        taxRate: po.taxRate,
-        subtotal: po.subtotal,
-        tax: po.tax,
-        total: po.total,
-        approvalStatus: enabled ? 'pending' : 'approved',
-        createdById: userId,
-        items: {
-          create: po.items.map((it, idx) => ({
-            description: it.description,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            discount: it.discount,
-            taxRate: it.taxRate,
-            taxCode: it.taxCode,
-            productId: it.productId,
-            total: it.total,
-            order: idx,
-          })),
-        },
-      } as Prisma.VendorBillUncheckedCreateInput,
-      include: BILL_INCLUDE,
+    const bill = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.vendorBill.create({
+        data: {
+          billNumber,
+          title: `Bill for ${po.title}`,
+          supplierId: po.supplierId,
+          purchaseOrderId: po.id,
+          currency: po.currency ?? 'EGP',
+          exchangeRate,
+          taxRate: po.taxRate,
+          subtotal: po.subtotal,
+          tax: po.tax,
+          total: po.total,
+          approvalStatus: enabled ? 'pending' : 'approved',
+          createdById: userId,
+          items: {
+            create: po.items.map((it, idx) => ({
+              description: it.description,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              discount: it.discount,
+              taxRate: it.taxRate,
+              taxCode: it.taxCode,
+              productId: it.productId,
+              total: it.total,
+              order: idx,
+            })),
+          },
+        } as Prisma.VendorBillUncheckedCreateInput,
+        include: BILL_INCLUDE,
+      });
+
+      // Auto-approved (approvals disabled) → post now; clears GRNI if the PO was received.
+      if (created.approvalStatus === 'approved') {
+        await this.posting.postVendorBill(created, tx, userId, { useGrni: await this.wasReceived(created.purchaseOrderId, tx) });
+      }
+      return created;
     });
-
-    // Auto-approved (approvals disabled) → post now; clears GRNI if the PO was received.
-    if (bill.approvalStatus === 'approved') {
-      await this.posting.postVendorBill(bill, undefined, userId, { useGrni: await this.wasReceived(bill.purchaseOrderId) });
-    }
 
     await this.timeline.log('bill.created', `Vendor Bill ${billNumber} created from PO`, bill.id, 'VendorBill', { poId }, userId);
     return toClient(bill);

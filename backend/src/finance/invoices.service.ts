@@ -56,16 +56,16 @@ export class InvoicesService {
    * invoice becomes approved. No-op when GL posting is disabled, before the
    * cutover date, or already posted (idempotent on the invoice id).
    */
-  private async postInvoiceIssued(invoiceId: string, userId: string) {
-    const inv = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
+  private async postInvoiceIssued(invoiceId: string, userId: string, tx: Prisma.TransactionClient) {
+    const inv = await tx.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
     if (!inv) return;
     // If a prior issued entry exists (approve → reject reversed it → re-approve),
     // the base sourceId is taken; post() is idempotent on (sourceType,sourceId)
     // and would no-op. Re-post under a versioned sourceId so AR is re-recognized.
-    const prior = await this.prisma.journalEntry.findFirst({
+    const prior = await tx.journalEntry.findFirst({
       where: { sourceType: 'Invoice', sourceId: { startsWith: invoiceId } }, select: { id: true },
     });
-    await this.posting.postInvoiceIssued(inv, undefined, userId, prior ? `${invoiceId}#r${Date.now()}` : undefined);
+    await this.posting.postInvoiceIssued(inv, tx, userId, prior ? `${invoiceId}#r${Date.now()}` : undefined);
   }
 
   private async getApprovalConfig(module: string): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -364,12 +364,15 @@ export class InvoicesService {
     if (steps.length) {
       const result = await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'approve', undefined, userPermissions);
       const finalApproved = result.status === 'approved';
-      const updated = await this.prisma.invoice.update({
-        where: { id },
-        data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
-        include: INVOICE_INCLUDE,
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.invoice.update({
+          where: { id },
+          data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
+          include: INVOICE_INCLUDE,
+        });
+        if (finalApproved) await this.postInvoiceIssued(id, userId, tx);
+        return changed;
       });
-      if (finalApproved) await this.postInvoiceIssued(id, userId);
       return toClient(updated);
     }
 
@@ -377,12 +380,15 @@ export class InvoicesService {
     const { approverRoles } = await this.getApprovalConfig('invoices');
     if (!this.canUserApprove(approverRoles, userRole, userPermissions)) throw new ForbiddenException('You are not authorized to approve invoices');
     if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot approve an invoice you created');
-    const updated = await this.prisma.invoice.update({
-      where: { id },
-      data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
-      include: INVOICE_INCLUDE,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.invoice.update({
+        where: { id },
+        data: { approvalStatus: 'approved', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
+        include: INVOICE_INCLUDE,
+      });
+      await this.postInvoiceIssued(id, userId, tx);
+      return changed;
     });
-    await this.postInvoiceIssued(id, userId);
     return toClient(updated);
   }
 
