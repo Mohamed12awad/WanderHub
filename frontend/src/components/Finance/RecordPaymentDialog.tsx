@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useId } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -41,6 +41,7 @@ type Props = CreateProps | EditProps;
 const RecordPaymentDialog: React.FC<Props> = (props) => {
   const { toast } = useToast();
   const { tr } = useLanguage();
+  const fieldId = useId();
   const f = tr.finance;
 
   const isEdit = props.mode === "edit";
@@ -57,6 +58,13 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
   const [notes, setNotes] = useState("");
   const [accountId, setAccountId] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  /**
+   * Whether the user has actually edited something. Deliberately not derived by
+   * comparing values against empty: the dialog prefills `amount` with the
+   * outstanding balance on open, so a value check would call every untouched
+   * dialog dirty and prompt on every Escape.
+   */
+  const [touched, setTouched] = useState(false);
 
   const { data: accountsData } = useQuery({
     queryKey: ["accounts"],
@@ -87,6 +95,7 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
       setAmount(String(outstanding));
     }
     if (!open && !isEdit) reset();
+    if (open) setTouched(false);
   }, [editPayment, isEdit, open, outstanding, reset]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,15 +135,32 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
   };
 
   const dialogContent = (
-    <DialogContent>
+    <DialogContent
+      // Radix dismisses on backdrop click and Escape by default, which threw
+      // away a part-entered payment on a stray click with no warning. A click
+      // outside is too easy to do by accident to be treated as "discard this".
+      onPointerDownOutside={(event) => { if (touched) event.preventDefault(); }}
+      onInteractOutside={(event) => { if (touched) event.preventDefault(); }}
+      onEscapeKeyDown={(event) => {
+        // Escape stays a real exit — it is deliberate — but has to be confirmed
+        // once the form holds work. Cancel and the X button are unaffected.
+        if (touched && !window.confirm(tr.common.discardChanges)) event.preventDefault();
+      }}
+    >
       <DialogHeader>
         <DialogTitle>{isEdit ? "Edit Payment" : f.recordPayment}</DialogTitle>
       </DialogHeader>
-      <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+      {/* One handler covers every native field; the two Radix selects are
+          button-based and do not bubble a change event, so they set it too. */}
+      <form onSubmit={handleSubmit} onChange={() => setTouched(true)} className="space-y-4 mt-2">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>{f.amount} ({props.currency})</Label>
+            {/* These Labels carried no htmlFor and the Inputs no id, so the
+                fields had no programmatic label — the same defect the audit
+                fixed on the list pages. */}
+            <Label htmlFor={`${fieldId}-amount`}>{f.amount} ({props.currency})</Label>
             <Input
+              id={`${fieldId}-amount`}
               type="number"
               min={0.01}
               step="0.01"
@@ -144,13 +170,13 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
             />
           </div>
           <div className="space-y-2">
-            <Label>{f.paymentDate}</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            <Label htmlFor={`${fieldId}-date`}>{f.paymentDate}</Label>
+            <Input id={`${fieldId}-date`} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           </div>
         </div>
         <div className="space-y-2">
           <Label>{f.paymentMethod}</Label>
-          <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
+          <Select value={method} onValueChange={(v) => { setTouched(true); setMethod(v as PaymentMethod); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {Object.entries(f.paymentMethods).map(([k, v]) => (
@@ -162,7 +188,7 @@ const RecordPaymentDialog: React.FC<Props> = (props) => {
         {accounts.length > 0 && (
           <div className="space-y-2">
             <Label>Account</Label>
-            <Select value={accountId} onValueChange={setAccountId}>
+            <Select value={accountId} onValueChange={(v) => { setTouched(true); setAccountId(v); }}>
               <SelectTrigger><SelectValue placeholder="Select account (optional)" /></SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
