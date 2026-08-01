@@ -2,10 +2,12 @@ import { Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestj
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { CurrentUser, AuthUser } from '../auth/decorators/current-user.decorator';
 import { MoneyAsString } from '../common/money-as-string.decorator';
 import { StatementsService } from './statements.service';
 import { PeriodCloseService } from './period-close.service';
 import { ReconciliationService } from './reconciliation.service';
+import { FiscalYearService } from './fiscal-year.service';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -15,6 +17,7 @@ export class StatementsController {
     private readonly statements: StatementsService,
     private readonly periods: PeriodCloseService,
     private readonly reconciliation: ReconciliationService,
+    private readonly fiscalYear: FiscalYearService,
   ) {}
 
   @Post('reconcile')
@@ -61,6 +64,14 @@ export class StatementsController {
   @RequirePermission('accounting:manage')
   closePeriod(@Param('period') period: string) {
     return this.periods.closePeriod(period);
+  }
+
+  // Year-end close: zeroes P&L into Retained Earnings and locks all 12 months.
+  @Post('fiscal-years/:year/close')
+  @HttpCode(200)
+  @RequirePermission('accounting:manage')
+  closeFiscalYear(@Param('year') year: string, @CurrentUser() user: AuthUser) {
+    return this.fiscalYear.closeFiscalYear(Number(year), user.id);
   }
 
   @Post('periods/:period/reopen')

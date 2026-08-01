@@ -8,6 +8,7 @@ import { StatementsController } from './statements.controller';
 import { StatementsService } from './statements.service';
 import { ReconciliationService } from './reconciliation.service';
 import { PeriodCloseService } from './period-close.service';
+import { FiscalYearService } from './fiscal-year.service';
 
 /**
  * Double-entry General Ledger: chart of accounts, manual journal entries, the
@@ -16,7 +17,7 @@ import { PeriodCloseService } from './period-close.service';
  */
 @Module({
   controllers: [ChartOfAccountsController, JournalController, StatementsController],
-  providers: [ChartOfAccountsService, JournalService, PostingService, StatementsService, ReconciliationService, PeriodCloseService],
+  providers: [ChartOfAccountsService, JournalService, PostingService, StatementsService, ReconciliationService, PeriodCloseService, FiscalYearService],
   exports: [ChartOfAccountsService, JournalService, PostingService, StatementsService, ReconciliationService, PeriodCloseService],
 })
 export class AccountingModule {}

@@ -41,7 +41,7 @@ export class PeriodCloseService {
   }
 
   /** Per-account debit/credit/net over an arbitrary date window. */
-  private async aggregatesBetween(start: Date, end: Date): Promise<MonthAgg[]> {
+  async aggregatesBetween(start: Date, end: Date): Promise<MonthAgg[]> {
     return this.prisma.$queryRaw<MonthAgg[]>(Prisma.sql`
       SELECT jl."accountId" AS "accountId",
              COALESCE(SUM(CASE WHEN jl."baseAmount" > 0 THEN jl."baseAmount" ELSE 0 END), 0)::float8 AS dr,
