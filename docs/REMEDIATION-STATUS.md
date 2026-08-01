@@ -259,14 +259,19 @@ is fully consumed.
 
 ## Suggested next session
 
-1. **Item (2), pending-invoice stock** — the last red test. Invoice creation moves stock and posts COGS
-   unconditionally; rejection reverses only the `Invoice` journal. Either defer the stock movement to
-   approval, or reverse the movement and `StockCogs` on reject. The waiting test asserts the latter.
-2. **Item (1), quote→invoice conversion** — route conversion through the same transactional creation
-   path `InvoicesService` uses, rather than writing the invoice directly.
-3. **Item (4), PO receipt** — remove stock mutation from the generic `updateStatus` so `receive()` is
-   the single idempotent receipt path, and wrap that path in one transaction.
-4. **The `ApprovalService.act()` residual** (noted under 9 above) — thread a `tx` through `act()` so the
-   step advance rolls back with the document.
-5. Re-run `npm --prefix backend run verify:gl` after each — fastest end-to-end signal — and watch the
-   `it.failing` count reach zero.
+1. **The last P0 — edit/delete of an approved document.** Reverse the live entry and restore stock
+   inside the same transaction as the edit or delete. `restoreStockForRejectedInvoice` plus the reject
+   paths in `invoices.service.ts` are the pattern to copy. A defensible alternative is to refuse to
+   delete a posted document at all and require an explicit void. Write the test first — this is the
+   one remaining P0 with no coverage.
+2. **Manual stock adjustments post no GL** (P1). `defaultInventoryAdjustment` is declared, seeded and
+   exposed in Settings but referenced by no posting code, so Inventory Asset drifts from the stock
+   subledger with every recount or write-off. `verify:gl` check 3 will start catching this once there
+   is real valued stock in the database.
+3. **Vendor-bill self-approval** (P1). Gated on `enabled`, which defaults to false, while the PO path
+   applies the same check unconditionally — so with approvals off, one user can raise a bill and
+   approve it.
+4. **IDOR on mutation handlers** (P1). Fail-closed scoping fixed *reads*; six mutation paths still
+   fetch by raw id without caller scope.
+5. Re-run `npm --prefix backend run verify:gl` after each — fastest end-to-end signal. Note it needs a
+   live database; the Docker Postgres used during this work is `nawahub-pg` on port 5433.
