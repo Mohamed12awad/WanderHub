@@ -12,7 +12,7 @@ interface TransactionAwareNumberSequence {
 
 describe('NumberSequenceService', () => {
   // Audit P1: sequence allocation ignores the caller transaction (number-sequence.service.ts:18).
-  it.failing('nextNumber uses the supplied transaction client', async () => {
+  it('nextNumber uses the supplied transaction client', async () => {
     const rootUpsert = jest.fn().mockResolvedValue({
       lastNumber: 9,
       prefix: 'ROOT',

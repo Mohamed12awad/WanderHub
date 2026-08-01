@@ -207,7 +207,7 @@ describe('PostingService.reverse', () => {
   });
 
   // Audit P1: reverse() bypasses the reversal-date lock (posting.service.ts:275).
-  it.failing('reverse rejects a reversal dated in a closed period', async () => {
+  it('reverse rejects a reversal dated in a closed period', async () => {
     const { svc, prisma, periods } = make();
     prisma.journalEntry.findUnique.mockResolvedValueOnce(postedEntry());
     periods.isDateLocked.mockResolvedValue(true);
@@ -219,7 +219,7 @@ describe('PostingService.reverse', () => {
   });
 
   // Audit P1: reverseLive() bypasses the reversal-date lock (posting.service.ts:312).
-  it.failing('reverseLive rejects a reversal dated in a closed period', async () => {
+  it('reverseLive rejects a reversal dated in a closed period', async () => {
     const { svc, prisma, periods } = make();
     prisma.journalEntry.findFirst.mockResolvedValueOnce(postedEntry());
     periods.isDateLocked.mockResolvedValue(true);

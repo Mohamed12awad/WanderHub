@@ -201,7 +201,7 @@ export class PostingService {
       );
     }
 
-    const entryNumber = await this.numbers.nextNumber('journal', 'JE');
+    const entryNumber = await this.numbers.nextNumber('journal', 'JE', 4, '-', db);
     try {
       return await db.journalEntry.create({
         data: {
@@ -234,7 +234,19 @@ export class PostingService {
     opts: { date?: Date; createdById?: string | null },
     db: Db,
   ): Promise<{ id: string }> {
-    const entryNumber = await this.numbers.nextNumber('journal', 'JE');
+    // Audit 2026-08 (P1): only reverseById() checked the period lock, so the
+    // eleven automated paths that reach reverse()/reverseLive() — invoice
+    // void/reject, payment delete/edit, bill void/edit, expense edit — could
+    // write a mirror entry into a closed period. The check belongs here so
+    // every path inherits it.
+    const reversalDate = opts.date ?? new Date();
+    if (await this.periods.isDateLocked(reversalDate)) {
+      throw new BadRequestException(
+        `Cannot post a reversal to ${reversalDate.toISOString().slice(0, 7)}: the accounting period is closed.`,
+      );
+    }
+
+    const entryNumber = await this.numbers.nextNumber('journal', 'JE', 4, '-', db);
     const mirror = await db.journalEntry.create({
       data: {
         entryNumber,
