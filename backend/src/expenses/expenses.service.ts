@@ -7,7 +7,9 @@ import { buildCfConditions } from '../common/customFields';
 import { CustomFieldsService } from '../common/custom-fields.service';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { ApprovalService } from '../common/approval.service';
+import { VisibilityService } from '../common/visibility.service';
 import { PostingService } from '../accounting/posting.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateExpenseReportDto } from './dto/create-expense-report.dto';
 import { UpdateExpenseReportDto } from './dto/update-expense-report.dto';
 
@@ -27,6 +29,7 @@ export class ExpensesService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
     private readonly posting: PostingService,
   ) {}
 
@@ -154,8 +157,12 @@ export class ExpensesService {
     return toClient(report);
   }
 
-  async update(id: string, body: UpdateExpenseReportDto, userId?: string) {
-    const existing = await this.prisma.expenseReport.findUnique({ where: { id } });
+  async update(id: string, body: UpdateExpenseReportDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'expenses', 'userId');
+    const existing = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!existing) throw new NotFoundException('expense report not found');
     const { expenses, project, ...rest } = body;
     // Map project ID string → Prisma relation connect
@@ -199,8 +206,12 @@ export class ExpensesService {
     return toClient(report);
   }
 
-  async approve(id: string, userId: string, userRole: string) {
-    const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
+  async approve(id: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'expenses', 'userId');
+    const report = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!report) throw new NotFoundException('expense report not found');
     if (report.approvalStatus === 'approved') return toClient(report);
 
@@ -240,8 +251,12 @@ export class ExpensesService {
     return toClient(updated);
   }
 
-  async reject(id: string, userId: string, reason: string, userRole: string) {
-    const report = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
+  async reject(id: string, reason: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'expenses', 'userId');
+    const report = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!report) throw new NotFoundException('expense report not found');
     if (report.approvalStatus === 'rejected') return toClient(report);
 
@@ -280,8 +295,12 @@ export class ExpensesService {
     return toClient(updated);
   }
 
-  async remove(id: string, userId?: string) {
-    const existing = await this.prisma.expenseReport.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'expenses', 'userId');
+    const existing = await this.prisma.expenseReport.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!existing) throw new NotFoundException('expense report not found');
     await this.prisma.$transaction(async (tx) => {
       await this.posting.reverseLive('ExpenseReport', id, { createdById: userId ?? null }, tx);

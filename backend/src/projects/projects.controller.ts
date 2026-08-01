@@ -58,14 +58,14 @@ export class ProjectsController {
   @Put(':id')
   @RequirePermission('projects:edit')
   update(@Param('id') id: string, @Body() body: UpdateProjectDto, @CurrentUser() user: AuthUser) {
-    return this.projects.update(id, body, user.id);
+    return this.projects.update(id, body, user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('projects:delete')
-  remove(@Param('id') id: string) {
-    return this.projects.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.projects.remove(id, user);
   }
 
   // ── Milestones ────────────────────────────────────────────────────────────
@@ -79,21 +79,21 @@ export class ProjectsController {
   @Post(':id/milestones')
   @HttpCode(201)
   @RequirePermission('projects:edit')
-  createMilestone(@Param('id') id: string, @Body() body: CreateMilestoneDto) {
-    return this.projects.createMilestone(id, body);
+  createMilestone(@Param('id') id: string, @Body() body: CreateMilestoneDto, @CurrentUser() user: AuthUser) {
+    return this.projects.createMilestone(id, body, user);
   }
 
   @Put(':id/milestones/:milestoneId')
   @RequirePermission('projects:edit')
-  updateMilestone(@Param('id') id: string, @Param('milestoneId') milestoneId: string, @Body() body: UpdateMilestoneDto) {
-    return this.projects.updateMilestone(id, milestoneId, body);
+  updateMilestone(@Param('id') id: string, @Param('milestoneId') milestoneId: string, @Body() body: UpdateMilestoneDto, @CurrentUser() user: AuthUser) {
+    return this.projects.updateMilestone(id, milestoneId, body, user);
   }
 
   @Delete(':id/milestones/:milestoneId')
   @HttpCode(204)
   @RequirePermission('projects:edit')
-  deleteMilestone(@Param('id') id: string, @Param('milestoneId') milestoneId: string) {
-    return this.projects.deleteMilestone(id, milestoneId);
+  deleteMilestone(@Param('id') id: string, @Param('milestoneId') milestoneId: string, @CurrentUser() user: AuthUser) {
+    return this.projects.deleteMilestone(id, milestoneId, user);
   }
 
   // ── Members ───────────────────────────────────────────────────────────────
@@ -107,14 +107,14 @@ export class ProjectsController {
   @Post(':id/members')
   @HttpCode(201)
   @RequirePermission('projects:edit')
-  addMember(@Param('id') id: string, @Body() body: AddMemberDto) {
-    return this.projects.addMember(id, body);
+  addMember(@Param('id') id: string, @Body() body: AddMemberDto, @CurrentUser() user: AuthUser) {
+    return this.projects.addMember(id, body, user);
   }
 
   @Delete(':id/members/:userId')
   @HttpCode(204)
   @RequirePermission('projects:edit')
-  removeMember(@Param('id') id: string, @Param('userId') userId: string) {
-    return this.projects.removeMember(id, userId);
+  removeMember(@Param('id') id: string, @Param('userId') userId: string, @CurrentUser() user: AuthUser) {
+    return this.projects.removeMember(id, userId, user);
   }
 }

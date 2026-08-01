@@ -10,9 +10,11 @@ import { NumberSequenceService } from '../number-sequence/number-sequence.servic
 import { TimelineService } from '../timeline/timeline.service';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { VisibilityService } from '../common/visibility.service';
 import { toClient } from '../common/serialize';
 import { UNPAGINATED_MAX } from '../common/paginate';
 import { calcTotals } from '../finance/finance.math';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
 import { UpdateSalesOrderDto } from './dto/update-sales-order.dto';
 
@@ -48,6 +50,7 @@ export class SalesOrdersService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
   ) {}
 
   private async getApprovalConfig(): Promise<{ enabled: boolean; approverRoles: string[] }> {
@@ -150,8 +153,12 @@ export class SalesOrdersService {
     return toClient(order);
   }
 
-  async update(id: string, body: UpdateSalesOrderDto, userId?: string) {
-    const order = await this.prisma.salesOrder.findUnique({ where: { id } });
+  async update(id: string, body: UpdateSalesOrderDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     if (['invoiced', 'cancelled'].includes(order.status)) {
       throw new BadRequestException(`A ${order.status} sales order cannot be edited`);
@@ -200,8 +207,12 @@ export class SalesOrdersService {
     return toClient(updated);
   }
 
-  async updateStatus(id: string, status: string, userId: string) {
-    const order = await this.prisma.salesOrder.findFirst({ where: { id, deletedAt: null } });
+  async updateStatus(id: string, status: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     const allowed = STATUS_TRANSITIONS[order.status] ?? [];
     if (!allowed.includes(status)) {
@@ -218,15 +229,22 @@ export class SalesOrdersService {
     return toClient(updated);
   }
 
-  async remove(id: string) {
-    const order = await this.prisma.salesOrder.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     await this.prisma.salesOrder.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
-  async approve(id: string, userId: string, userRole: string) {
-    const order = await this.prisma.salesOrder.findFirst({ where: { id, deletedAt: null } });
+  async approve(id: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     if (order.approvalStatus === 'approved') return toClient(order);
 
@@ -253,8 +271,12 @@ export class SalesOrdersService {
     return toClient(updated);
   }
 
-  async reject(id: string, userId: string, reason: string, userRole: string) {
-    const order = await this.prisma.salesOrder.findFirst({ where: { id, deletedAt: null } });
+  async reject(id: string, reason: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     if (order.approvalStatus === 'rejected') return toClient(order);
 
@@ -288,8 +310,13 @@ export class SalesOrdersService {
    * can't bill the same order twice. Stock is deducted later when the invoice is
    * sent — matching the existing quote→invoice path — so nothing double-counts.
    */
-  async convertToInvoice(id: string, userId: string) {
-    const order = await this.prisma.salesOrder.findFirst({ where: { id, deletedAt: null }, include: { items: true } });
+  async convertToInvoice(id: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'sales-orders', 'createdById');
+    const order = await this.prisma.salesOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+      include: { items: true },
+    });
     if (!order) throw new NotFoundException('Sales order not found');
     if (order.status === 'invoiced') throw new BadRequestException('Sales order already invoiced');
     if (order.status === 'cancelled') throw new BadRequestException('A cancelled sales order cannot be invoiced');

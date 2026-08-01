@@ -1,6 +1,13 @@
 import { NotFoundException } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 
+const authUser = (id: string, permissions = ['*']) => ({
+  id,
+  role: 'member',
+  roleId: 'member-role',
+  permissions,
+});
+
 function buildPrisma() {
   return {
     task: {
@@ -98,35 +105,55 @@ describe('TasksService.update', () => {
 
   it('throws NotFoundException when task does not exist', async () => {
     const prisma = buildPrisma();
-    prisma.task.findUnique.mockResolvedValue(null);
+    prisma.task.findFirst.mockResolvedValue(null);
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
-    await expect(svc.update('missing', { title: 'x' } as any, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.update('missing', { title: 'x' } as any, authUser('user-1'))).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.task.update).not.toHaveBeenCalled();
   });
 
   it('applies changes and returns serialized task', async () => {
     const prisma = buildPrisma();
-    prisma.task.findUnique.mockResolvedValue(sampleTask);
+    prisma.task.findFirst.mockResolvedValue(sampleTask);
     const updated = { ...sampleTask, title: 'Updated title', assignedTo: null, createdBy: null };
     prisma.task.update.mockResolvedValue(updated);
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    const result: any = await svc.update('task-1', { title: 'Updated title' } as any, 'user-1');
+    const result: any = await svc.update('task-1', { title: 'Updated title' } as any, authUser('user-1'));
 
     expect(result.title).toBe('Updated title');
   });
 
   it('dispatches notification when assignee changes to someone other than the updater', async () => {
     const prisma = buildPrisma();
-    prisma.task.findUnique.mockResolvedValue({ ...sampleTask, assignedToId: null });
+    prisma.task.findFirst.mockResolvedValue({ ...sampleTask, assignedToId: null });
     prisma.task.update.mockResolvedValue({ ...sampleTask, assignedToId: 'user-3', assignedTo: null, createdBy: null });
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    await svc.update('task-1', { assignedTo: 'user-3' } as any, 'user-1');
+    await svc.update('task-1', { assignedTo: 'user-3' } as any, authUser('user-1'));
 
     expect(dispatcherMock.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-3', type: 'task_assigned' }),
     );
+  });
+
+  it('returns not-found and performs no write for a task assigned to another user', async () => {
+    const prisma = buildPrisma();
+    const otherUserTask = { ...sampleTask, id: 'task-user-b', assignedToId: 'user-b' };
+    prisma.task.findFirst.mockImplementation(async ({ where }: any) =>
+      where.assignedToId === 'user-a' ? null : otherUserTask,
+    );
+    visibilityMock.ownershipWhere.mockResolvedValueOnce({ assignedToId: 'user-a' });
+    const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
+    const user = authUser('user-a', ['tasks:edit:own']);
+
+    await expect(svc.update('task-user-b', { title: 'tampered' } as any, user))
+      .rejects.toBeInstanceOf(NotFoundException);
+
+    expect(visibilityMock.ownershipWhere).toHaveBeenCalledWith(user, 'tasks', 'assignedToId');
+    expect(prisma.task.findFirst).toHaveBeenCalledWith({
+      where: { id: 'task-user-b', deletedAt: null, assignedToId: 'user-a' },
+    });
+    expect(prisma.task.update).not.toHaveBeenCalled();
   });
 });
 
@@ -137,7 +164,7 @@ describe('TasksService.complete', () => {
     const prisma = buildPrisma();
     prisma.task.findFirst.mockResolvedValue(null);
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
-    await expect(svc.complete('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.complete('missing', authUser('user-1'))).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.task.update).not.toHaveBeenCalled();
   });
 
@@ -147,7 +174,7 @@ describe('TasksService.complete', () => {
     prisma.task.update.mockResolvedValue({ ...sampleTask, status: 'done' });
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    const result: any = await svc.complete('task-1', 'user-1');
+    const result: any = await svc.complete('task-1', authUser('user-1'));
 
     expect(prisma.task.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'done' }) }),
@@ -161,7 +188,7 @@ describe('TasksService.complete', () => {
     prisma.task.update.mockResolvedValue({ ...sampleTask, status: 'todo' });
     const svc = new TasksService(prisma, timelineMock, visibilityMock, dispatcherMock, customFieldsMock);
 
-    await svc.complete('task-1', 'user-1');
+    await svc.complete('task-1', authUser('user-1'));
 
     expect(prisma.task.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'todo' }) }),

@@ -62,14 +62,17 @@ export class QuotesController {
 
   @Post(':id/convert')
   @HttpCode(201)
-  @RequirePermission('quotes:create')
+  // Conversion mints a document in ANOTHER module, so it must require that
+  // module's create permission — audit 2026-08 (P1). Scoped access to the
+  // source quote is enforced by the service.
+  @RequirePermission('invoices:create')
   convert(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.quotes.convertQuoteToInvoice(id, user.id);
   }
 
   @Post(':id/convert-to-sales-order')
   @HttpCode(201)
-  @RequirePermission('quotes:create')
+  @RequirePermission('sales-orders:create')
   convertToSalesOrder(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.quotes.convertQuoteToSalesOrder(id, user.id);
   }

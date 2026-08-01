@@ -41,47 +41,47 @@ export class PurchaseOrdersController {
   @Put(':id')
   @RequirePermission('purchase-orders:edit')
   update(@Param('id') id: string, @Body() body: UpdatePurchaseOrderDto, @CurrentUser() user: AuthUser) {
-    return this.pos.update(id, body, user.id);
+    return this.pos.update(id, body, user);
   }
 
   @Patch(':id/status')
   @RequirePermission('purchase-orders:edit')
   updateStatus(@Param('id') id: string, @Body() body: { status: string }, @CurrentUser() user: AuthUser) {
     if (!body.status) throw new BadRequestException('Status is required');
-    return this.pos.updateStatus(id, body.status, user.id);
+    return this.pos.updateStatus(id, body.status, user);
   }
 
   @Patch(':id/approve')
   @RequirePermission('purchase-orders:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.pos.approve(id, user.id, user.role);
+    return this.pos.approve(id, user);
   }
 
   @Patch(':id/reject')
   @RequirePermission('purchase-orders:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.pos.reject(id, user.id, user.role, body.reason.trim());
+    return this.pos.reject(id, body.reason.trim(), user);
   }
 
   @Post(':id/receive')
   @HttpCode(200)
   @RequirePermission('purchase-orders:edit')
   receive(@Param('id') id: string, @Body() body: { warehouseId?: string }, @CurrentUser() user: AuthUser) {
-    return this.pos.receive(id, user.id, body?.warehouseId);
+    return this.pos.receive(id, user, body?.warehouseId);
   }
 
   @Post(':id/create-bill')
   @HttpCode(201)
-  @RequirePermission('purchase-orders:create')
+  @RequirePermission('vendor-bills:create')
   createBill(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.bills.createFromPO(id, user.id);
+    return this.bills.createFromPO(id, user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('purchase-orders:delete')
-  remove(@Param('id') id: string) {
-    return this.pos.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.pos.remove(id, user);
   }
 }

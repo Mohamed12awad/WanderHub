@@ -49,6 +49,19 @@ export class ProjectsService {
     return data;
   }
 
+  private async getScopedProject(id: string, user?: AuthUser) {
+    // BulkService prefilters visible ids before calling remove() and currently
+    // has no AuthUser parameter at that internal service call boundary.
+    const scopeWhere = user
+      ? await this.visibility.ownershipWhere(user, 'projects', 'managerId')
+      : {};
+    const project = await this.prisma.project.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!project) throw new NotFoundException('project not found');
+    return project;
+  }
+
   async findAll(query: Record<string, string>, user: AuthUser) {
     const { page, limit: limitRaw, q, status, customerId } = query;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'projects', 'managerId');
@@ -125,9 +138,9 @@ export class ProjectsService {
     return toClient(project);
   }
 
-  async update(id: string, body: UpdateProjectDto, userId: string) {
-    const existing = await this.prisma.project.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundException('project not found');
+  async update(id: string, body: UpdateProjectDto, user: AuthUser) {
+    const userId = user.id;
+    const existing = await this.getScopedProject(id, user);
     const data = this.cleanData(body);
     if ('customFields' in data) {
       data.customFields = await this.customFields.validateAndClean(
@@ -147,9 +160,8 @@ export class ProjectsService {
     return toClient(project);
   }
 
-  async remove(id: string) {
-    const existing = await this.prisma.project.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundException('project not found');
+  async remove(id: string, user?: AuthUser) {
+    await this.getScopedProject(id, user);
     await this.prisma.project.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
@@ -197,7 +209,8 @@ export class ProjectsService {
     return toClient(withCost);
   }
 
-  async createMilestone(projectId: string, body: CreateMilestoneDto) {
+  async createMilestone(projectId: string, body: CreateMilestoneDto, user: AuthUser) {
+    await this.getScopedProject(projectId, user);
     const { dueDate, ...rest } = body;
     const milestone = await this.prisma.projectMilestone.create({
       data: { ...rest, projectId, ...(dueDate ? { dueDate: new Date(dueDate) } : {}) } as Prisma.ProjectMilestoneUncheckedCreateInput,
@@ -205,7 +218,8 @@ export class ProjectsService {
     return toClient(milestone);
   }
 
-  async updateMilestone(projectId: string, milestoneId: string, body: UpdateMilestoneDto) {
+  async updateMilestone(projectId: string, milestoneId: string, body: UpdateMilestoneDto, user: AuthUser) {
+    await this.getScopedProject(projectId, user);
     const existing = await this.prisma.projectMilestone.findFirst({ where: { id: milestoneId, projectId } });
     if (!existing) throw new NotFoundException('project not found');
     const { dueDate, ...rest } = body as unknown as Record<string, unknown>;
@@ -220,7 +234,8 @@ export class ProjectsService {
     return toClient(milestone);
   }
 
-  async deleteMilestone(projectId: string, milestoneId: string) {
+  async deleteMilestone(projectId: string, milestoneId: string, user: AuthUser) {
+    await this.getScopedProject(projectId, user);
     const existing = await this.prisma.projectMilestone.findFirst({ where: { id: milestoneId, projectId } });
     if (!existing) throw new NotFoundException('project not found');
     await this.prisma.projectMilestone.delete({ where: { id: milestoneId } });
@@ -237,7 +252,8 @@ export class ProjectsService {
     return toClient(members);
   }
 
-  async addMember(projectId: string, body: AddMemberDto) {
+  async addMember(projectId: string, body: AddMemberDto, user: AuthUser) {
+    await this.getScopedProject(projectId, user);
     const member = await this.prisma.projectMember.upsert({
       where: { projectId_userId: { projectId, userId: body.userId } },
       update: { role: body.role ?? 'member' },
@@ -247,7 +263,8 @@ export class ProjectsService {
     return toClient(member);
   }
 
-  async removeMember(projectId: string, userId: string) {
+  async removeMember(projectId: string, userId: string, user: AuthUser) {
+    await this.getScopedProject(projectId, user);
     const existing = await this.prisma.projectMember.findFirst({ where: { projectId, userId } });
     if (!existing) throw new NotFoundException('project not found');
     await this.prisma.projectMember.delete({ where: { id: existing.id } });

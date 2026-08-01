@@ -1,5 +1,12 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
+
+const authUser = (id: string, permissions = ['*']) => ({
+  id,
+  role: 'member',
+  roleId: 'member-role',
+  permissions,
+});
 
 /**
  * Audit 2026-08 (P0) — PO receipt had two divergent paths and was not atomic.
@@ -92,6 +99,7 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
     }),
   };
   const timeline: any = { log: jest.fn() };
+  const visibility: any = { ownershipWhere: jest.fn().mockResolvedValue({}) };
 
   const svc = new PurchaseOrdersService(
     prisma,            // prisma
@@ -100,12 +108,15 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
     inventory,         // inventory
     {} as any,         // approvals
     {} as any,         // customFields
+    visibility,        // visibility
     posting,           // posting
   );
 
   return {
     svc,
+    prisma,
     inventory,
+    visibility,
     committed: () => committedMovements,
     status: () => committedStatus,
   };
@@ -114,14 +125,14 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
 describe('PurchaseOrdersService.receive — atomicity', () => {
   it('commits every line and the status together on success', async () => {
     const { svc, committed, status } = build();
-    await svc.receive('po1', 'u1');
+    await svc.receive('po1', authUser('u1'));
     expect(committed()).toHaveLength(2);
     expect(status()).toBe('received');
   });
 
   it('rolls back all stock when a GRNI posting fails partway through', async () => {
     const { svc, committed, status } = build({ failGrniOnLine: 2 });
-    await expect(svc.receive('po1', 'u1')).rejects.toThrow('missing GRNI mapping');
+    await expect(svc.receive('po1', authUser('u1'))).rejects.toThrow('missing GRNI mapping');
     // Neither line may survive — a partial receipt leaves the PO unreceivable.
     expect(committed()).toHaveLength(0);
     expect(status()).toBe('ordered');
@@ -129,16 +140,44 @@ describe('PurchaseOrdersService.receive — atomicity', () => {
 
   it('rejects a second receipt', async () => {
     const { svc } = build();
-    await svc.receive('po1', 'u1');
-    await expect(svc.receive('po1', 'u1')).rejects.toBeInstanceOf(BadRequestException);
+    await svc.receive('po1', authUser('u1'));
+    await expect(svc.receive('po1', authUser('u1'))).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 
 describe('PurchaseOrdersService.updateStatus — no longer moves stock', () => {
   it('creates no stock movement when the status becomes "received"', async () => {
     const { svc, inventory, committed } = build();
-    await svc.updateStatus('po1', 'received', 'u1');
+    await svc.updateStatus('po1', 'received', authUser('u1'));
     expect(inventory.applyMovement).not.toHaveBeenCalled();
     expect(committed()).toHaveLength(0);
+  });
+});
+
+describe('PurchaseOrdersService — mutation scope', () => {
+  it('returns not-found and performs no write for another user\'s purchase order', async () => {
+    const { svc, prisma, visibility } = build();
+    const otherUserPo = {
+      id: 'po-user-b',
+      createdById: 'user-b',
+      status: 'draft',
+      approvalStatus: 'pending',
+      deletedAt: null,
+    };
+    const user = authUser('user-a', ['purchase-orders:edit:own']);
+    visibility.ownershipWhere.mockResolvedValue({ createdById: 'user-a' });
+    prisma.purchaseOrder.findFirst.mockImplementation(async ({ where }: any) =>
+      where.createdById === 'user-a' ? null : otherUserPo,
+    );
+
+    await expect(svc.update('po-user-b', { title: 'tampered' } as any, user))
+      .rejects.toBeInstanceOf(NotFoundException);
+
+    expect(visibility.ownershipWhere).toHaveBeenCalledWith(user, 'purchase-orders', 'createdById');
+    expect(prisma.purchaseOrder.findFirst).toHaveBeenCalledWith({
+      where: { id: 'po-user-b', deletedAt: null, createdById: 'user-a' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.purchaseOrder.update).not.toHaveBeenCalled();
   });
 });

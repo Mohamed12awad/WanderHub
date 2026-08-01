@@ -38,30 +38,54 @@ export class InventoryService {
    * COGS (Dr Inventory / Cr COGS). Supports partial returns.
    */
   async returnStock(body: { movementId: string; qty: number; note?: string }, userId: string) {
-    const orig = await this.prisma.stockMovement.findUnique({ where: { id: body.movementId } });
-    if (!orig) throw new NotFoundException('Original movement not found');
-    if (orig.qty >= 0) throw new BadRequestException('Can only return an outbound (sale) movement');
-    const maxQty = -orig.qty;
-    if (!body.qty || body.qty <= 0 || body.qty > maxQty + 1e-9) {
-      throw new BadRequestException(`qty must be between 0 and ${maxQty}`);
-    }
-    const move = await this.applyMovement({
-      productId: orig.productId,
-      warehouseId: orig.warehouseId ?? undefined,
-      qty: body.qty,
-      type: 'in',
-      sourceMovementId: orig.id,
-      refType: 'return',
-      refId: orig.refId ?? undefined,
-      note: body.note ?? `Return of movement ${orig.id}`,
-      userId,
-    });
-    if (move) {
+    // Audit 2026-08: two defects fixed here.
+    //  - The movement committed in its own transaction and the COGS reversal was
+    //    then posted outside any transaction, so a failed reversal left stock
+    //    restored with its COGS still standing.
+    //  - The quantity was checked against the ORIGINAL outbound only, without
+    //    summing prior returns, so an outbound of 10 could be returned 10 twice —
+    //    adding 20 units back and reversing double the COGS of the sale.
+    const move = await this.prisma.$transaction(async (tx) => {
+      const orig = await tx.stockMovement.findUnique({ where: { id: body.movementId } });
+      if (!orig) throw new NotFoundException('Original movement not found');
+      if (orig.qty >= 0) throw new BadRequestException('Can only return an outbound (sale) movement');
+      const maxQty = -orig.qty;
+
+      // Returns are inbound movements carrying sourceMovementId, so their summed
+      // quantity is how much of this sale has already come back.
+      const prior = await tx.stockMovement.aggregate({
+        where: { sourceMovementId: orig.id },
+        _sum: { qty: true },
+      });
+      const alreadyReturned = Number(prior._sum.qty ?? 0);
+      const remaining = maxQty - alreadyReturned;
+
+      if (!body.qty || body.qty <= 0 || body.qty > remaining + 1e-9) {
+        throw new BadRequestException(
+          alreadyReturned > 0
+            ? `qty must be between 0 and ${remaining} (${alreadyReturned} of ${maxQty} already returned)`
+            : `qty must be between 0 and ${maxQty}`,
+        );
+      }
+
+      const created = await this.applyMovementTx({
+        productId: orig.productId,
+        warehouseId: orig.warehouseId ?? undefined,
+        qty: body.qty,
+        type: 'in',
+        sourceMovementId: orig.id,
+        refType: 'return',
+        refId: orig.refId ?? undefined,
+        note: body.note ?? `Return of movement ${orig.id}`,
+        userId,
+      }, tx);
+
       await this.posting.postCogsReversal(
-        { id: move.id, qty: body.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: orig.productId, warehouseId: move.warehouseId },
-        undefined, userId,
+        { id: created.id, qty: body.qty, unitCost: Number(created.unitCost ?? 0), date: created.createdAt, productId: orig.productId, warehouseId: created.warehouseId },
+        tx, userId,
       );
-    }
+      return created;
+    });
     return toClient(move);
   }
 

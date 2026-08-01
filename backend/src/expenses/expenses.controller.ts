@@ -37,26 +37,26 @@ export class ExpensesController {
   @Put(':id')
   @RequirePermission('expenses:edit')
   update(@Param('id') id: string, @Body() body: UpdateExpenseReportDto, @CurrentUser() user: AuthUser) {
-    return this.expenses.update(id, body, user.id);
+    return this.expenses.update(id, body, user);
   }
 
   @Patch(':id/approve')
   @RequirePermission('expenses:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.expenses.approve(id, user.id, user.role);
+    return this.expenses.approve(id, user);
   }
 
   @Patch(':id/reject')
   @RequirePermission('expenses:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.expenses.reject(id, user.id, body.reason.trim(), user.role);
+    return this.expenses.reject(id, body.reason.trim(), user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('expenses:delete')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.expenses.remove(id, user.id);
+    return this.expenses.remove(id, user);
   }
 }

@@ -149,8 +149,12 @@ export class TasksService {
     return toClient(task);
   }
 
-  async update(id: string, body: UpdateTaskDto, userId?: string) {
-    const existing = await this.prisma.task.findUnique({ where: { id } });
+  async update(id: string, body: UpdateTaskDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId');
+    const existing = await this.prisma.task.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!existing) throw new NotFoundException('task not found');
     const { _id, id: _id2, createdAt, updatedAt, assignedTo, createdBy, deal, linkedTo, project, milestone, ...rest } =
       body as unknown as Record<string, unknown>;
@@ -195,15 +199,26 @@ export class TasksService {
     return toClient(task);
   }
 
-  async remove(id: string) {
-    const existing = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
+  async remove(id: string, user?: AuthUser) {
+    // BulkService prefilters visible ids before calling this internal path and
+    // currently has no AuthUser parameter at the service call boundary.
+    const scopeWhere = user
+      ? await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId')
+      : {};
+    const existing = await this.prisma.task.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!existing) throw new NotFoundException('task not found');
     await this.prisma.task.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }
 
-  async complete(id: string, userId: string) {
-    const task = await this.prisma.task.findFirst({ where: { id, deletedAt: null } });
+  async complete(id: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'tasks', 'assignedToId');
+    const task = await this.prisma.task.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
     if (!task) throw new NotFoundException('task not found');
     const wasDone = task.status === 'done';
     const updated = await this.prisma.task.update({

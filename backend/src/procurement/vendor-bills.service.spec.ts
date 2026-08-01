@@ -1,4 +1,12 @@
+import { NotFoundException } from '@nestjs/common';
 import { VendorBillsService } from './vendor-bills.service';
+
+const authUser = (id: string, role = 'admin', permissions = ['*']) => ({
+  id,
+  role,
+  roleId: `${role}-role`,
+  permissions,
+});
 
 function makeService(prisma: any) {
   const numberSequence: any = { nextNumber: jest.fn() };
@@ -10,6 +18,7 @@ function makeService(prisma: any) {
     act: jest.fn(),
   };
   const customFields: any = { validateAndClean: jest.fn() };
+  const visibility: any = { ownershipWhere: jest.fn().mockResolvedValue({}) };
   const posting: any = {
     postVendorBill: jest.fn().mockResolvedValue(undefined),
     postVendorBillPayment: jest.fn().mockResolvedValue(undefined),
@@ -27,6 +36,7 @@ function makeService(prisma: any) {
     timeline,
     approvals,
     customFields,
+    visibility,
     posting,
     currency,
   );
@@ -136,7 +146,7 @@ describe('VendorBillsService — document/journal atomicity', () => {
     const svc = makeService(prisma);
     (svc as any).posting.postVendorBill.mockRejectedValue(new Error('missing AP mapping'));
 
-    await expect(svc.approve('bill-atomic', 'approver-1', 'admin')).rejects.toThrow('missing AP mapping');
+    await expect(svc.approve('bill-atomic', authUser('approver-1'))).rejects.toThrow('missing AP mapping');
 
     expect(state().bill.approvalStatus).toBe('pending');
     expect(state().journals).toHaveLength(0);
@@ -149,7 +159,7 @@ describe('VendorBillsService — document/journal atomicity', () => {
       await postingTx.journalEntry.create({ data: { sourceType: 'VendorBill', sourceId: 'bill-atomic' } });
     });
 
-    await svc.approve('bill-atomic', 'approver-1', 'admin');
+    await svc.approve('bill-atomic', authUser('approver-1'));
 
     expect(state().bill).toMatchObject({ approvalStatus: 'approved', status: 'received' });
     expect(state().journals).toEqual([{ sourceType: 'VendorBill', sourceId: 'bill-atomic' }]);
@@ -175,7 +185,7 @@ describe('VendorBillsService — segregation of duties', () => {
     };
     const svc = makeService(prisma);
 
-    await expect(svc.approve('bill-self', 'user-1', 'admin')).rejects.toThrow('Cannot approve your own bill');
+    await expect(svc.approve('bill-self', authUser('user-1'))).rejects.toThrow('Cannot approve your own bill');
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -190,7 +200,7 @@ describe('VendorBillsService — segregation of duties', () => {
     };
     const svc = makeService(prisma);
 
-    await expect(svc.reject('bill-self', 'user-1', 'admin', 'no')).rejects.toThrow('Cannot reject your own bill');
+    await expect(svc.reject('bill-self', 'no', authUser('user-1'))).rejects.toThrow('Cannot reject your own bill');
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
@@ -202,7 +212,7 @@ describe('VendorBillsService — postings follow the document lifecycle', () => 
     await svc.update(
       'bill-lifecycle',
       { items: [{ description: 'Replacement', quantity: 1, unitPrice: 75 }] } as any,
-      'editor-1',
+      authUser('editor-1'),
     );
 
     expect(posting.reverseLive).toHaveBeenCalledWith(
@@ -216,7 +226,7 @@ describe('VendorBillsService — postings follow the document lifecycle', () => 
   it('reverses the live entry when an approved bill is deleted', async () => {
     const { svc, prisma, tx, posting } = buildBillLifecycle();
 
-    await svc.remove('bill-lifecycle', 'deleter-1');
+    await svc.remove('bill-lifecycle', authUser('deleter-1'));
 
     // The reversal must be attributed, or the journal records who deleted nothing.
     expect(posting.reverseLive).toHaveBeenCalledWith('VendorBill', 'bill-lifecycle', { createdById: 'deleter-1' }, tx);
@@ -224,6 +234,39 @@ describe('VendorBillsService — postings follow the document lifecycle', () => 
       where: { id: 'bill-lifecycle' },
       data: { deletedAt: expect.any(Date) },
     });
+    expect(prisma.vendorBill.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('VendorBillsService — mutation scope', () => {
+  it('returns not-found and performs no write for another user\'s vendor bill', async () => {
+    const otherUserBill = {
+      id: 'bill-user-b',
+      createdById: 'user-b',
+      approvalStatus: 'pending',
+      deletedAt: null,
+    };
+    const prisma: any = {
+      vendorBill: {
+        findFirst: jest.fn(async ({ where }: any) =>
+          where.createdById === 'user-a' ? null : otherUserBill,
+        ),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    };
+    const svc = makeService(prisma);
+    const user = authUser('user-a', 'member', ['vendor-bills:edit:own']);
+    (svc as any).visibility.ownershipWhere.mockResolvedValue({ createdById: 'user-a' });
+
+    await expect(svc.update('bill-user-b', { title: 'tampered' } as any, user))
+      .rejects.toBeInstanceOf(NotFoundException);
+
+    expect((svc as any).visibility.ownershipWhere).toHaveBeenCalledWith(user, 'vendor-bills', 'createdById');
+    expect(prisma.vendorBill.findFirst).toHaveBeenCalledWith({
+      where: { id: 'bill-user-b', deletedAt: null, createdById: 'user-a' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.vendorBill.update).not.toHaveBeenCalled();
   });
 });

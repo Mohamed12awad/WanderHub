@@ -18,6 +18,16 @@ interface BulkEntityConfig {
   model: string; // prisma delegate name
   /** Owner column. Present only on owner-scoped entities; enables assignOwner + visibility scoping. */
   ownerField?: string;
+  /**
+   * Column used for visibility scoping when it is NOT a reassignable owner.
+   *
+   * Audit 2026-08: projects and tasks are scoped by `managerId` / `assignedToId`
+   * in their own services, but had neither field here — so `scopeWhere()`
+   * returned `{}` and bulk delete/status silently operated on every record,
+   * including ones the caller could not see individually. Kept separate from
+   * `ownerField` so declaring it does not also enable bulk owner reassignment.
+   */
+  scopeField?: string;
   /** Allowed status values for setStatus. */
   statusValues?: string[];
   /** When true, setStatus accepts any string (no enum constraint). */
@@ -31,8 +41,8 @@ const BULK_ENTITIES: Record<string, BulkEntityConfig> = {
   leads: { base: 'leads', model: 'lead', ownerField: 'ownerId', statusValues: ['new', 'contacted', 'nurturing', 'qualified', 'unqualified', 'converted'] },
   deals: { base: 'deals', model: 'deal', ownerField: 'ownerId', statusValues: ['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'cancelled'] },
   suppliers: { base: 'suppliers', model: 'supplier', statusValues: ['active', 'inactive'] },
-  projects: { base: 'projects', model: 'project', statusValues: ['planning', 'active', 'on_hold', 'completed', 'cancelled'] },
-  tasks: { base: 'tasks', model: 'task', statusValues: ['todo', 'in_progress', 'done', 'cancelled'] },
+  projects: { base: 'projects', model: 'project', scopeField: 'managerId', statusValues: ['planning', 'active', 'on_hold', 'completed', 'cancelled'] },
+  tasks: { base: 'tasks', model: 'task', scopeField: 'assignedToId', statusValues: ['todo', 'in_progress', 'done', 'cancelled'] },
   // Products have neither an owner nor a status column — only bulk delete applies.
   products: { base: 'products', model: 'product' },
 };
@@ -85,8 +95,9 @@ export class BulkService {
 
   /** Records visible to the user — scoped only for owner-bearing entities. */
   private async scopeWhere(cfg: BulkEntityConfig, user: AuthUser): Promise<Record<string, unknown>> {
-    if (!cfg.ownerField) return {};
-    return this.visibility.ownershipWhere(user, cfg.base, cfg.ownerField);
+    const field = cfg.ownerField ?? cfg.scopeField;
+    if (!field) return {};
+    return this.visibility.ownershipWhere(user, cfg.base, field);
   }
 
   async run(entity: string, action: BulkAction, ids: string[], value: string | undefined, user: AuthUser): Promise<BulkResult> {

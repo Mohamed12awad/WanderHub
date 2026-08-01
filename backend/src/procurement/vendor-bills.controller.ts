@@ -44,40 +44,41 @@ export class VendorBillsController {
   @Put(':id')
   @RequirePermission('vendor-bills:edit')
   update(@Param('id') id: string, @Body() body: UpdateVendorBillDto, @CurrentUser() user: AuthUser) {
-    return this.bills.update(id, body, user.id);
+    return this.bills.update(id, body, user);
   }
 
   @Patch(':id/approve')
   @RequirePermission('vendor-bills:approve')
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.bills.approve(id, user.id, user.role);
+    return this.bills.approve(id, user);
   }
 
   @Patch(':id/reject')
   @RequirePermission('vendor-bills:approve')
   reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() user: AuthUser) {
     if (!body.reason?.trim()) throw new BadRequestException('Rejection reason is required');
-    return this.bills.reject(id, user.id, user.role, body.reason.trim());
+    return this.bills.reject(id, body.reason.trim(), user);
   }
 
+  // Money out is a distinct duty from editing the bill — audit 2026-08 (P1).
   @Post(':id/payments')
   @HttpCode(201)
-  @RequirePermission('vendor-bills:edit')
+  @RequirePermission('vendor-bills:pay')
   recordPayment(@Param('id') id: string, @Body() body: RecordBillPaymentDto, @CurrentUser() user: AuthUser) {
-    return this.bills.recordPayment(id, body, user.id);
+    return this.bills.recordPayment(id, body, user);
   }
 
   @Delete(':billId/payments/:paymentId')
   @HttpCode(204)
-  @RequirePermission('vendor-bills:edit')
-  deletePayment(@Param('billId') billId: string, @Param('paymentId') paymentId: string) {
-    return this.bills.deletePayment(billId, paymentId);
+  @RequirePermission('vendor-bills:pay')
+  deletePayment(@Param('billId') billId: string, @Param('paymentId') paymentId: string, @CurrentUser() user: AuthUser) {
+    return this.bills.deletePayment(billId, paymentId, user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('vendor-bills:delete')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.bills.remove(id, user.id);
+    return this.bills.remove(id, user);
   }
 }

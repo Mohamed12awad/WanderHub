@@ -13,7 +13,9 @@ import { UpdateVendorBillDto } from './dto/update-vendor-bill.dto';
 import { RecordBillPaymentDto } from './dto/record-bill-payment.dto';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { VisibilityService } from '../common/visibility.service';
 import { PostingService } from '../accounting/posting.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 const BILL_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -41,6 +43,7 @@ export class VendorBillsService {
     private readonly timeline: TimelineService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
     private readonly posting: PostingService,
     private readonly currency: CurrencyService,
   ) {}
@@ -198,9 +201,13 @@ export class VendorBillsService {
     return toClient(bill);
   }
 
-  async update(id: string, body: UpdateVendorBillDto, userId: string) {
-    const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+  async update(id: string, body: UpdateVendorBillDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const existing = await this.prisma.vendorBill.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!existing) throw new NotFoundException('Vendor bill not found');
 
     const { items, taxRate, taxInclusive, ...rest } = body;
     const data = this.cleanData(rest);
@@ -246,9 +253,13 @@ export class VendorBillsService {
     return toClient(bill);
   }
 
-  async approve(id: string, userId: string, userRole: string) {
-    const bill = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
-    if (!bill) return null;
+  async approve(id: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const bill = await this.prisma.vendorBill.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!bill) throw new NotFoundException('Vendor bill not found');
     if (bill.approvalStatus === 'approved') return toClient(bill);
 
     const steps = await this.approvals.listSteps('VendorBill', id);
@@ -299,9 +310,13 @@ export class VendorBillsService {
     return toClient(updated);
   }
 
-  async reject(id: string, userId: string, userRole: string, reason: string) {
-    const bill = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
-    if (!bill) return null;
+  async reject(id: string, reason: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const bill = await this.prisma.vendorBill.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!bill) throw new NotFoundException('Vendor bill not found');
     if (bill.approvalStatus === 'rejected') return toClient(bill);
 
     const steps = await this.approvals.listSteps('VendorBill', id);
@@ -339,8 +354,12 @@ export class VendorBillsService {
     return toClient(updated);
   }
 
-  async recordPayment(billId: string, body: RecordBillPaymentDto, userId: string) {
-    const bill = await this.prisma.vendorBill.findFirst({ where: { id: billId, deletedAt: null } });
+  async recordPayment(billId: string, body: RecordBillPaymentDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const bill = await this.prisma.vendorBill.findFirst({
+      where: { id: billId, deletedAt: null, ...scopeWhere },
+    });
     if (!bill) throw new NotFoundException('Vendor bill not found');
     if (bill.approvalStatus !== 'approved') throw new BadRequestException('Vendor bill must be approved before recording payment');
     if (bill.status === 'cancelled') throw new BadRequestException('Cannot record a payment against a cancelled vendor bill');
@@ -397,9 +416,12 @@ export class VendorBillsService {
     return updated ? toClient(updated) : null;
   }
 
-  async deletePayment(billId: string, paymentId: string) {
-    const payment = await this.prisma.vendorBillPayment.findFirst({ where: { id: paymentId, billId } });
-    if (!payment) return null;
+  async deletePayment(billId: string, paymentId: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const payment = await this.prisma.vendorBillPayment.findFirst({
+      where: { id: paymentId, billId, bill: { deletedAt: null, ...scopeWhere } },
+    });
+    if (!payment) throw new NotFoundException('Vendor bill payment not found');
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // GL: reverse the payment entry before deleting the row.
@@ -416,12 +438,14 @@ export class VendorBillsService {
   }
 
   /** Creates a Vendor Bill pre-filled from a Purchase Order's items and totals. */
-  async createFromPO(poId: string, userId: string) {
+  async createFromPO(poId: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
     const po = await this.prisma.purchaseOrder.findFirst({
-      where: { id: poId, deletedAt: null },
+      where: { id: poId, deletedAt: null, ...scopeWhere },
       include: { items: { orderBy: { order: 'asc' } } },
     });
-    if (!po) throw new BadRequestException('Purchase order not found');
+    if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before creating a bill');
 
     // A PO must not be billed more than once: a second full-value bill for the
@@ -484,9 +508,13 @@ export class VendorBillsService {
     return toClient(bill);
   }
 
-  async remove(id: string, userId?: string) {
-    const existing = await this.prisma.vendorBill.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+  async remove(id: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'vendor-bills', 'createdById');
+    const existing = await this.prisma.vendorBill.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!existing) throw new NotFoundException('Vendor bill not found');
     // Deleting a bill that has recorded payments would hide the document while
     // its payments — and the account balance they moved — remain. Require the
     // payments to be voided first so the ledger stays reconciled.

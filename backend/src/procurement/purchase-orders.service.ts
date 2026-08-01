@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NumberSequenceService } from '../number-sequence/number-sequence.service';
@@ -11,7 +11,9 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { InventoryService } from '../inventory/inventory.service';
 import { ApprovalService } from '../common/approval.service';
 import { CustomFieldsService } from '../common/custom-fields.service';
+import { VisibilityService } from '../common/visibility.service';
 import { PostingService } from '../accounting/posting.service';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
 
 const PO_INCLUDE = {
   supplier: { select: { id: true, name: true, email: true, phone: true } },
@@ -30,6 +32,7 @@ export class PurchaseOrdersService {
     private readonly inventory: InventoryService,
     private readonly approvals: ApprovalService,
     private readonly customFields: CustomFieldsService,
+    private readonly visibility: VisibilityService,
     private readonly posting: PostingService,
   ) {}
 
@@ -38,11 +41,13 @@ export class PurchaseOrdersService {
    * the PO unit cost (establishing inventory valuation) plus a GRNI posting
    * (Dr Inventory / Cr GRNI). Idempotent — a PO can only be received once.
    */
-  async receive(id: string, userId: string, warehouseId?: string) {
+  async receive(id: string, user: AuthUser, warehouseId?: string) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
     const po = await this.prisma.purchaseOrder.findFirst({
-      where: { id, deletedAt: null }, include: { items: { orderBy: { order: 'asc' } } },
+      where: { id, deletedAt: null, ...scopeWhere }, include: { items: { orderBy: { order: 'asc' } } },
     });
-    if (!po) throw new BadRequestException('Purchase order not found');
+    if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before receiving');
 
     // Audit 2026-08 (P0): each line used to commit in its own transaction, with
@@ -169,9 +174,13 @@ export class PurchaseOrdersService {
     return toClient(po);
   }
 
-  async update(id: string, body: UpdatePurchaseOrderDto, userId: string) {
-    const existing = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+  async update(id: string, body: UpdatePurchaseOrderDto, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
+    const existing = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!existing) throw new NotFoundException('Purchase order not found');
 
     const { items, taxRate, ...rest } = body;
     const data = this.cleanData(rest);
@@ -210,14 +219,16 @@ export class PurchaseOrdersService {
     return toClient(po);
   }
 
-  async updateStatus(id: string, status: string, userId: string) {
+  async updateStatus(id: string, status: string, user: AuthUser) {
+    const userId = user.id;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
     // Existence check only — the line items are no longer needed here now that
     // this path does not touch stock.
     const existing = await this.prisma.purchaseOrder.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...scopeWhere },
       select: { id: true },
     });
-    if (!existing) return null;
+    if (!existing) throw new NotFoundException('Purchase order not found');
 
     // Audit 2026-08 (P0): this used to ALSO bring items into stock on the
     // transition to 'received' — with no unit cost (so valuation fell back to
@@ -236,9 +247,13 @@ export class PurchaseOrdersService {
     return toClient(po);
   }
 
-  async approve(id: string, userId: string, userRole: string) {
-    const po = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
-    if (!po) return null;
+  async approve(id: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus === 'approved') return toClient(po);
 
     const steps = await this.approvals.listSteps('PurchaseOrder', id);
@@ -280,9 +295,13 @@ export class PurchaseOrdersService {
     return toClient(updated);
   }
 
-  async reject(id: string, userId: string, userRole: string, reason: string) {
-    const po = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
-    if (!po) return null;
+  async reject(id: string, reason: string, user: AuthUser) {
+    const { id: userId, role: userRole } = user;
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus === 'rejected') return toClient(po);
 
     const steps = await this.approvals.listSteps('PurchaseOrder', id);
@@ -309,9 +328,12 @@ export class PurchaseOrdersService {
     return toClient(updated);
   }
 
-  async remove(id: string) {
-    const existing = await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) return null;
+  async remove(id: string, user: AuthUser) {
+    const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
+    const existing = await this.prisma.purchaseOrder.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+    });
+    if (!existing) throw new NotFoundException('Purchase order not found');
     await this.prisma.purchaseOrder.update({ where: { id }, data: { deletedAt: new Date() } });
     return true;
   }

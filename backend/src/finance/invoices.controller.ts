@@ -74,22 +74,24 @@ export class InvoicesController {
     return this.invoices.rejectInvoice(id, user.id, body.reason.trim(), user.role, user.permissions);
   }
 
+  // Recording money against a document is a different duty from drafting it —
+  // audit 2026-08 (P1): these reused invoices:create/edit/delete.
   @Post('invoices/:id/payments')
   @HttpCode(201)
-  @RequirePermission('invoices:create')
+  @RequirePermission('invoices:pay')
   recordPayment(@Param('id') id: string, @Body() body: RecordPaymentDto, @CurrentUser() user: AuthUser) {
     return this.invoices.recordPayment(id, body, user);
   }
 
   @Patch('invoices/:invoiceId/payments/:paymentId')
-  @RequirePermission('invoices:edit')
+  @RequirePermission('invoices:pay')
   editPayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @Body() body: EditPaymentDto, @CurrentUser() user: AuthUser) {
     return this.invoices.editPayment(invoiceId, paymentId, body, user);
   }
 
   @Delete('invoices/:invoiceId/payments/:paymentId')
   @HttpCode(204)
-  @RequirePermission('invoices:delete')
+  @RequirePermission('invoices:pay')
   deletePayment(@Param('invoiceId') invoiceId: string, @Param('paymentId') paymentId: string, @CurrentUser() user: AuthUser) {
     return this.invoices.deleteInvoicePayment(invoiceId, paymentId, user);
   }

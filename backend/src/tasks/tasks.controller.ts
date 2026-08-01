@@ -43,19 +43,19 @@ export class TasksController {
   @Put(':id')
   @RequirePermission('tasks:edit')
   update(@Param('id') id: string, @Body() body: UpdateTaskDto, @CurrentUser() user: AuthUser) {
-    return this.tasks.update(id, body, user.id);
+    return this.tasks.update(id, body, user);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @RequirePermission('tasks:delete')
-  remove(@Param('id') id: string) {
-    return this.tasks.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.tasks.remove(id, user);
   }
 
   @Patch(':id/complete')
   @RequirePermission('tasks:edit')
   complete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.tasks.complete(id, user.id);
+    return this.tasks.complete(id, user);
   }
 }

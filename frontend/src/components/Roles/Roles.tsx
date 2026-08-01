@@ -36,7 +36,7 @@ const RESOURCE_LABELS: Record<Resource, string> = {
 const ACTION_LABELS: Record<string, string> = {
   view: "View", create: "Create", edit: "Edit",
   delete: "Delete", export: "Export", approve: "Approve", manage: "Manage",
-  send: "Send",
+  send: "Send", pay: "Record Payment",
 };
 
 function PermissionMatrix({

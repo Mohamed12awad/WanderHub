@@ -18,7 +18,7 @@ export const PERMISSION_REGISTRY = {
   notes:    ["view", "create", "edit", "delete"],
   emails:   ["view", "send"],
   quotes:   ["view", "create", "edit", "delete", "approve"],
-  invoices: ["view", "create", "edit", "delete", "approve"],
+  invoices: ["view", "create", "edit", "delete", "approve", "pay"],
   "sales-orders": ["view", "create", "edit", "delete", "approve"],
   reports:  ["view", "export"],
   users:    ["view", "create", "edit", "delete"],
@@ -28,7 +28,7 @@ export const PERMISSION_REGISTRY = {
   logs:     ["view"],
   suppliers: ["view", "create", "edit", "delete"],
   "purchase-orders": ["view", "create", "edit", "delete", "approve"],
-  "vendor-bills": ["view", "create", "edit", "delete", "approve"],
+  "vendor-bills": ["view", "create", "edit", "delete", "approve", "pay"],
   warehouses: ["view", "manage"],
   "product-categories": ["view", "manage"],
   projects: ["view", "create", "edit", "delete"],
@@ -37,4 +37,4 @@ export const PERMISSION_REGISTRY = {
 export type Resource = keyof typeof PERMISSION_REGISTRY;
 export type Permission = `${Resource}:${string}`;
 
-export const ALL_ACTIONS = ["view", "create", "edit", "delete", "export", "approve", "manage", "send"] as const;
+export const ALL_ACTIONS = ["view", "create", "edit", "delete", "export", "approve", "manage", "send", "pay"] as const;
