@@ -77,6 +77,17 @@ export class VendorBillsService {
     return !!mv;
   }
 
+  /**
+   * Fractional over-billing allowance, from `glConfig.overBillTolerancePct`
+   * (e.g. 2 → 2%). Defaults to 0: a supplier cannot bill for more than was
+   * received unless the workspace opts in.
+   */
+  private async overBillTolerance(): Promise<number> {
+    const gl = (await this.posting.getGlConfig()) as { overBillTolerancePct?: number };
+    const pct = Number(gl.overBillTolerancePct ?? 0);
+    return Number.isFinite(pct) && pct > 0 ? pct / 100 : 0;
+  }
+
   private async getApprovalConfig() {
     const config = await this.prisma.workspaceConfig.findFirst();
     const approvals =
@@ -448,18 +459,40 @@ export class VendorBillsService {
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before creating a bill');
 
-    // A PO must not be billed more than once: a second full-value bill for the
-    // same goods would create a duplicate AP liability (the supplier could be
-    // paid twice). Block creation when an active bill already exists.
-    const existingBill = await this.prisma.vendorBill.findFirst({
-      where: { purchaseOrderId: po.id, deletedAt: null },
-      select: { id: true, billNumber: true },
-    });
-    if (existingBill) {
+    // Three-way match, leg 2 of 2: received → billed. Previously a PO could be
+    // billed exactly once, for its FULL ordered value, regardless of what had
+    // actually arrived — so a short shipment was still billed in full and
+    // nothing detected it. Bill only what has been received and not yet billed;
+    // repeat billing is now legitimate as long as the cumulative billed
+    // quantity stays within the received quantity (plus any tolerance).
+    const tolerance = await this.overBillTolerance();
+    const billable = po.items
+      .map((it) => ({ it, qty: it.receivedQty * (1 + tolerance) - it.billedQty }))
+      .filter(({ qty }) => qty > 1e-9);
+
+    if (!billable.length) {
+      const anythingReceived = po.items.some((it) => it.receivedQty > 0);
       throw new BadRequestException(
-        `Purchase order already has a bill (${existingBill.billNumber}). Delete it before creating another.`,
+        anythingReceived
+          ? 'Everything received on this purchase order has already been billed.'
+          : 'Nothing has been received against this purchase order yet, so there is nothing to bill.',
       );
     }
+
+    // Totals come from the billable quantities, not the PO's ordered totals.
+    const totals = calcTotals(
+      billable.map(({ it, qty }) => ({
+        description: it.description,
+        quantity: qty,
+        unitPrice: Number(it.unitPrice),
+        discount: it.discount,
+        taxRate: it.taxRate,
+        taxCode: it.taxCode ?? undefined,
+        productId: it.productId ?? undefined,
+      })),
+      po.taxRate,
+      false,
+    );
 
     const billNumber = await this.numberSequence.nextNumber('bill', 'BILL');
     const { enabled } = await this.getApprovalConfig();
@@ -475,27 +508,38 @@ export class VendorBillsService {
           currency: po.currency ?? 'EGP',
           exchangeRate,
           taxRate: po.taxRate,
-          subtotal: po.subtotal,
-          tax: po.tax,
-          total: po.total,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          total: totals.total,
           approvalStatus: enabled ? 'pending' : 'approved',
           createdById: userId,
           items: {
-            create: po.items.map((it, idx) => ({
+            create: billable.map(({ it, qty }, idx) => ({
+              // Linked to the PO line so cumulative billing can be matched
+              // against cumulative receipt on any later bill.
+              purchaseOrderItemId: it.id,
               description: it.description,
-              quantity: it.quantity,
+              quantity: qty,
               unitPrice: it.unitPrice,
               discount: it.discount,
               taxRate: it.taxRate,
               taxCode: it.taxCode,
               productId: it.productId,
-              total: it.total,
+              total: totals.items[idx].total,
               order: idx,
             })),
           },
         } as Prisma.VendorBillUncheckedCreateInput,
         include: BILL_INCLUDE,
       });
+
+      // Record what this bill consumed, so a subsequent bill sees less headroom.
+      for (const { it, qty } of billable) {
+        await tx.purchaseOrderItem.update({
+          where: { id: it.id },
+          data: { billedQty: { increment: qty } },
+        });
+      }
 
       // Auto-approved (approvals disabled) → post now; clears GRNI if the PO was received.
       if (created.approvalStatus === 'approved') {

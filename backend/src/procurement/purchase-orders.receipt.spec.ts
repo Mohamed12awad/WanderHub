@@ -36,8 +36,8 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
   let stagedStatus = poRow.status;
 
   const items = [
-    { id: 'i1', productId: 'p1', quantity: 5, unitPrice: 10, order: 0 },
-    { id: 'i2', productId: 'p2', quantity: 3, unitPrice: 20, order: 1 },
+    { id: 'i1', productId: 'p1', description: 'A', quantity: 5, receivedQty: 0, billedQty: 0, unitPrice: 10, order: 0 },
+    { id: 'i2', productId: 'p2', description: 'B', quantity: 3, receivedQty: 0, billedQty: 0, unitPrice: 20, order: 1 },
   ];
 
   const txClient = {
@@ -49,6 +49,14 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
       ),
     },
     product: { findUnique: jest.fn(async () => ({ tracksInventory: true })) },
+    purchaseOrderItem: {
+      update: jest.fn(async ({ where, data }: any) => {
+        const it = items.find((i) => i.id === where.id)!;
+        it.receivedQty += data.receivedQty.increment;
+        return it;
+      }),
+      findMany: jest.fn(async () => items.map((i) => ({ quantity: i.quantity, receivedQty: i.receivedQty }))),
+    },
     purchaseOrder: {
       update: jest.fn(async ({ data }: any) => {
         stagedStatus = data.status;
@@ -93,6 +101,7 @@ function build(opts: { failGrniOnLine?: number; alreadyReceived?: boolean } = {}
     }),
   };
   const posting: any = {
+    getGlConfig: jest.fn(async () => ({})),
     postGrni: jest.fn(async () => {
       line += 1;
       if (opts.failGrniOnLine === line) throw new Error('missing GRNI mapping');

@@ -67,8 +67,14 @@ export class PurchaseOrdersController {
   @Post(':id/receive')
   @HttpCode(200)
   @RequirePermission('purchase-orders:edit')
-  receive(@Param('id') id: string, @Body() body: { warehouseId?: string }, @CurrentUser() user: AuthUser) {
-    return this.pos.receive(id, user, body?.warehouseId);
+  // `lines` enables a partial receipt: [{ itemId, qty }]. Omit it to receive
+  // everything still outstanding on the order (the previous behaviour).
+  receive(
+    @Param('id') id: string,
+    @Body() body: { warehouseId?: string; lines?: { itemId: string; qty: number }[] },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pos.receive(id, user, body?.warehouseId, body?.lines);
   }
 
   @Post(':id/create-bill')

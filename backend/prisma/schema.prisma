@@ -1134,12 +1134,19 @@ model PurchaseOrderItem {
   productId       String?
   description     String
   quantity        Float
+  // Three-way match (audit 2026-08): ordered → received → billed, tracked
+  // cumulatively per line so partial receipts and partial billing can be
+  // compared. Over-receipt and over-billing are checked against these.
+  receivedQty     Float         @default(0)
+  billedQty       Float         @default(0)
   unitPrice       Decimal       @db.Decimal(18, 4)
   discount        Float         @default(0)
   taxRate         Float         @default(0)
   taxCode         String?
   total           Decimal       @db.Decimal(18, 4)
   order           Int           @default(0)
+
+  billItems VendorBillItem[]
 }
 
 // ─── Procurement — Vendor Bills ───────────────────────────────────────────────
@@ -1201,6 +1208,11 @@ model VendorBillItem {
   id          String     @id @default(cuid())
   billId      String
   bill        VendorBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  // Links this bill line to the PO line it settles, so billed quantity can be
+  // matched against received quantity (three-way match). Null for bills raised
+  // without a PO, which are not matched.
+  purchaseOrderItemId String?
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
   productId   String?
   description String
   quantity    Float

@@ -41,7 +41,13 @@ export class PurchaseOrdersService {
    * the PO unit cost (establishing inventory valuation) plus a GRNI posting
    * (Dr Inventory / Cr GRNI). Idempotent — a PO can only be received once.
    */
-  async receive(id: string, user: AuthUser, warehouseId?: string) {
+  async receive(
+    id: string,
+    user: AuthUser,
+    warehouseId?: string,
+    /** Per-line quantities for a partial receipt. Omit to receive everything outstanding. */
+    lines?: { itemId: string; qty: number }[],
+  ) {
     const userId = user.id;
     const scopeWhere = await this.visibility.ownershipWhere(user, 'purchase-orders', 'createdById');
     const po = await this.prisma.purchaseOrder.findFirst({
@@ -50,6 +56,39 @@ export class PurchaseOrdersService {
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before receiving');
 
+    // Three-way match, leg 1 of 2: ordered → received. Quantities are validated
+    // against what is still outstanding on each line, with an optional
+    // over-receipt tolerance, rather than the previous all-or-nothing receipt.
+    const tolerance = await this.overReceiptTolerance();
+    const requested = new Map<string, number>();
+    if (lines?.length) {
+      for (const l of lines) {
+        if (!(l.qty > 0)) throw new BadRequestException('Receipt quantity must be greater than zero');
+        requested.set(l.itemId, (requested.get(l.itemId) ?? 0) + l.qty);
+      }
+      const unknown = [...requested.keys()].filter((k) => !po.items.some((it) => it.id === k));
+      if (unknown.length) throw new BadRequestException(`Unknown purchase order line(s): ${unknown.join(', ')}`);
+    } else {
+      for (const it of po.items) {
+        const outstanding = it.quantity - it.receivedQty;
+        if (outstanding > 1e-9) requested.set(it.id, outstanding);
+      }
+    }
+    if (!requested.size) throw new BadRequestException('Purchase order has already been fully received');
+
+    for (const it of po.items) {
+      const qty = requested.get(it.id);
+      if (qty === undefined) continue;
+      const max = it.quantity * (1 + tolerance) - it.receivedQty;
+      if (qty > max + 1e-9) {
+        throw new BadRequestException(
+          `Cannot receive ${qty} of "${it.description}": ordered ${it.quantity}, ` +
+            `already received ${it.receivedQty}` +
+            (tolerance > 0 ? `, tolerance ${(tolerance * 100).toFixed(1)}%` : '') + '.',
+        );
+      }
+    }
+
     // Audit 2026-08 (P0): each line used to commit in its own transaction, with
     // GRNI posted outside any transaction and the status update only after the
     // loop. A failure partway through left stock for the earlier lines
@@ -57,29 +96,59 @@ export class PurchaseOrdersService {
     // the idempotency probe below — permanently unreceivable. Probe, movements,
     // GRNI postings and the status update now share one transaction.
     await this.prisma.$transaction(async (tx) => {
-      const already = await tx.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: id } });
-      if (already) throw new BadRequestException('Purchase order has already been received');
-
       for (const it of po.items) {
-        if (!it.productId || it.quantity <= 0) continue;
-        const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
-        if (!product?.tracksInventory) continue;
-        const move = await this.inventory.applyMovement({
-          productId: it.productId, warehouseId, qty: it.quantity, unitCost: Number(it.unitPrice),
-          type: 'in', refType: 'po-receipt', refId: id, note: `PO ${po.poNumber}`, userId,
-        }, tx);
-        if (move) {
-          await this.posting.postGrni(
-            { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? it.unitPrice), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId, supplierId: po.supplierId },
-            tx, userId,
-          );
+        const qty = requested.get(it.id);
+        if (qty === undefined) continue;
+
+        // Stock only moves for inventory-tracked products; receivedQty is still
+        // recorded for services and non-tracked goods so billing can match.
+        if (it.productId) {
+          const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+          if (product?.tracksInventory) {
+            const move = await this.inventory.applyMovement({
+              productId: it.productId, warehouseId, qty, unitCost: Number(it.unitPrice),
+              type: 'in', refType: 'po-receipt', refId: id, note: `PO ${po.poNumber}`, userId,
+            }, tx);
+            if (move) {
+              await this.posting.postGrni(
+                { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? it.unitPrice), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId, supplierId: po.supplierId },
+                tx, userId,
+              );
+            }
+          }
         }
+        await tx.purchaseOrderItem.update({
+          where: { id: it.id },
+          data: { receivedQty: { increment: qty } },
+        });
       }
-      await tx.purchaseOrder.update({ where: { id }, data: { status: 'received' } });
+
+      // Fully received only when every line is satisfied; otherwise the PO stays
+      // open so the remainder can arrive later.
+      const after = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: id }, select: { quantity: true, receivedQty: true },
+      });
+      const fully = after.every((it) => it.receivedQty >= it.quantity - 1e-9);
+      await tx.purchaseOrder.update({
+        where: { id },
+        data: { status: fully ? 'received' : 'partially_received' },
+      });
     });
 
-    await this.timeline.log('po.received', `Purchase Order ${po.poNumber} received into stock`, id, 'PurchaseOrder', {}, userId);
+    const received = [...requested.values()].reduce((s, q) => s + q, 0);
+    await this.timeline.log('po.received', `Purchase Order ${po.poNumber}: received ${received} unit(s)`, id, 'PurchaseOrder', {}, userId);
     return toClient(await this.prisma.purchaseOrder.findUnique({ where: { id }, include: PO_INCLUDE }));
+  }
+
+  /**
+   * Fractional over-receipt allowance, from `glConfig.overReceiptTolerancePct`
+   * (e.g. 5 → 5%). Defaults to 0: receiving more than was ordered is refused
+   * unless the workspace opts in.
+   */
+  private async overReceiptTolerance(): Promise<number> {
+    const gl = (await this.posting.getGlConfig()) as { overReceiptTolerancePct?: number };
+    const pct = Number(gl.overReceiptTolerancePct ?? 0);
+    return Number.isFinite(pct) && pct > 0 ? pct / 100 : 0;
   }
 
   private async getApprovalConfig() {
