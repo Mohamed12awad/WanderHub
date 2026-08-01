@@ -425,8 +425,41 @@ export class InvoicesService {
     return toClient(updated);
   }
 
+  /**
+   * Puts back the stock a sale drew and reverses its COGS.
+   *
+   * Audit 2026-08 (P0): invoice creation depletes stock and books COGS
+   * unconditionally — before approval — but rejection reversed only the
+   * `Invoice` journal, so a rejected sale permanently consumed inventory and
+   * left its COGS standing. Mirrors the draw in `createInvoiceInTx`.
+   */
+  private async restoreStockForRejectedInvoice(
+    tx: Prisma.TransactionClient,
+    invoice: { id: string; items?: { productId?: string | null; quantity: number }[] },
+    userId: string,
+  ) {
+    for (const it of invoice.items ?? []) {
+      if (!it.productId) continue;
+      const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+      if (!product?.tracksInventory) continue;
+      const move = await this.inventory.applyMovement({
+        productId: it.productId, qty: it.quantity, type: 'in',
+        refType: 'InvoiceRejected', refId: invoice.id, userId,
+      }, tx);
+      if (move) {
+        await this.posting.postCogsReversal(
+          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
+          tx, userId,
+        );
+      }
+    }
+  }
+
   async rejectInvoice(id: string, userId: string, reason: string, userRole: string, userPermissions: string[] = []) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
+      include: { items: true },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.approvalStatus === 'rejected') return toClient(invoice);
 
@@ -439,6 +472,7 @@ export class InvoicesService {
         // Reverse the issued GL entry that approval posted (idempotent no-op when
         // nothing was posted). A later re-approval re-posts under a versioned id.
         await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
+        await this.restoreStockForRejectedInvoice(tx, invoice, userId);
         return tx.invoice.update({
           where: { id },
           // Clear any prior approval: rejecting a previously-approved invoice must
@@ -455,6 +489,7 @@ export class InvoicesService {
     if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject an invoice you created');
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
+      await this.restoreStockForRejectedInvoice(tx, invoice, userId);
       return tx.invoice.update({
         where: { id },
         // Clear any prior approval (see chain path above).

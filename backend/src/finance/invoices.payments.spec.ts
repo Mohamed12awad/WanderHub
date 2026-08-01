@@ -2,7 +2,7 @@ import { InvoicesService } from './invoices.service';
 
 describe('InvoicesService — inventory effects of rejection', () => {
   // Audit P0: pending creation depletes stock/COGS while rejection reverses only Invoice GL (invoices.service.ts:217-231, 400).
-  it.failing('rejecting an invoice restores stock and leaves no net COGS', async () => {
+  it('rejecting an invoice restores stock and leaves no net COGS', async () => {
     let stockOnHand = 10;
     let netCogs = 0;
     const invoice = {
