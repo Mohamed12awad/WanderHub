@@ -217,22 +217,28 @@ All original P0 items are closed. The last one (`923eab9`) is recorded under "Do
 14. **Conversion endpoints check the source, not the target, permission** — `quotes:create` can mint
     invoices.
 
-### P2 / P3
+### P2 / P3 — all closed except the absent modules
 
-19. Statements scan the full ledger when no period is closed (`statements.service.ts:36-55`).
-20. No fiscal-year close; retained earnings never crystallise.
-21. "Cash flow" is a cash-account delta, not a classified cash-flow statement.
-22. Missing `(period, closedAt)` index; period close does one awaited upsert per account.
-23. Global throttle 100 req/min per IP is too low for a dense ERP behind office NAT — it broke a real
-    session during the audit (`app.module.ts:84`).
-24. FIFO tie-break nondeterministic (`inventory.service.ts:89-92`) — order by `(receivedAt, id)`.
-25. Remaining a11y: ~4 unnamed icon buttons per page (pagination controls); clickable table **rows**
-    still lack keyboard access (per-module `*Row.tsx`, ~10 files); 2 unlabelled inputs per list page.
-26. RTL bidi bug: English titles in Arabic truncate at the **start** (`...oice for Birthday`). Needs
-    `dir="auto"` on mixed-content cells.
-27. Chart of Accounts renders flat although `parentId`/`children` exist and are indexed; default 10
-    rows/page is too low for an ERP.
-28. Absent modules: fixed assets, HR/payroll, manufacturing/BOM. Blueprints in the audit §2.5–2.6.
+Items 19–27 are done (see "Done" above for the commits). Two are worth calling out because the
+resolution differs from what the audit proposed:
+
+- **19 — statements scanning the full ledger: not changed, deliberately.** The scan is real but
+  semantically required — with no closed period there is no snapshot to build on, so the balance
+  genuinely *is* the sum of all history. It already aggregates DB-side and is indexed
+  (`JournalEntry(date, status)`, `JournalLine(accountId)`, `JournalLine(journalEntryId)`). The
+  mitigation is the period-close workflow, which now works correctly.
+- **25 — clickable rows: partially conformant by choice.** Rows are focusable and Enter/Space-
+  activatable, but keep their implicit `row` role. Overriding it to `link`/`button` would strip the
+  table's row/column context from assistive tech — a worse trade in a dense ERP grid. The fully
+  conformant pattern is a real link in each row's primary cell, across ~21 row components. **Follow-up.**
+
+### Still absent — whole modules, not defects
+
+28. **Fixed assets, HR/payroll, manufacturing/BOM.** Blueprints in audit §2.5–2.6. These are greenfield
+    module builds — schema, services, controllers, UI, and their own GL integration seams — not audit
+    remediation. They need their own scoping and a decision about sequencing; nothing here was
+    attempted. Fixed assets is the one with the strongest pull, since its absence is also why the
+    cash-flow statement's investing section is empty by default.
 
 ---
 
