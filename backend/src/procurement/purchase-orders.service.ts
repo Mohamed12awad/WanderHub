@@ -44,25 +44,35 @@ export class PurchaseOrdersService {
     });
     if (!po) throw new BadRequestException('Purchase order not found');
     if (po.approvalStatus !== 'approved') throw new BadRequestException('Purchase order must be approved before receiving');
-    const already = await this.prisma.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: id } });
-    if (already) throw new BadRequestException('Purchase order has already been received');
 
-    for (const it of po.items) {
-      if (!it.productId || it.quantity <= 0) continue;
-      const product = await this.prisma.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
-      if (!product?.tracksInventory) continue;
-      const move = await this.inventory.applyMovement({
-        productId: it.productId, warehouseId, qty: it.quantity, unitCost: Number(it.unitPrice),
-        type: 'in', refType: 'po-receipt', refId: id, note: `PO ${po.poNumber}`, userId,
-      });
-      if (move) {
-        await this.posting.postGrni(
-          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? it.unitPrice), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId, supplierId: po.supplierId },
-          undefined, userId,
-        );
+    // Audit 2026-08 (P0): each line used to commit in its own transaction, with
+    // GRNI posted outside any transaction and the status update only after the
+    // loop. A failure partway through left stock for the earlier lines
+    // committed, the PO still flagged unreceived, and every retry rejected by
+    // the idempotency probe below — permanently unreceivable. Probe, movements,
+    // GRNI postings and the status update now share one transaction.
+    await this.prisma.$transaction(async (tx) => {
+      const already = await tx.stockMovement.findFirst({ where: { refType: 'po-receipt', refId: id } });
+      if (already) throw new BadRequestException('Purchase order has already been received');
+
+      for (const it of po.items) {
+        if (!it.productId || it.quantity <= 0) continue;
+        const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+        if (!product?.tracksInventory) continue;
+        const move = await this.inventory.applyMovement({
+          productId: it.productId, warehouseId, qty: it.quantity, unitCost: Number(it.unitPrice),
+          type: 'in', refType: 'po-receipt', refId: id, note: `PO ${po.poNumber}`, userId,
+        }, tx);
+        if (move) {
+          await this.posting.postGrni(
+            { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? it.unitPrice), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId, supplierId: po.supplierId },
+            tx, userId,
+          );
+        }
       }
-    }
-    await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'received' } });
+      await tx.purchaseOrder.update({ where: { id }, data: { status: 'received' } });
+    });
+
     await this.timeline.log('po.received', `Purchase Order ${po.poNumber} received into stock`, id, 'PurchaseOrder', {}, userId);
     return toClient(await this.prisma.purchaseOrder.findUnique({ where: { id }, include: PO_INCLUDE }));
   }
@@ -201,31 +211,25 @@ export class PurchaseOrdersService {
   }
 
   async updateStatus(id: string, status: string, userId: string) {
+    // Existence check only — the line items are no longer needed here now that
+    // this path does not touch stock.
     const existing = await this.prisma.purchaseOrder.findFirst({
       where: { id, deletedAt: null },
-      include: { items: true },
+      select: { id: true },
     });
     if (!existing) return null;
 
-    const po = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.purchaseOrder.update({
-        where: { id },
-        data: { status: status as Prisma.PurchaseOrderUpdateInput['status'] },
-        include: PO_INCLUDE,
-      });
-      // Receiving the PO brings product-linked items into stock — once, on the
-      // transition into 'received'.
-      if (status === 'received' && existing.status !== 'received') {
-        for (const item of existing.items) {
-          if (item.productId) {
-            await this.inventory.applyMovement(
-              { productId: item.productId, qty: item.quantity, type: 'in', refType: 'PurchaseOrder', refId: id, userId },
-              tx,
-            );
-          }
-        }
-      }
-      return updated;
+    // Audit 2026-08 (P0): this used to ALSO bring items into stock on the
+    // transition to 'received' — with no unit cost (so valuation fell back to
+    // the current average, often zero) and no GRNI posting, keyed
+    // `refType: 'PurchaseOrder'`. Because `receive()` probes for
+    // `refType: 'po-receipt'`, the two paths could not see each other and the
+    // same PO could be received twice: once uncosted here, once costed there.
+    // Stock is now moved only by the dedicated, idempotent `receive()` use case.
+    const po = await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: { status: status as Prisma.PurchaseOrderUpdateInput['status'] },
+      include: PO_INCLUDE,
     });
 
     await this.timeline.log('po.status', `PO status changed to ${status}`, id, 'PurchaseOrder', { status }, userId);
