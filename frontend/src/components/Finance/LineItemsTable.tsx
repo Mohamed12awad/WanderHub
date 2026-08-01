@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TaxRateSelect } from "@/components/common/TaxRateSelect";
@@ -85,11 +85,52 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
     [],
   );
 
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Focus can only move to a row that does not exist yet after React has
+  // rendered it, so the request is parked here and applied in an effect.
+  const [pendingFocus, setPendingFocus] = useState<{ row: number; col: string } | null>(null);
+
+  const focusCell = useCallback((row: number, col: string) => {
+    const el = gridRef.current?.querySelector<HTMLInputElement>(`[data-row="${row}"][data-col="${col}"]`);
+    if (!el) return false;
+    el.focus();
+    el.select?.();
+    return true;
+  }, []);
+
+  useEffect(() => {
+    if (!pendingFocus) return;
+    focusCell(pendingFocus.row, pendingFocus.col);
+    setPendingFocus(null);
+  }, [pendingFocus, focusCell]);
+
   const addRow = () =>
     onChange([...items, { description: "", quantity: 1, unitPrice: 0, discount: 0, taxRate: 0 }]);
 
   const removeRow = (idx: number) =>
     onChange(items.filter((_, i) => i !== idx));
+
+  /**
+   * This grid lives inside the document's <form>, so without intercepting it
+   * Enter in any cell submits the whole invoice — losing the line the user was
+   * still typing. Enter now means "next row", adding one at the end, which is
+   * also how a line-item grid is expected to behave.
+   */
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (event.key !== "Enter" || target.tagName !== "INPUT") return;
+    const row = Number(target.dataset.row);
+    const col = target.dataset.col;
+    if (!col || Number.isNaN(row)) return;
+
+    event.preventDefault();
+    if (row < items.length - 1) {
+      focusCell(row + 1, col);
+      return;
+    }
+    addRow();
+    setPendingFocus({ row: items.length, col });
+  };
 
   const update = (idx: number, field: keyof LineItemRow, value: string | number) => {
     onChange(
@@ -101,7 +142,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
 
   return (
     <div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" ref={gridRef} onKeyDown={handleGridKeyDown}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -151,9 +192,12 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                 </TableCell>
                 <TableCell>
                   <Input
+                    data-row={idx}
+                    data-col="description"
                     value={item.description}
                     onChange={(e) => update(idx, "description", e.target.value)}
                     placeholder={f.description}
+                    aria-label={`${f.description} ${idx + 1}`}
                     className="h-8"
                   />
                 </TableCell>
@@ -161,8 +205,11 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                   <Input
                     type="number"
                     min={0}
+                    data-row={idx}
+                    data-col="quantity"
                     value={item.quantity}
                     onChange={(e) => update(idx, "quantity", e.target.value)}
+                    aria-label={`${f.quantity} ${idx + 1}`}
                     className="h-8 text-right"
                   />
                 </TableCell>
@@ -171,8 +218,11 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     type="number"
                     min={0}
                     step="0.01"
+                    data-row={idx}
+                    data-col="unitPrice"
                     value={item.unitPrice}
                     onChange={(e) => update(idx, "unitPrice", e.target.value)}
+                    aria-label={`${f.unitPrice} ${idx + 1}`}
                     className="h-8 text-right"
                   />
                 </TableCell>
@@ -181,8 +231,11 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     type="number"
                     min={0}
                     max={100}
+                    data-row={idx}
+                    data-col="discount"
                     value={item.discount}
                     onChange={(e) => update(idx, "discount", e.target.value)}
+                    aria-label={`${f.discount} ${idx + 1}`}
                     className="h-8 text-right"
                   />
                 </TableCell>
