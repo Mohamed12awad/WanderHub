@@ -207,20 +207,7 @@ export class InvoicesService {
     }
 
     // A sale draws stock-tracked items out of stock and books COGS.
-    for (const it of lineItems) {
-      if (!it.productId) continue;
-      const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
-      if (!product?.tracksInventory) continue;
-      const move = await this.inventory.applyMovement({
-        productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: inv.id, userId,
-      }, tx);
-      if (move) {
-        await this.posting.postCogs(
-          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
-          tx, userId,
-        );
-      }
-    }
+    await this.drawInvoiceStock(tx, lineItems, inv.id, userId);
 
     // Auto-approved (approvals disabled) → post the issued GL entry now, since
     // approveInvoice won't be called for this invoice.
@@ -272,7 +259,10 @@ export class InvoicesService {
 
   async updateInvoice(id: string, body: UpdateInvoiceDto, user: AuthUser) {
     const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+      include: { items: true },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
     const { items, taxRate, customer: _customer, deal: _deal, issueDate, dueDate, taxInclusive, ...rest } = body;
     const data: Record<string, unknown> = { ...rest };
@@ -291,6 +281,16 @@ export class InvoicesService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (items) {
+        // Audit 2026-08 (P0): changing an approved invoice's lines reset it to
+        // `pending` but left its issued journal entry standing, so re-approval
+        // posted a SECOND entry under a versioned sourceId — an invoice edited
+        // from 114 to 228 ended with AR at 342. The old lines' stock draw was
+        // never undone either. Un-issue the document first: reverse the live
+        // entry and put the old lines' stock back, then re-draw for the new
+        // lines, all inside this transaction.
+        await this.posting.reverseLive('Invoice', id, { createdById: user.id }, tx);
+        await this.restoreInvoiceStock(tx, invoice, user.id, 'InvoiceEdited');
+
         const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
         const inclusive = taxInclusive !== undefined ? taxInclusive : invoice.taxInclusive;
         const totals = calcTotals(items, tr, inclusive);
@@ -304,8 +304,14 @@ export class InvoicesService {
         data.items = { create: totals.items.map((it, idx) => ({ ...it, order: idx })) };
       }
       await tx.invoice.update({ where: { id }, data: data as Prisma.InvoiceUncheckedUpdateInput });
-      // Totals changed → re-derive paid status from the existing payments.
-      if (items) await this.recalcInvoiceTotals(tx, id);
+      if (items) {
+        // Draw stock for the replacement lines, mirroring creation.
+        const tr = taxRate !== undefined ? taxRate : invoice.taxRate;
+        const inclusive = taxInclusive !== undefined ? taxInclusive : invoice.taxInclusive;
+        await this.drawInvoiceStock(tx, calcTotals(items, tr, inclusive).items, id, user.id);
+        // Totals changed → re-derive paid status from the existing payments.
+        await this.recalcInvoiceTotals(tx, id);
+      }
       return tx.invoice.findUnique({ where: { id }, include: INVOICE_INCLUDE });
     });
     return toClient(updated);
@@ -366,7 +372,10 @@ export class InvoicesService {
 
   async deleteInvoice(id: string, user: AuthUser) {
     const scopeWhere = await this.visibility.ownershipWhere(user, 'invoices', 'createdById');
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null, ...scopeWhere } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null, ...scopeWhere },
+      include: { items: true },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
     // Deleting an invoice that has recorded payments would hide the document
     // while its payments — and the account balance they moved — remain. Require
@@ -375,9 +384,19 @@ export class InvoicesService {
     if (paymentCount > 0) {
       throw new BadRequestException('Cannot delete an invoice that has payments. Delete its payments first.');
     }
-    // Soft delete; payment history is preserved for audit but excluded from
-    // listings (payments are filtered by invoice.deletedAt).
-    await this.prisma.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
+
+    // Audit 2026-08 (P0): this used to soft-delete with NO reversal, so AR,
+    // revenue, tax, stock depletion and COGS all stayed in the ledger for a
+    // document that had vanished from every listing — invisible, permanent
+    // overstatement. Void the postings and return the stock in the same
+    // transaction as the delete.
+    await this.prisma.$transaction(async (tx) => {
+      await this.posting.reverseLive('Invoice', id, { createdById: user.id }, tx);
+      await this.restoreInvoiceStock(tx, invoice, user.id, 'InvoiceDeleted');
+      // Soft delete; payment history is preserved for audit but excluded from
+      // listings (payments are filtered by invoice.deletedAt).
+      await tx.invoice.update({ where: { id }, data: { deletedAt: new Date() } });
+    });
     return true;
   }
 
@@ -425,18 +444,43 @@ export class InvoicesService {
     return toClient(updated);
   }
 
+  /** Draws stock for a sale's lines and books the COGS. */
+  private async drawInvoiceStock(
+    tx: Prisma.TransactionClient,
+    lineItems: { productId?: string | null; quantity: number }[],
+    invoiceId: string,
+    userId: string,
+  ) {
+    for (const it of lineItems) {
+      if (!it.productId) continue;
+      const product = await tx.product.findUnique({ where: { id: it.productId }, select: { tracksInventory: true } });
+      if (!product?.tracksInventory) continue;
+      const move = await this.inventory.applyMovement({
+        productId: it.productId, qty: -it.quantity, type: 'out', refType: 'Invoice', refId: invoiceId, userId,
+      }, tx);
+      if (move) {
+        await this.posting.postCogs(
+          { id: move.id, qty: move.qty, unitCost: Number(move.unitCost ?? 0), date: move.createdAt, productId: it.productId, warehouseId: move.warehouseId },
+          tx, userId,
+        );
+      }
+    }
+  }
+
   /**
-   * Puts back the stock a sale drew and reverses its COGS.
+   * Puts back the stock a sale drew and reverses its COGS — the inverse of
+   * `drawInvoiceStock`.
    *
    * Audit 2026-08 (P0): invoice creation depletes stock and books COGS
-   * unconditionally — before approval — but rejection reversed only the
-   * `Invoice` journal, so a rejected sale permanently consumed inventory and
-   * left its COGS standing. Mirrors the draw in `createInvoiceInTx`.
+   * unconditionally — before approval — but neither rejection, post-approval
+   * edits, nor deletion put any of it back, so a sale that never completed
+   * consumed inventory permanently and left its COGS standing.
    */
-  private async restoreStockForRejectedInvoice(
+  private async restoreInvoiceStock(
     tx: Prisma.TransactionClient,
     invoice: { id: string; items?: { productId?: string | null; quantity: number }[] },
     userId: string,
+    refType: string,
   ) {
     for (const it of invoice.items ?? []) {
       if (!it.productId) continue;
@@ -444,7 +488,7 @@ export class InvoicesService {
       if (!product?.tracksInventory) continue;
       const move = await this.inventory.applyMovement({
         productId: it.productId, qty: it.quantity, type: 'in',
-        refType: 'InvoiceRejected', refId: invoice.id, userId,
+        refType, refId: invoice.id, userId,
       }, tx);
       if (move) {
         await this.posting.postCogsReversal(
@@ -472,7 +516,7 @@ export class InvoicesService {
         // Reverse the issued GL entry that approval posted (idempotent no-op when
         // nothing was posted). A later re-approval re-posts under a versioned id.
         await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
-        await this.restoreStockForRejectedInvoice(tx, invoice, userId);
+        await this.restoreInvoiceStock(tx, invoice, userId, 'InvoiceRejected');
         return tx.invoice.update({
           where: { id },
           // Clear any prior approval: rejecting a previously-approved invoice must
@@ -489,7 +533,7 @@ export class InvoicesService {
     if (invoice.createdById === userId && !userPermissions.includes('*')) throw new ForbiddenException('You cannot reject an invoice you created');
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);
-      await this.restoreStockForRejectedInvoice(tx, invoice, userId);
+      await this.restoreInvoiceStock(tx, invoice, userId, 'InvoiceRejected');
       return tx.invoice.update({
         where: { id },
         // Clear any prior approval (see chain path above).
