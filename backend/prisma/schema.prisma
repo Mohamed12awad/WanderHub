@@ -1454,6 +1454,10 @@ model AccountBalance {
 
   @@unique([accountId, period])
   @@index([accountId, period])
+  // Statements and the posting lock filter by period first (and by closedAt),
+  // but every existing index led with accountId — so those hot queries scanned
+  // a material share of the table once snapshots accumulate (audit 2026-08).
+  @@index([period, closedAt])
 }
 
 // ─── Cost Centers (Analytic Accounts) ─────────────────────────────────────────

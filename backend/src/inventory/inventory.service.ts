@@ -112,7 +112,9 @@ export class InventoryService {
     let totalCost = 0;
     const layers = await db.stockCostLayer.findMany({
       where: { productId, warehouseId, remainingQty: { gt: 0 } },
-      orderBy: { receivedAt: 'asc' },
+      // Tie-break on id so same-timestamp layers consume in a stable order —
+      // otherwise COGS for an identical sale is not reproducible (audit 2026-08).
+      orderBy: [{ receivedAt: 'asc' }, { id: 'asc' }],
     });
     for (const l of layers) {
       if (remaining <= 1e-9) break;

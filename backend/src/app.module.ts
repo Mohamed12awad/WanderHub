@@ -81,7 +81,11 @@ import { ProductCategoriesModule } from './product-categories/product-categories
         autoLogging: { ignore: (req) => (req as { url?: string }).url?.includes('/health') },
       },
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    // Audit 2026-08: 100/min per IP was too low for a dense ERP — one screen
+    // fires many parallel calls and a whole office shares one NAT address, which
+    // knocked a real session out during the audit. Raised here; the strict
+    // per-route limits on /auth and /emails still apply on top.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 600 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
     WorkspaceConfigModule,
