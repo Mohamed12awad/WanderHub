@@ -45,6 +45,14 @@ export class StatementsController {
     return this.statements.balanceSheet(asOf);
   }
 
+  // Classified into operating / investing / financing. The original
+  // /cash-flow endpoint is kept for the existing treasury view.
+  @Get('cash-flow/classified')
+  @RequirePermission('accounting:view')
+  cashFlowClassified(@Query('start') start?: string, @Query('end') end?: string) {
+    return this.statements.cashFlowClassified(start, end);
+  }
+
   @Get('cash-flow')
   @RequirePermission('accounting:view')
   cashFlow(@Query('start') start?: string, @Query('end') end?: string) {

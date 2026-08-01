@@ -1364,6 +1364,11 @@ model ChartOfAccount {
   children      ChartOfAccount[] @relation("CoaHierarchy")
   isActive      Boolean          @default(true)
   currency      String           @default("EGP")
+  // Cash-flow statement section: 'operating' | 'investing' | 'financing'.
+  // Null falls back to a default derived from `type` (see StatementsService) —
+  // set it explicitly where the default is wrong, e.g. a bank loan sitting in
+  // liabilities belongs to financing rather than operating.
+  cashFlowCategory String?
   cashAccountId String?          @unique
   cashAccount   Account?         @relation(fields: [cashAccountId], references: [id], onDelete: SetNull)
   createdAt     DateTime         @default(now())

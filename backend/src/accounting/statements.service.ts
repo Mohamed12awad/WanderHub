@@ -153,6 +153,110 @@ export class StatementsService {
     };
   }
 
+  /**
+   * Default cash-flow section for an account type, used when the account has no
+   * explicit `cashFlowCategory`.
+   *
+   * Only equity defaults to financing; everything else defaults to operating,
+   * and investing is reached solely by explicit tagging.
+   *
+   * A type-based guess cannot do better than that. The working-capital accounts
+   * that dominate real cash movement — receivables, payables, inventory,
+   * prepayments — are operating, yet they span both `asset` and `liability`, so
+   * a rule like "asset ⇒ investing" misfiles AR collections as investing cash.
+   * (It did exactly that on the seeded data before this was corrected.) Making
+   * operating the residual keeps the common case right and confines the error
+   * to the section where a misclassification distorts least; genuine investing
+   * accounts — fixed assets, investments — are tagged per account instead.
+   */
+  private static defaultCashFlowSection(type: string): 'operating' | 'investing' | 'financing' {
+    return type === 'equity' ? 'financing' : 'operating';
+  }
+
+  /**
+   * Classified cash-flow statement over [start, end].
+   *
+   * Audit 2026-08 (P2 item 21): this reported only the net change per cash
+   * account — a treasury view, not a cash-flow statement, since nothing was
+   * classified into operating / investing / financing.
+   *
+   * Method: every journal entry that touches a cash account is balanced, so the
+   * negation of its NON-cash lines partitions that entry's cash movement
+   * exactly. Each non-cash line is therefore attributed in full to its account's
+   * section — no pro-rata approximation, and the sections always re-sum to the
+   * net change on the cash accounts.
+   */
+  async cashFlowClassified(start?: string, end?: string) {
+    const endAt = end ? endOfDay(end) : new Date();
+    const startAt = start ? startOfDay(start) : new Date(0);
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{ code: string; name: string; type: string; category: string | null; amount: number }>
+    >(Prisma.sql`
+      SELECT coa.code, coa.name, coa.type::text AS type, coa."cashFlowCategory" AS category,
+             COALESCE(SUM(-jl."baseAmount"), 0)::float8 AS amount
+      FROM "JournalLine" jl
+      JOIN "JournalEntry" je ON je.id = jl."journalEntryId"
+      JOIN "ChartOfAccount" coa ON coa.id = jl."accountId"
+      WHERE je.status <> 'draft'
+        AND je.date >= ${startAt} AND je.date <= ${endAt}
+        AND coa."cashAccountId" IS NULL
+        AND je.id IN (
+          SELECT l."journalEntryId" FROM "JournalLine" l
+          JOIN "ChartOfAccount" c ON c.id = l."accountId"
+          WHERE c."cashAccountId" IS NOT NULL
+        )
+      GROUP BY coa.code, coa.name, coa.type, coa."cashFlowCategory"
+      HAVING ABS(COALESCE(SUM(jl."baseAmount"), 0)) > 0.005
+      ORDER BY coa.code ASC
+    `);
+
+    const sections = { operating: [] as typeof rows, investing: [] as typeof rows, financing: [] as typeof rows };
+    for (const r of rows) {
+      const section = (r.category as keyof typeof sections) ?? StatementsService.defaultCashFlowSection(r.type);
+      (sections[section] ?? sections.operating).push(r);
+    }
+
+    const sum = (list: typeof rows) => list.reduce((s, r) => s + r.amount, 0);
+    const fmt = (list: typeof rows) =>
+      list.map((r) => ({ code: r.code, name: r.name, amount: money(r.amount) }));
+
+    const [opening, closing] = await this.cashPosition(start, end);
+    const operating = sum(sections.operating);
+    const investing = sum(sections.investing);
+    const financing = sum(sections.financing);
+
+    return {
+      start: start ?? null, end: end ?? null,
+      operating: { rows: fmt(sections.operating), total: money(operating) },
+      investing: { rows: fmt(sections.investing), total: money(investing) },
+      financing: { rows: fmt(sections.financing), total: money(financing) },
+      netChange: money(operating + investing + financing),
+      openingCash: money(opening),
+      closingCash: money(closing),
+      // The three sections must reconcile to the movement on the cash accounts.
+      reconciles: Math.abs(operating + investing + financing - (closing - opening)) < 0.01,
+    };
+  }
+
+  /** Opening and closing cash across every cash/bank-linked GL account. */
+  private async cashPosition(start?: string, end?: string): Promise<[number, number]> {
+    const endAt = end ? endOfDay(end) : undefined;
+    const startAt = start ? new Date(startOfDay(start).getTime() - 1) : undefined;
+    const [endBal, startBal, cashAccounts] = await Promise.all([
+      this.closingBalances(endAt),
+      startAt ? this.closingBalances(startAt) : Promise.resolve(new Map<string, number>()),
+      this.prisma.chartOfAccount.findMany({
+        where: { deletedAt: null, cashAccountId: { not: null } },
+        select: { id: true },
+      }),
+    ]);
+    return [
+      cashAccounts.reduce((s, a) => s + (startBal.get(a.id) ?? 0), 0),
+      cashAccounts.reduce((s, a) => s + (endBal.get(a.id) ?? 0), 0),
+    ];
+  }
+
   /** Cash flow over [start, end]: net change on cash/bank GL accounts. */
   async cashFlow(start?: string, end?: string) {
     const endAt = end ? endOfDay(end) : undefined;
