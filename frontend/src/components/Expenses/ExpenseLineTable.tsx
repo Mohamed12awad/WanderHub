@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useCallback } from "react";
+import { useGridKeyboardNav } from "@/hooks/useGridKeyboardNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,18 +55,20 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
     );
   };
 
-  const addRow = () => onChange([...lines, blankLine()]);
+  const addRow = useCallback(() => onChange([...lines, blankLine()]), [lines, onChange]);
 
   const removeRow = (idx: number) => {
     if (lines.length === 1) return;
     onChange(lines.filter((_, i) => i !== idx));
   };
 
+  const { gridRef, onKeyDown } = useGridKeyboardNav(lines.length, addRow);
+
   const total = lines.reduce((sum, row) => sum + (row.amount || 0), 0);
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-md border" ref={gridRef} onKeyDown={onKeyDown}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -89,9 +92,12 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
               <TableRow key={idx}>
                 <TableCell>
                   <Input
+                    data-row={idx}
+                    data-col="description"
                     value={row.description}
                     onChange={(e) => update(idx, "description", e.target.value)}
                     placeholder="Description"
+                    aria-label={`Description ${idx + 1}`}
                     className="h-8"
                   />
                 </TableCell>
@@ -100,8 +106,11 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
                     type="number"
                     min={0}
                     step="0.01"
+                    data-row={idx}
+                    data-col="amount"
                     value={row.amount || ""}
                     onChange={(e) => update(idx, "amount", e.target.value)}
+                    aria-label={`Amount ${idx + 1}`}
                     className="h-8"
                   />
                 </TableCell>
@@ -127,9 +136,12 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
                 </TableCell>
                 <TableCell>
                   <Input
+                    data-row={idx}
+                    data-col="beneficiary"
                     value={row.beneficiary}
                     onChange={(e) => update(idx, "beneficiary", e.target.value)}
                     placeholder="Beneficiary"
+                    aria-label={`Beneficiary ${idx + 1}`}
                     className="h-8"
                   />
                 </TableCell>
