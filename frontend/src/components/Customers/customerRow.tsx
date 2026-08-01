@@ -47,14 +47,14 @@ const CustomerRow: React.FC<CustomerRowProps> = ({ item, handleDelete, selection
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/customers/${item._id}`)}>
       {selectionCell}
-      <TableCell className="font-medium">{item.name}</TableCell>
+      <TableCell dir="auto" className="font-medium">{item.name}</TableCell>
       <TableCell>
         <Badge variant="outline" className={`${STATUS_COLORS[item.status] ?? ""} capitalize w-fit`}>
           {tr.contacts.statuses?.[item.status] ?? item.status}
         </Badge>
       </TableCell>
-      <TableCell className="text-foreground/70">{item.phone}</TableCell>
-      <TableCell className="text-foreground/70 capitalize">{item.location}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{item.phone}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70 capitalize">{item.location}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

@@ -58,7 +58,7 @@ const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete, selectionCell }) 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/leads/${item._id}`)}>
       {selectionCell}
-      <TableCell>
+      <TableCell dir="auto">
         <div className="font-medium">{item.name}</div>
         {item.company && <div className="text-xs text-muted-foreground">{item.company}</div>}
       </TableCell>
@@ -75,9 +75,9 @@ const LeadRow: React.FC<LeadRowProps> = ({ item, handleDelete, selectionCell }) 
           </span>
         )}
       </TableCell>
-      <TableCell className="text-foreground/70">{item.phone}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{item.phone}</TableCell>
       <TableCell className="text-foreground/70 capitalize">{item.source}</TableCell>
-      <TableCell className="text-foreground/70">{item.owner?.name}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{item.owner?.name}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

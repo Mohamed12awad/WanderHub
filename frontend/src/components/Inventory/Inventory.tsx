@@ -146,8 +146,8 @@ export function Inventory() {
         emptyMessage={inv.empty}
         renderRow={(it) => (
           <TableRow key={it._id}>
-            <TableCell className="font-medium">{it.product?.name ?? it.productId}</TableCell>
-            <TableCell className="text-sm">{it.warehouse?.name ?? "—"}</TableCell>
+            <TableCell dir="auto" className="font-medium">{it.product?.name ?? it.productId}</TableCell>
+            <TableCell dir="auto" className="text-sm">{it.warehouse?.name ?? "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{it.location ?? "—"}</TableCell>
             <TableCell className="text-right font-mono">{it.quantityOnHand}</TableCell>
             <TableCell className="text-right font-mono">{it.reorderLevel}</TableCell>

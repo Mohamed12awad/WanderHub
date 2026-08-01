@@ -167,7 +167,7 @@ export default function ApprovalsSettings() {
                       <div key={idx} className="rounded-lg border p-3 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-medium">Step {idx + 1}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeStep(mod.key, idx)}>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Remove approval step ${idx + 1}`} onClick={() => removeStep(mod.key, idx)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>

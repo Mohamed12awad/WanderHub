@@ -22,9 +22,9 @@ const InvoiceRow: React.FC<{
       className="cursor-pointer hover:bg-muted/40"
       onClick={() => navigate(`/finance/invoices/${inv._id}`)}
     >
-      <TableCell className="font-mono text-xs text-muted-foreground">{inv.invoiceNumber}</TableCell>
-      <TableCell className="font-medium max-w-[180px] truncate">{inv.title}</TableCell>
-      <TableCell>
+      <TableCell dir="auto" className="font-mono text-xs text-muted-foreground">{inv.invoiceNumber}</TableCell>
+      <TableCell dir="auto" className="font-medium max-w-[180px] truncate">{inv.title}</TableCell>
+      <TableCell dir="auto">
         <Link
           to={`/customers/${inv.customer._id}`}
           className="text-primary hover:underline text-sm"
@@ -36,11 +36,11 @@ const InvoiceRow: React.FC<{
       <TableCell>
         <FinanceStatusBadge status={inv.status} type="invoice" />
       </TableCell>
-      <TableCell className="text-right font-medium tabular-nums">
+      <TableCell dir="auto" className="text-right font-medium tabular-nums">
         {inv.total.toLocaleString()}{" "}
         <span className="text-xs text-muted-foreground">{inv.currency}</span>
       </TableCell>
-      <TableCell className={`text-right font-medium tabular-nums ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
+      <TableCell dir="auto" className={`text-right font-medium tabular-nums ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
         {outstanding.toLocaleString()}{" "}
         <span className="text-xs opacity-70">{inv.currency}</span>
       </TableCell>

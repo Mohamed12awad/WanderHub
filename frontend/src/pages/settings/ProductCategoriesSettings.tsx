@@ -72,15 +72,15 @@ export default function ProductCategoriesSettings() {
         emptyMessage="No categories yet."
         renderRow={(c, handleDelete) => (
           <TableRow key={c._id}>
-            <TableCell className="font-medium">{c.name}{c.code && <span className="ms-2 font-mono text-xs text-muted-foreground">{c.code}</span>}</TableCell>
+            <TableCell dir="auto" className="font-medium">{c.name}{c.code && <span className="ms-2 font-mono text-xs text-muted-foreground">{c.code}</span>}</TableCell>
             <TableCell>
               {c.costMethod ? <Badge variant="outline">{METHOD_LABEL[c.costMethod] ?? c.costMethod}</Badge> : <span className="text-xs text-muted-foreground">Org default</span>}
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">{c._count?.products ?? 0}</TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(c._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${c.name}`} onClick={() => handleDelete(c._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </TableCell>
           </TableRow>

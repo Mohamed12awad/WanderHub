@@ -71,7 +71,7 @@ export default function AiSettings() {
           {s.save}
         </Button>
         {configured && (
-          <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive" onClick={() => delKey.mutate({ p, scope })}>
+          <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive" aria-label={`Delete ${p} ${scope} key`} onClick={() => delKey.mutate({ p, scope })}>
             <Trash2 className="h-4 w-4" />
           </Button>
         )}

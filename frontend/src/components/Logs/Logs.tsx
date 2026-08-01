@@ -313,10 +313,10 @@ export function Logs() {
                 {paginationInfo?.total != null && ` · ${paginationInfo.total.toLocaleString()} entries`}
               </span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Next page" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>

@@ -370,12 +370,14 @@ export default function ViewProject() {
                       )}
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <button
+                          type="button"
+                          aria-label={`Edit milestone ${m.title}`}
                           onClick={() => setEditingMs({ id: m._id, title: m.title, description: m.description ?? "", dueDate: m.dueDate ? m.dueDate.substring(0, 10) : "", estimatedCost: m.estimatedCost != null ? String(m.estimatedCost) : "" })}
                           className="p-1 rounded hover:bg-muted"
                         >
                           <Pencil className="h-3 w-3 text-muted-foreground" />
                         </button>
-                        <button onClick={() => setDeleteMsId(m._id)} className="p-1 rounded hover:bg-muted text-destructive opacity-60 hover:opacity-100">
+                        <button type="button" aria-label={`Delete milestone ${m.title}`} onClick={() => setDeleteMsId(m._id)} className="p-1 rounded hover:bg-muted text-destructive opacity-60 hover:opacity-100">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -479,6 +481,8 @@ export default function ViewProject() {
                 return (
                   <div key={task._id} className={cn("group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 hover:shadow-sm transition-all", task.status === "done" && "opacity-60")}>
                     <button
+                      type="button"
+                      aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"}: ${task.title}`}
                       onClick={() => completeMut.mutate(task._id)}
                       className={cn(
                         "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
@@ -520,10 +524,10 @@ export default function ViewProject() {
                     </div>
 
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditTask(task); setTaskPanelOpen(true); }} className="p-1 rounded hover:bg-muted">
+                      <button type="button" aria-label={`Edit task ${task.title}`} onClick={() => { setEditTask(task); setTaskPanelOpen(true); }} className="p-1 rounded hover:bg-muted">
                         <Pencil className="h-3 w-3 text-muted-foreground" />
                       </button>
-                      <button onClick={() => deleteTaskMut.mutate(task._id)} className="p-1 rounded hover:bg-muted text-destructive opacity-60 hover:opacity-100">
+                      <button type="button" aria-label={`Delete task ${task.title}`} onClick={() => deleteTaskMut.mutate(task._id)} className="p-1 rounded hover:bg-muted text-destructive opacity-60 hover:opacity-100">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
@@ -545,8 +549,8 @@ export default function ViewProject() {
                   {invoices.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No invoices</TableCell></TableRow>}
                   {invoices.map((inv: any) => (
                     <TableRow key={inv._id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/finance/invoices/${inv._id}`)}>
-                      <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
-                      <TableCell className="tabular-nums">{inv.total?.toLocaleString()} {inv.currency}</TableCell>
+                      <TableCell dir="auto" className="font-medium">{inv.invoiceNumber}</TableCell>
+                      <TableCell dir="auto" className="tabular-nums">{inv.total?.toLocaleString()} {inv.currency}</TableCell>
                       <TableCell className="tabular-nums">{inv.totalPaid?.toLocaleString()}</TableCell>
                       <TableCell className="capitalize">{inv.status?.replace("_", " ")}</TableCell>
                     </TableRow>
@@ -564,7 +568,7 @@ export default function ViewProject() {
                   {expenses.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">No expenses</TableCell></TableRow>}
                   {expenses.map((ex: any) => (
                     <TableRow key={ex._id} className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/expenses/${ex._id}`)}>
-                      <TableCell className="font-medium">{ex.title}</TableCell>
+                      <TableCell dir="auto" className="font-medium">{ex.title}</TableCell>
                       <TableCell className="tabular-nums">{(ex.expenses ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0).toLocaleString()}</TableCell>
                       <TableCell className="capitalize">{ex.approvalStatus}</TableCell>
                     </TableRow>
@@ -600,7 +604,7 @@ export default function ViewProject() {
                     <p className="text-sm font-medium truncate">{m.user?.name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{m.role}</p>
                   </div>
-                  <button onClick={() => removeMemberMutation.mutate(m.user?._id)} className="text-destructive opacity-50 hover:opacity-100">
+                  <button type="button" aria-label={`Remove ${m.user?.name ?? "team member"}`} onClick={() => removeMemberMutation.mutate(m.user?._id)} className="text-destructive opacity-50 hover:opacity-100">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>

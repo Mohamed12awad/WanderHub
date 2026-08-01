@@ -30,16 +30,16 @@ const VendorBillRow: React.FC<Props> = ({ _id, billNumber, title, supplier, stat
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/procurement/bills/${_id}`)}>
-      <TableCell className="font-medium">{billNumber}</TableCell>
-      <TableCell>{title}</TableCell>
-      <TableCell className="text-muted-foreground">{supplierName ?? "—"}</TableCell>
+      <TableCell dir="auto" className="font-medium">{billNumber}</TableCell>
+      <TableCell dir="auto">{title}</TableCell>
+      <TableCell dir="auto" className="text-muted-foreground">{supplierName ?? "—"}</TableCell>
       <TableCell><ProcurementStatusBadge status={status} /></TableCell>
-      <TableCell className="tabular-nums">{total?.toLocaleString()} {currency}</TableCell>
-      <TableCell className={`tabular-nums font-medium ${outstanding > 0 ? "text-destructive" : "text-emerald-600"}`}>{outstanding.toLocaleString()} {currency}</TableCell>
+      <TableCell dir="auto" className="tabular-nums">{total?.toLocaleString()} {currency}</TableCell>
+      <TableCell dir="auto" className={`tabular-nums font-medium ${outstanding > 0 ? "text-destructive" : "text-emerald-600"}`}>{outstanding.toLocaleString()} {currency}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="opacity-0 group-hover:opacity-100 transition"><MoreHorizontal className="h-4 w-4" /></button>
+            <button type="button" aria-label={tr.common.actions} className="opacity-0 group-hover:opacity-100 transition"><MoreHorizontal className="h-4 w-4" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <Link to={`/procurement/bills/${_id}`}><DropdownMenuItem>{tr.common.view ?? "View"}</DropdownMenuItem></Link>

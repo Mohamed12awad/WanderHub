@@ -39,7 +39,7 @@ export default function BalanceSheet() {
         <TableRow><TableCell colSpan={2} className="text-sm text-muted-foreground ps-6">{accounting.none}</TableCell></TableRow>
       ) : rows.map((r) => (
         <TableRow key={r.code + r.name}>
-          <TableCell className="ps-6"><span className="font-mono text-xs text-muted-foreground me-2">{r.code}</span>{r.name}</TableCell>
+          <TableCell dir="auto" className="ps-6"><span className="font-mono text-xs text-muted-foreground me-2">{r.code}</span>{r.name}</TableCell>
           <TableCell className="text-right font-mono">{num(r.amount)}</TableCell>
         </TableRow>
       ))}

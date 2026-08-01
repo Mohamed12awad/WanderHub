@@ -322,11 +322,11 @@ const QuoteDetail: React.FC = () => {
               <TableBody>
                 {quote.items.map((item, idx) => (
                   <TableRow key={idx}>
-                    <TableCell>{item.description}</TableCell>
+                    <TableCell dir="auto">{item.description}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.unitPrice.toLocaleString()}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.discount}%</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {quote.currency}</TableCell>
+                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {quote.currency}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

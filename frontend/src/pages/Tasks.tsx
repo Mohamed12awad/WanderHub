@@ -54,6 +54,8 @@ function TaskCard({
     <div className={cn("group rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-all", task.status === "done" && "opacity-60")}>
       <div className="flex items-start gap-2">
         <button
+          type="button"
+          aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"}: ${task.title}`}
           onClick={onComplete}
           className={cn(
             "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors",

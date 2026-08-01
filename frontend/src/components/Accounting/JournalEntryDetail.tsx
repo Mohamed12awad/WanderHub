@@ -140,7 +140,7 @@ export default function JournalEntryDetail() {
               {entry.lines.map((l) => (
                 <TableRow key={l._id}>
                   <TableCell className="font-mono text-xs">{l.account?.code}</TableCell>
-                  <TableCell>{l.account?.name}</TableCell>
+                  <TableCell dir="auto">{l.account?.name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{l.memo ?? ""}</TableCell>
                   <TableCell className="text-right font-mono">{fmt(l.debit)}</TableCell>
                   <TableCell className="text-right font-mono">{fmt(l.credit)}</TableCell>

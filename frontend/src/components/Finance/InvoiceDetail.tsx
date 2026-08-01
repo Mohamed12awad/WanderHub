@@ -344,11 +344,11 @@ const InvoiceDetail: React.FC = () => {
               <TableBody>
                 {invoice.items.map((item, idx) => (
                   <TableRow key={idx}>
-                    <TableCell>{item.description}</TableCell>
+                    <TableCell dir="auto">{item.description}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.unitPrice.toLocaleString()}</TableCell>
                     <TableCell className="text-right tabular-nums">{item.discount}%</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {invoice.currency}</TableCell>
+                    <TableCell dir="auto" className="text-right tabular-nums font-medium">{item.total.toLocaleString()} {invoice.currency}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -412,19 +412,19 @@ const InvoiceDetail: React.FC = () => {
                 {payments.map((p) => (
                   <TableRow key={p._id}>
                     <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">{p.amount.toLocaleString()} {p.currency}</TableCell>
+                    <TableCell dir="auto" className="text-right font-medium tabular-nums">{p.amount.toLocaleString()} {p.currency}</TableCell>
                     <TableCell className="capitalize">
                       {f.paymentMethods[p.method] ?? p.method}
                     </TableCell>
-                    <TableCell className="">{p.reference ?? "—"}</TableCell>
-                    <TableCell className="">{p.createdBy?.name}</TableCell>
+                    <TableCell dir="auto" className="">{p.reference ?? "—"}</TableCell>
+                    <TableCell dir="auto" className="">{p.createdBy?.name}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPayment(p)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit payment ${p.reference ?? p._id}`} onClick={() => setEditingPayment(p)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         {canDelete && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletePaymentId(p._id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete payment ${p.reference ?? p._id}`} onClick={() => setDeletePaymentId(p._id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}

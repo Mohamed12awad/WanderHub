@@ -36,14 +36,14 @@ export default function PurchaseOrderRow({ po, handleDelete }: Props) {
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/procurement/purchase-orders/${po._id}`)}>
-      <TableCell className="font-medium">{po.poNumber}</TableCell>
-      <TableCell>{po.supplier?.name || "-"}</TableCell>
+      <TableCell dir="auto" className="font-medium">{po.poNumber}</TableCell>
+      <TableCell dir="auto">{po.supplier?.name || "-"}</TableCell>
       <TableCell>
         <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(po.status)}`}>
           {tr.purchaseOrders.statuses[po.status] ?? po.status}
         </span>
       </TableCell>
-      <TableCell className="font-medium">
+      <TableCell dir="auto" className="font-medium">
         {po.total.toLocaleString()} {po.currency}
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">

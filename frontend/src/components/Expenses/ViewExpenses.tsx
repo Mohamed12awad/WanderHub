@@ -349,19 +349,20 @@ const ViewExpense = () => {
               <TableBody>
                 {formData.expenses.map((expense) => (
                   <TableRow key={expense._id}>
-                    <TableCell>{expense.description}</TableCell>
+                    <TableCell dir="auto">{expense.description}</TableCell>
                     <TableCell className="tabular-nums">{expense.amount.toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {new Date(expense.date).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="capitalize">{expense.category}</TableCell>
-                    <TableCell>{expense.beneficiary}</TableCell>
+                    <TableCell dir="auto">{expense.beneficiary}</TableCell>
                     {canDeleteItem && (
                       <TableCell>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
+                          aria-label={`Delete ${expense.description}`}
                           onClick={() => handleDeleteItem(expenseId!, expense._id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />

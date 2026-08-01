@@ -82,13 +82,13 @@ export default function AccountLedger() {
                 {ledger.data.map((l) => (
                   <TableRow key={l._id} className={l.status === "reversed" ? "opacity-60" : ""}>
                     <TableCell className="text-xs">{new Date(l.date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell dir="auto" className="font-mono text-xs">
                       <Link to={`/accounting/journal/${l.entryId}`} className="text-primary hover:underline">{l.entryNumber}</Link>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell dir="auto" className="text-xs text-muted-foreground">
                       {a.sources[l.sourceType] ?? l.sourceType}{l.status === "reversed" && <Badge variant="outline" className="ms-1 text-[10px]">{a.statuses.reversed}</Badge>}
                     </TableCell>
-                    <TableCell className="text-sm">{l.memo ?? "—"}</TableCell>
+                    <TableCell dir="auto" className="text-sm">{l.memo ?? "—"}</TableCell>
                     <TableCell className="text-right font-mono">{parseFloat(l.debit) ? num(l.debit) : ""}</TableCell>
                     <TableCell className="text-right font-mono">{parseFloat(l.credit) ? num(l.credit) : ""}</TableCell>
                   </TableRow>

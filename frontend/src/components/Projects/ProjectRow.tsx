@@ -36,16 +36,16 @@ const ProjectRow: React.FC<Props> = ({ _id, name, customer, manager, status, bud
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/projects/${_id}`)}>
-      <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="text-muted-foreground">{customer?.name ?? "—"}</TableCell>
-      <TableCell className="text-muted-foreground">{manager?.name ?? "—"}</TableCell>
+      <TableCell dir="auto" className="font-medium">{name}</TableCell>
+      <TableCell dir="auto" className="text-muted-foreground">{customer?.name ?? "—"}</TableCell>
+      <TableCell dir="auto" className="text-muted-foreground">{manager?.name ?? "—"}</TableCell>
       <TableCell><Badge variant="outline" className={`${STATUS_COLORS[status] ?? ""} capitalize`}>{status?.replace("_", " ")}</Badge></TableCell>
-      <TableCell className="tabular-nums">{budget ? `${budget.toLocaleString()} ${currency}` : "—"}</TableCell>
+      <TableCell dir="auto" className="tabular-nums">{budget ? `${budget.toLocaleString()} ${currency}` : "—"}</TableCell>
       <TableCell className="text-muted-foreground text-xs">{endDate ? new Date(endDate).toLocaleDateString() : "—"}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="opacity-0 group-hover:opacity-100 transition"><MoreHorizontal className="h-4 w-4" /></button>
+            <button type="button" aria-label={tr.common.actions} className="opacity-0 group-hover:opacity-100 transition"><MoreHorizontal className="h-4 w-4" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <Link to={`/projects/${_id}`}><DropdownMenuItem>{tr.common.view ?? "View"}</DropdownMenuItem></Link>

@@ -15,9 +15,9 @@ export default function SupplierRow({ supplier, handleDelete }: Props) {
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/procurement/suppliers/${supplier._id}`)}>
-      <TableCell className="font-medium">{supplier.name}</TableCell>
-      <TableCell>{supplier.contactName || "-"}</TableCell>
-      <TableCell>{supplier.email || "-"}</TableCell>
+      <TableCell dir="auto" className="font-medium">{supplier.name}</TableCell>
+      <TableCell dir="auto">{supplier.contactName || "-"}</TableCell>
+      <TableCell dir="auto">{supplier.email || "-"}</TableCell>
       <TableCell>
         <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${

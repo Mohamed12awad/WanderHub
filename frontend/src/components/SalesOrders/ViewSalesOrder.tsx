@@ -304,7 +304,7 @@ export default function ViewSalesOrder() {
             <TableBody>
               {(so.items ?? []).map((it: any, i: number) => (
                 <TableRow key={it.id ?? it._id ?? i}>
-                  <TableCell>{it.description}</TableCell>
+                  <TableCell dir="auto">{it.description}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell>
                   <TableCell className="text-right tabular-nums">{it.discount ?? 0}</TableCell>

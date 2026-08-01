@@ -116,7 +116,7 @@ export default function ApiKeysSettings() {
           </DialogHeader>
           <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-2">
             <code className="text-xs break-all flex-1">{revealKey}</code>
-            <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => revealKey && copy(revealKey)}>
+            <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" aria-label="Copy API key" onClick={() => revealKey && copy(revealKey)}>
               <Copy className="h-4 w-4" />
             </Button>
           </div>

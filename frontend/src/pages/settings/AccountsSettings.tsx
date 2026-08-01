@@ -190,10 +190,10 @@ export default function AccountsSettings() {
                       <TableCell className="text-right font-mono">{acc.balance.toLocaleString()}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); openEdit(acc); }}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${acc.name}`} onClick={(e) => { e.stopPropagation(); openEdit(acc); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); setPendingDelete(acc); }}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${acc.name}`} onClick={(e) => { e.stopPropagation(); setPendingDelete(acc); }}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>

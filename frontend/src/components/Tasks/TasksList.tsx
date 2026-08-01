@@ -76,18 +76,18 @@ export function TasksList({ headerExtra }: { headerExtra?: ReactNode }) {
           return (
             <TableRow key={task._id} className={task.status === "done" ? "opacity-60" : ""}>
               <TableCell>
-                <button onClick={() => complete(task._id)}
+                <button type="button" aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"}: ${task.title}`} onClick={() => complete(task._id)}
                   className={cn("flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors",
                     task.status === "done" ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40 hover:border-primary")}>
                   {task.status === "done" && <Check className="h-2.5 w-2.5 text-white" />}
                 </button>
               </TableCell>
-              <TableCell className={cn("font-medium max-w-xs truncate", task.status === "done" && "line-through text-muted-foreground")}>{task.title}</TableCell>
+              <TableCell dir="auto" className={cn("font-medium max-w-xs truncate", task.status === "done" && "line-through text-muted-foreground")}>{task.title}</TableCell>
               <TableCell><Badge variant="outline" className={cn("border-0", STATUS_BADGE[task.status])}>{t.statuses[task.status] ?? task.status}</Badge></TableCell>
               <TableCell><Badge variant="secondary" className={cn("text-xs", PRIORITY_STYLE[task.priority])}>{t.priorities[task.priority]}</Badge></TableCell>
-              <TableCell className="text-sm text-muted-foreground">{task.project ? <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 hover:text-primary hover:underline"><FolderKanban className="h-3 w-3" />{task.project.name}</Link> : "—"}</TableCell>
+              <TableCell dir="auto" className="text-sm text-muted-foreground">{task.project ? <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 hover:text-primary hover:underline"><FolderKanban className="h-3 w-3" />{task.project.name}</Link> : "—"}</TableCell>
               <TableCell className={cn("text-xs", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{task.assignedTo?.name ?? "—"}</TableCell>
+              <TableCell dir="auto" className="text-xs text-muted-foreground">{task.assignedTo?.name ?? "—"}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <div className="flex gap-0.5">
                   <button onClick={() => openEdit(task)} className="p-1 rounded hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>

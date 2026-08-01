@@ -43,7 +43,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/expenses/${id}`)}>
-      <TableCell className="font-medium">{title}</TableCell>
+      <TableCell dir="auto" className="font-medium">{title}</TableCell>
       <TableCell className="font-medium tabular-nums">
         {total.toLocaleString()}
       </TableCell>
@@ -55,7 +55,7 @@ const ExpenseRow: React.FC<ExpenseRowProps> = ({ id, title, total, approvalStatu
           {approvalStatus === "approved" ? "Approved" : approvalStatus === "rejected" ? "Rejected" : "Pending"}
         </Badge>
       </TableCell>
-      <TableCell className="text-foreground/70">{owner}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{owner}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

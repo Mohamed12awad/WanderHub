@@ -22,9 +22,9 @@ const QuoteRow: React.FC<{
       className="cursor-pointer hover:bg-muted/40"
       onClick={() => navigate(`/finance/quotes/${q._id}`)}
     >
-      <TableCell className="font-mono text-xs text-muted-foreground">{q.quoteNumber}</TableCell>
-      <TableCell className="font-medium max-w-[180px] truncate">{q.title}</TableCell>
-      <TableCell>
+      <TableCell dir="auto" className="font-mono text-xs text-muted-foreground">{q.quoteNumber}</TableCell>
+      <TableCell dir="auto" className="font-medium max-w-[180px] truncate">{q.title}</TableCell>
+      <TableCell dir="auto">
         <Link
           to={`/customers/${q.customer._id}`}
           className="text-primary hover:underline text-sm"
@@ -45,7 +45,7 @@ const QuoteRow: React.FC<{
           <span className="text-xs text-muted-foreground capitalize">{q.approvalStatus ?? "—"}</span>
         )}
       </TableCell>
-      <TableCell className="text-right font-medium tabular-nums">
+      <TableCell dir="auto" className="text-right font-medium tabular-nums">
         {q.total.toLocaleString()}{" "}
         <span className="text-xs text-muted-foreground">{q.currency}</span>
       </TableCell>

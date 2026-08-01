@@ -132,18 +132,19 @@ export default function TaxRatesSettings() {
               <TableBody>
                 {taxRates.map((t) => (
                   <TableRow key={t.id}>
-                    <TableCell className="font-medium">{t.name}</TableCell>
+                    <TableCell dir="auto" className="font-medium">{t.name}</TableCell>
                     <TableCell className="font-mono">{t.rate}%</TableCell>
                     <TableCell>
                       {t.isDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${t.name}`} onClick={() => openEdit(t)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                          aria-label={`Delete ${t.name}`}
                           onClick={() => setPendingDelete(t)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />

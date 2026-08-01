@@ -36,8 +36,8 @@ const UserRow: React.FC<UserRowProps> = ({ id, name, email, role, active, date, 
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => onEdit(id)}>
-      <TableCell className="font-medium">{name}</TableCell>
-      <TableCell className="text-foreground/70">{email}</TableCell>
+      <TableCell dir="auto" className="font-medium">{name}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{email}</TableCell>
       <TableCell className="text-foreground/70 capitalize">{role}</TableCell>
       <TableCell>
         <Badge

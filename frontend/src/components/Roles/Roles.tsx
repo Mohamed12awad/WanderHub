@@ -127,6 +127,8 @@ function PermissionMatrix({
                       <td key={action} className="px-2 py-2.5 text-center">
                         {available ? (
                           <button
+                            type="button"
+                            aria-label={`${on ? "Remove" : "Grant"} ${action} for ${RESOURCE_LABELS[resource]}`}
                             onClick={() => toggle(perm)}
                             disabled={isLocked}
                             className={cn(
@@ -234,13 +236,14 @@ export function Roles() {
                     <CardTitle className="text-sm font-semibold capitalize">{role.name}</CardTitle>
                   </div>
                   <div className="flex gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditRole(role)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`Edit ${role.name}`} onClick={() => setEditRole(role)}>
                       <Pencil className="h-3 w-3" />
                     </Button>
                     {!locked && (
                       <Button
                         variant="ghost" size="icon"
                         className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        aria-label={`Delete ${role.name}`}
                         onClick={() => deleteMutation.mutate(role._id)}
                       >
                         <Trash2 className="h-3 w-3" />

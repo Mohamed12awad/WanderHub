@@ -96,11 +96,13 @@ const MODULE_INFO: Record<ModuleKey, ModuleInfo> = {
   },
 };
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (v: boolean) => void }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
@@ -155,6 +157,7 @@ export default function ModulesSettings() {
               </div>
               <Toggle
                 checked={enabled}
+                label={label(tr)}
                 onChange={(v) => setModule(key, v)}
               />
             </div>

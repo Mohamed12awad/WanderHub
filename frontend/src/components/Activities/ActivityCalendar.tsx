@@ -257,13 +257,13 @@ export function ActivityCalendar() {
             >
               <PlusCircle className="h-3.5 w-3.5" />New Activity
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(subMonths(current, 1))}>
+            <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous month" onClick={() => setCurrent(subMonths(current, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" className="h-8" onClick={() => { setCurrent(new Date()); setSelected(new Date()); }}>
               {c.today}
             </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrent(addMonths(current, 1))}>
+            <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next month" onClick={() => setCurrent(addMonths(current, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

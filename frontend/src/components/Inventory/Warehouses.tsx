@@ -71,16 +71,16 @@ export default function Warehouses() {
         emptyMessage="No warehouses yet."
         renderRow={(w, handleDelete) => (
           <TableRow key={w._id} className={w.isActive ? "" : "opacity-50"}>
-            <TableCell className="font-mono text-xs">{w.code}</TableCell>
-            <TableCell className="font-medium">{w.name}</TableCell>
+            <TableCell dir="auto" className="font-mono text-xs">{w.code}</TableCell>
+            <TableCell dir="auto" className="font-medium">{w.name}</TableCell>
             <TableCell className="space-x-1">
               {w.isDefault && <Badge variant="outline" className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Default</Badge>}
               {!w.isActive && <Badge variant="outline">Inactive</Badge>}
             </TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(w)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={w.isDefault} onClick={() => handleDelete(w._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${w.code} ${w.name}`} onClick={() => openEdit(w)}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${w.code} ${w.name}`} disabled={w.isDefault} onClick={() => handleDelete(w._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </TableCell>
           </TableRow>

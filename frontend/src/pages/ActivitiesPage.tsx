@@ -111,7 +111,7 @@ export function ActivitiesPage() {
                   {a.type}
                 </span>
               </TableCell>
-              <TableCell className="max-w-[22rem]">
+              <TableCell dir="auto" className="max-w-[22rem]">
                 <span className={cn("font-medium", done && "line-through text-muted-foreground")}>
                   {a.title}
                 </span>
@@ -119,7 +119,7 @@ export function ActivitiesPage() {
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell dir="auto">
                 {entity ? (
                   <Link
                     to={entity.href}

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useId } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -15,6 +16,7 @@ interface PaginationProps {
 
 export function Pagination({ page, pages, total, limit, onPageChange, onLimitChange }: PaginationProps) {
   const { tr } = useLanguage();
+  const pageSizeId = useId();
 
   if (pages <= 1 && !onLimitChange) return null;
 
@@ -41,8 +43,9 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
         </p>
         {onLimitChange && limit !== undefined && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">{tr.table.rows}</span>
+            <label htmlFor={pageSizeId} className="text-xs text-muted-foreground">{tr.table.rows}</label>
             <select
+              id={pageSizeId}
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
               className="h-7 rounded border border-input bg-background px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -61,6 +64,7 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
           className="h-8 w-8"
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
+          aria-label={tr.table.previousPage}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -77,6 +81,8 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
               size="icon"
               className="h-8 w-8 text-xs"
               onClick={() => onPageChange(p as number)}
+              aria-label={tr.table.goToPage(p as number)}
+              aria-current={p === page ? "page" : undefined}
             >
               {p}
             </Button>
@@ -89,6 +95,7 @@ export function Pagination({ page, pages, total, limit, onPageChange, onLimitCha
           className="h-8 w-8"
           onClick={() => onPageChange(page + 1)}
           disabled={page === pages}
+          aria-label={tr.table.nextPage}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

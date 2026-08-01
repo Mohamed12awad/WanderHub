@@ -214,6 +214,7 @@ export default function JournalEntries() {
                   />
                   <Button
                     type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+                    aria-label={`Remove line ${i + 1}`}
                     disabled={lines.length <= 2}
                     onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}
                   >

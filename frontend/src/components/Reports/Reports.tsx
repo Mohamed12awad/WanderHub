@@ -328,7 +328,7 @@ const Reports: React.FC = () => {
                     <TableHeader><TableRow><TableHead>Owner</TableHead><TableHead className="text-right">Won</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {leaderboard.map((o) => (
-                        <TableRow key={o.ownerId}><TableCell>{o.name}</TableCell><TableCell className="text-right">{o.count}</TableCell><TableCell className="text-right font-medium">{o.value.toLocaleString()}</TableCell></TableRow>
+                        <TableRow key={o.ownerId}><TableCell dir="auto">{o.name}</TableCell><TableCell className="text-right">{o.count}</TableCell><TableCell className="text-right font-medium">{o.value.toLocaleString()}</TableCell></TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -435,8 +435,8 @@ const Reports: React.FC = () => {
                       {outstanding.map((inv) => (
                         <TableRow key={inv._id}>
                           <TableCell><Link to={`/finance/invoices/${inv._id}`} className="font-mono text-sm text-blue-500 hover:underline">{inv.invoiceNumber}</Link></TableCell>
-                          <TableCell>{inv.customer ? <Link to={`/customers/${inv.customer._id}`} className="text-blue-500 hover:underline">{inv.customer.name}</Link> : "—"}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{inv.deal ? <Link to={`/deals/${inv.deal._id}`} className="text-blue-500 hover:underline">{inv.deal.title}</Link> : "—"}</TableCell>
+                          <TableCell dir="auto">{inv.customer ? <Link to={`/customers/${inv.customer._id}`} className="text-blue-500 hover:underline">{inv.customer.name}</Link> : "—"}</TableCell>
+                          <TableCell dir="auto" className="text-sm text-muted-foreground">{inv.deal ? <Link to={`/deals/${inv.deal._id}`} className="text-blue-500 hover:underline">{inv.deal.title}</Link> : "—"}</TableCell>
                           <TableCell className="text-right">{inv.total.toLocaleString()} {inv.currency}</TableCell>
                           <TableCell className="text-right text-green-600">{inv.totalPaid.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-semibold text-red-600">{inv.outstanding.toLocaleString()} {inv.currency}</TableCell>
@@ -488,7 +488,7 @@ const Reports: React.FC = () => {
               {topCustomers.length === 0 ? <ChartEmpty /> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Revenue</TableHead></TableRow></TableHeader>
-                  <TableBody>{topCustomers.map((c) => <TableRow key={c.customerId}><TableCell><Link to={`/customers/${c.customerId}`} className="text-blue-500 hover:underline">{c.name}</Link></TableCell><TableCell className="text-right font-medium">{c.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
+                  <TableBody>{topCustomers.map((c) => <TableRow key={c.customerId}><TableCell dir="auto"><Link to={`/customers/${c.customerId}`} className="text-blue-500 hover:underline">{c.name}</Link></TableCell><TableCell className="text-right font-medium">{c.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
                 </Table>
               )}
             </CardContent>
@@ -499,7 +499,7 @@ const Reports: React.FC = () => {
               {topProducts.length === 0 ? <ChartEmpty /> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Product</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Revenue</TableHead></TableRow></TableHeader>
-                  <TableBody>{topProducts.map((p) => <TableRow key={p.productId ?? p.name}><TableCell>{p.name}</TableCell><TableCell className="text-right">{p.qty.toLocaleString()}</TableCell><TableCell className="text-right font-medium">{p.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
+                  <TableBody>{topProducts.map((p) => <TableRow key={p.productId ?? p.name}><TableCell dir="auto">{p.name}</TableCell><TableCell className="text-right">{p.qty.toLocaleString()}</TableCell><TableCell className="text-right font-medium">{p.revenue.toLocaleString()}</TableCell></TableRow>)}</TableBody>
                 </Table>
               )}
             </CardContent>
@@ -564,7 +564,7 @@ const Reports: React.FC = () => {
                 <Table>
                   <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Location</TableHead><TableHead className="text-right">On Hand</TableHead><TableHead className="text-right">Reorder</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                   <TableBody>{inventory.products.map((p) => (
-                    <TableRow key={p.productId}><TableCell>{p.name}</TableCell><TableCell className="text-muted-foreground">{p.location ?? "—"}</TableCell><TableCell className="text-right">{p.quantityOnHand}</TableCell><TableCell className="text-right">{p.reorderLevel}</TableCell><TableCell>{p.lowStock ? <Badge variant="outline" className="border-amber-300 text-amber-600">Low</Badge> : <Badge variant="outline" className="border-green-300 text-green-600">OK</Badge>}</TableCell></TableRow>
+                    <TableRow key={p.productId}><TableCell dir="auto">{p.name}</TableCell><TableCell dir="auto" className="text-muted-foreground">{p.location ?? "—"}</TableCell><TableCell className="text-right">{p.quantityOnHand}</TableCell><TableCell className="text-right">{p.reorderLevel}</TableCell><TableCell>{p.lowStock ? <Badge variant="outline" className="border-amber-300 text-amber-600">Low</Badge> : <Badge variant="outline" className="border-green-300 text-green-600">OK</Badge>}</TableCell></TableRow>
                   ))}</TableBody>
                 </Table>
               )}
@@ -650,8 +650,8 @@ function DealsReportTab({ startDate, endDate, enabled }: { startDate: string; en
               <TableBody>
                 {deals.map((d) => (
                   <TableRow key={d._id}>
-                    <TableCell><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell>
-                    <TableCell className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell>
+                    <TableCell dir="auto"><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell>
+                    <TableCell dir="auto" className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell>
                     <TableCell className="capitalize text-muted-foreground">{d.category?.replace(/_/g, " ") ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{d.status}</Badge></TableCell>
                     <TableCell className="text-right font-medium">{Number(d.price || 0).toLocaleString()} {d.currency}</TableCell>
@@ -695,7 +695,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
           <Table>
             <TableHeader><TableRow><TableHead>Deal</TableHead><TableHead>Customer</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Value</TableHead></TableRow></TableHeader>
             <TableBody>{report.bookings.map((d) => (
-              <TableRow key={d._id}><TableCell><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell><TableCell className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell><TableCell className="capitalize">{d.status}</TableCell><TableCell className="text-right">{Number(d.price || 0).toLocaleString()} {d.currency}</TableCell></TableRow>
+              <TableRow key={d._id}><TableCell dir="auto"><Link to={`/deals/${d._id}`} className="text-blue-500 hover:underline">{d.title}</Link></TableCell><TableCell dir="auto" className="text-muted-foreground">{d.customer?.name ?? "—"}</TableCell><TableCell className="capitalize">{d.status}</TableCell><TableCell dir="auto" className="text-right">{Number(d.price || 0).toLocaleString()} {d.currency}</TableCell></TableRow>
             ))}</TableBody>
           </Table>
         </CardContent>
@@ -708,7 +708,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
             <Table>
               <TableHeader><TableRow><TableHead>PO</TableHead><TableHead>Title</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
               <TableBody>{report.purchases.map((p) => (
-                <TableRow key={p._id}><TableCell className="font-mono text-sm">{p.poNumber ?? "—"}</TableCell><TableCell className="text-muted-foreground">{p.title ?? "—"}</TableCell><TableCell className="capitalize">{p.status}</TableCell><TableCell className="text-right">{Number(p.total || 0).toLocaleString()} {p.currency ?? ""}</TableCell></TableRow>
+                <TableRow key={p._id}><TableCell dir="auto" className="font-mono text-sm">{p.poNumber ?? "—"}</TableCell><TableCell dir="auto" className="text-muted-foreground">{p.title ?? "—"}</TableCell><TableCell className="capitalize">{p.status}</TableCell><TableCell dir="auto" className="text-right">{Number(p.total || 0).toLocaleString()} {p.currency ?? ""}</TableCell></TableRow>
               ))}</TableBody>
             </Table>
           )}
@@ -723,7 +723,7 @@ function FullReportTab({ startDate, endDate, enabled }: { startDate: string; end
               <TableHeader><TableRow><TableHead>Report</TableHead><TableHead>Approval</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
               <TableBody>{report.expenses.map((er) => {
                 const sum = (er.expenses ?? []).reduce((s, x) => s + Number(x.amount || 0), 0);
-                return <TableRow key={er._id}><TableCell>{er.title}</TableCell><TableCell className="capitalize">{er.approvalStatus}</TableCell><TableCell className="text-right">{sum.toLocaleString()}</TableCell></TableRow>;
+                return <TableRow key={er._id}><TableCell dir="auto">{er.title}</TableCell><TableCell className="capitalize">{er.approvalStatus}</TableCell><TableCell className="text-right">{sum.toLocaleString()}</TableCell></TableRow>;
               })}</TableBody>
             </Table>
           )}

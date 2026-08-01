@@ -75,7 +75,7 @@ export default function TrialBalance() {
                 {tb.rows.map((r) => (
                   <TableRow key={r.accountId}>
                     <TableCell className="font-mono text-xs">{r.code}</TableCell>
-                    <TableCell>{r.name}</TableCell>
+                    <TableCell dir="auto">{r.name}</TableCell>
                     <TableCell className="text-right font-mono">{parseFloat(r.debit) ? num(r.debit) : ""}</TableCell>
                     <TableCell className="text-right font-mono">{parseFloat(r.credit) ? num(r.credit) : ""}</TableCell>
                   </TableRow>

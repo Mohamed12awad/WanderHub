@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -19,6 +19,12 @@ import {
   type ChartAccountPayload,
 } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  buildAccountTree,
+  filterAccountTree,
+  flattenAccountTree,
+  type FlatAccountTreeItem,
+} from "@/components/Accounting/chartOfAccountsTree";
 
 const ACCOUNT_TYPES = ["asset", "liability", "equity", "income", "expense"] as const;
 type AccountType = (typeof ACCOUNT_TYPES)[number];
@@ -44,6 +50,8 @@ interface CoaRow {
   cashAccount?: { _id: string; name: string } | null;
 }
 
+type CoaTreeRow = FlatAccountTreeItem<CoaRow>;
+
 interface FormState { code: string; name: string; type: AccountType; parentId: string; currency: string; isActive: boolean }
 const emptyForm = (): FormState => ({ code: "", name: "", type: "asset", parentId: "", currency: "EGP", isActive: true });
 
@@ -65,6 +73,7 @@ export default function ChartOfAccounts() {
   const [editing, setEditing] = useState<CoaRow | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
 
   // Full list (unpaginated) for the parent-account picker.
   const { data: allData } = useQuery({ queryKey: queryKeys.accounting.chartOfAccounts, queryFn: () => getChartOfAccounts(), staleTime: 60000 });
@@ -103,9 +112,9 @@ export default function ChartOfAccounts() {
 
   return (
     <>
-      <GenericTable<CoaRow>
+      <GenericTable<CoaTreeRow>
         queryKey="coa"
-        fetchData={({ page, limit, q, filters }) => getChartOfAccounts({ page, limit, q, ...filters })}
+        fetchData={() => getChartOfAccounts()}
         deleteData={async (id) => { await deleteChartOfAccount(id); invalidate(); }}
         headers={headers}
         title={a.chartOfAccounts}
@@ -116,6 +125,24 @@ export default function ChartOfAccounts() {
         emptyMessage={a.noAccounts}
         importConfig={{ entity: "chart-of-accounts", title: a.chartOfAccounts }}
         exportConfig={{ entity: "chart-of-accounts", filename: "chart-of-accounts" }}
+        transformClientData={(accounts, { q, filters }) => {
+          const query = q.trim().toLocaleLowerCase();
+          const accountType = filters.type;
+          const tree = buildAccountTree(accounts);
+          const visibleTree = query || accountType
+            ? filterAccountTree(tree, (account) => {
+                const matchesType = !accountType || account.type === accountType;
+                const searchable = [
+                  account.code,
+                  account.name,
+                  account.currency,
+                  account.cashAccount?.name,
+                ].filter(Boolean).join(" ").toLocaleLowerCase();
+                return matchesType && (!query || searchable.includes(query));
+              })
+            : tree;
+          return flattenAccountTree(visibleTree, collapsedIds, Boolean(query || accountType));
+        }}
         renderRow={(row, handleDelete) => (
           <TableRow
             key={row._id}
@@ -123,14 +150,41 @@ export default function ChartOfAccounts() {
             onClick={() => navigate(`/accounting/chart-of-accounts/${row._id}`)}
             title={a.viewAccountLedger}
           >
-            <TableCell className="font-mono text-xs">{row.code}</TableCell>
-            <TableCell className={row.parentId ? "ps-6" : "font-semibold"}>
-              {row.name}{!row.isActive && <span className="ms-2 text-[10px] text-muted-foreground">({a.statuses.inactive})</span>}
+            <TableCell dir="auto" className="font-mono text-xs">{row.code}</TableCell>
+            <TableCell className={row.treeDepth === 0 ? "font-semibold" : undefined}>
+              <div className="flex min-w-0 items-center gap-1" style={{ paddingInlineStart: `${row.treeDepth * 1.25}rem` }}>
+                {row.treeHasChildren ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    aria-expanded={row.treeExpanded}
+                    aria-label={(row.treeExpanded ? a.collapseAccount : a.expandAccount)(`${row.code} ${row.name}`)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setCollapsedIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(row._id)) next.delete(row._id);
+                        else next.add(row._id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${row.treeExpanded ? "rotate-90 rtl:rotate-90" : "rtl:rotate-180"}`} />
+                  </Button>
+                ) : (
+                  <span className="h-6 w-6 shrink-0" aria-hidden="true" />
+                )}
+                <span dir="auto" className="min-w-0 truncate">
+                  {row.name}{!row.isActive && <span className="ms-2 text-[10px] text-muted-foreground">({a.statuses.inactive})</span>}
+                </span>
+              </div>
             </TableCell>
             <TableCell><Badge variant="outline" className={`capitalize border-0 ${TYPE_BADGE[row.type]}`}>{a.accountTypes[row.type]}</Badge></TableCell>
             <TableCell className="capitalize text-xs text-muted-foreground">{a.normalBalances[row.normalBalance]}</TableCell>
-            <TableCell className="text-xs">{row.currency}</TableCell>
-            <TableCell className="text-xs text-muted-foreground">{row.cashAccount?.name ?? "—"}</TableCell>
+            <TableCell dir="auto" className="text-xs">{row.currency}</TableCell>
+            <TableCell dir="auto" className="text-xs text-muted-foreground">{row.cashAccount?.name ?? "—"}</TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${tr.common.edit} ${row.code} ${row.name}`} onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button>

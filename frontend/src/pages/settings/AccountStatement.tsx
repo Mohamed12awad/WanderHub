@@ -102,13 +102,13 @@ export default function AccountStatement() {
                     return (
                       <TableRow key={t._id ?? t.id ?? i}>
                         <TableCell className="text-sm">{new Date(t.date).toLocaleDateString()}</TableCell>
-                        <TableCell>
+                        <TableCell dir="auto">
                           <Badge variant="outline" className={isIn ? "border-green-300 text-green-600" : "border-red-300 text-red-600"}>
                             {isIn ? <ArrowDownLeft className="h-3 w-3 me-1" /> : <ArrowUpRight className="h-3 w-3 me-1" />}
                             {isIn ? "In" : "Out"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell dir="auto" className="text-sm">
                           {href && t.reference ? (
                             <Link to={href} className="text-blue-500 hover:underline font-mono">{t.reference}</Link>
                           ) : (
@@ -116,7 +116,7 @@ export default function AccountStatement() {
                           )}
                         </TableCell>
                         <TableCell className="text-sm capitalize text-muted-foreground">{t.method?.replace(/_/g, " ")}</TableCell>
-                        <TableCell className={`text-right font-medium tabular-nums ${isIn ? "text-green-600" : "text-red-600"}`}>
+                        <TableCell dir="auto" className={`text-right font-medium tabular-nums ${isIn ? "text-green-600" : "text-red-600"}`}>
                           {isIn ? "+" : "−"}{t.amount.toLocaleString()} {t.currency}
                         </TableCell>
                       </TableRow>

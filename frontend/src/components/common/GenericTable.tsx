@@ -100,6 +100,8 @@ type GenericTableProps<T extends DataItem> = {
   topContent?: React.ReactNode;
   /** Compact controls rendered inline in the header (e.g. a list/board toggle). */
   headerExtra?: React.ReactNode;
+  /** Reorders or filters an unpaginated client-side dataset before rows render. */
+  transformClientData?: (items: T[], context: { q: string; filters: Record<string, string> }) => T[];
 };
 
 const SKELETON_WIDTHS = ["w-28", "w-20", "w-24", "w-16", "w-32", "w-12"];
@@ -164,6 +166,7 @@ export function GenericTable<T extends DataItem>({
   quickStatusFilter,
   topContent,
   headerExtra,
+  transformClientData,
 }: GenericTableProps<T>) {
   const { tr, isRTL } = useLanguage();
   const queryClient = useQueryClient();
@@ -393,9 +396,11 @@ export function GenericTable<T extends DataItem>({
 
   const filtered = isPaged
     ? dataList
-    : committedQ
-      ? dataList.filter((item) => Object.values(item).some((v) => typeof v === "string" && v.toLowerCase().includes(committedQ.toLowerCase())))
-      : dataList;
+    : transformClientData
+      ? transformClientData(dataList, { q: committedQ, filters: activeFilters })
+      : committedQ
+        ? dataList.filter((item) => Object.values(item).some((v) => typeof v === "string" && v.toLowerCase().includes(committedQ.toLowerCase())))
+        : dataList;
 
   const totalCount = paginationInfo ? paginationInfo.total : filtered.length;
 
@@ -499,6 +504,7 @@ export function GenericTable<T extends DataItem>({
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
+              aria-label={tr.table.searchPlaceholder(title)}
               placeholder={tr.table.searchPlaceholder(title)}
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
@@ -506,6 +512,8 @@ export function GenericTable<T extends DataItem>({
             />
             {localSearch && (
               <button
+                type="button"
+                aria-label={tr.table.clearSearch}
                 onClick={() => setLocalSearch("")}
                 className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -622,6 +630,8 @@ export function GenericTable<T extends DataItem>({
                   <DropdownMenuItem key={v.id} onClick={() => applySavedView(v)} className="flex items-center justify-between gap-2">
                     <span className="truncate">{v.name}</span>
                     <button
+                      type="button"
+                      aria-label={`${tr.common.delete} ${v.name}`}
                       onClick={(e) => { e.stopPropagation(); removeSavedView(v.id); }}
                       className="text-muted-foreground hover:text-destructive shrink-0"
                     >
@@ -644,7 +654,7 @@ export function GenericTable<T extends DataItem>({
             {Object.entries(activeFilters).map(([key, value]) => (
               <span key={key} className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/50 px-2 py-0.5 text-xs font-medium text-foreground">
                 {filterLabel(key, value)}
-                <button onClick={() => removeFilter(key)} className="hover:text-destructive transition-colors ms-0.5 opacity-60 hover:opacity-100">
+                <button type="button" aria-label={`${tr.common.delete} ${filterLabel(key, value)}`} onClick={() => removeFilter(key)} className="hover:text-destructive transition-colors ms-0.5 opacity-60 hover:opacity-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>

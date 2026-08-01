@@ -195,7 +195,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
       >
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="font-semibold text-base">{isEdit ? "Edit Task" : t.add}</h2>
-          <button onClick={handleClose} className="rounded-md p-1 hover:bg-muted transition-colors">
+          <button type="button" aria-label="Close task panel" onClick={handleClose} className="rounded-md p-1 hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -278,6 +278,8 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
                 {PRIORITIES.map((p) => (
                   <button
                     key={p}
+                    type="button"
+                    aria-label={t.priorities[p]}
                     onClick={() => set("priority", p)}
                     className={cn(
                       "px-2 py-0.5 rounded border text-xs font-medium capitalize transition-all",
@@ -369,7 +371,7 @@ export function AddTaskPanel({ open, onClose, task, cloneData, projectId, projec
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs"
                   >
                     {tag}
-                    <button onClick={() => removeTag(tag)} className="hover:text-destructive">
+                    <button type="button" aria-label={`Remove tag ${tag}`} onClick={() => removeTag(tag)} className="hover:text-destructive">
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </span>

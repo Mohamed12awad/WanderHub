@@ -253,7 +253,7 @@ export default function ViewVendorBill() {
             <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
             <TableBody>
               {(bill.items ?? []).map((it: any, i: number) => (
-                <TableRow key={it.id ?? it._id ?? i}><TableCell>{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell><TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell></TableRow>
+                <TableRow key={it.id ?? it._id ?? i}><TableCell dir="auto">{it.description}</TableCell><TableCell className="text-right tabular-nums">{it.quantity}</TableCell><TableCell className="text-right tabular-nums">{it.unitPrice?.toLocaleString()}</TableCell><TableCell className="text-right tabular-nums">{it.total?.toLocaleString()}</TableCell></TableRow>
               ))}
             </TableBody>
           </Table>
@@ -287,10 +287,10 @@ export default function ViewVendorBill() {
                 <TableRow key={p._id}>
                   <TableCell>{new Date(p.date).toLocaleDateString()}</TableCell>
                   <TableCell className="capitalize">{p.method?.replace("_", " ")}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.amount?.toLocaleString()} {p.currency}</TableCell>
+                  <TableCell dir="auto" className="text-right tabular-nums">{p.amount?.toLocaleString()} {p.currency}</TableCell>
                   <TableCell className="text-right">
                     {((user?.permissions ?? []).some((p) => p === '*' || p === 'vendor-bills:delete')) && (
-                      <button onClick={() => handleDeletePayment(p._id)} className="text-destructive opacity-60 hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button type="button" aria-label={`Delete payment ${p.reference ?? p._id}`} onClick={() => handleDeletePayment(p._id)} className="text-destructive opacity-60 hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
                     )}
                   </TableCell>
                 </TableRow>

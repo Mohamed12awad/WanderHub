@@ -31,14 +31,14 @@ export default function SalesOrderRow({ order, handleDelete }: Props) {
 
   return (
     <TableRow className="group cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/sales-orders/${order._id}`)}>
-      <TableCell className="font-medium">{order.orderNumber}</TableCell>
-      <TableCell>{order.customer?.name || "-"}</TableCell>
+      <TableCell dir="auto" className="font-medium">{order.orderNumber}</TableCell>
+      <TableCell dir="auto">{order.customer?.name || "-"}</TableCell>
       <TableCell>
         <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
           {order.status}
         </span>
       </TableCell>
-      <TableCell className="font-medium">
+      <TableCell dir="auto" className="font-medium">
         {order.total.toLocaleString()} {order.currency}
       </TableCell>
       <TableCell className="text-muted-foreground whitespace-nowrap">

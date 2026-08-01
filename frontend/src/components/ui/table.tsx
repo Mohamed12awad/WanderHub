@@ -54,16 +54,57 @@ TableFooter.displayName = "TableFooter"
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
->(({ className, ...props }, ref) => (
-  <tr
-    ref={ref}
-    className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, onClick, onKeyDown, role, tabIndex, ...props }, ref) => {
+  const isInteractive = Boolean(onClick)
+
+  const handleClick: React.MouseEventHandler<HTMLTableRowElement> = (event) => {
+    const target = event.target
+    if (
+      target instanceof Element &&
+      target !== event.currentTarget &&
+      target.closest("button, a, input, select, textarea, [role='button'], [role='link'], [role='menuitem']")
+    ) {
+      event.stopPropagation()
+      return
+    }
+    onClick?.(event)
+  }
+
+  const handleKeyDown: React.KeyboardEventHandler<HTMLTableRowElement> = (event) => {
+    onKeyDown?.(event)
+    if (
+      event.defaultPrevented ||
+      !isInteractive ||
+      event.target !== event.currentTarget ||
+      (event.key !== "Enter" && event.key !== " ")
+    ) return
+
+    event.preventDefault()
+    event.currentTarget.click()
+  }
+
+  return (
+    <tr
+      ref={ref}
+      className={cn(
+        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+        className
+      )}
+      onClick={isInteractive ? handleClick : undefined}
+      onKeyDown={isInteractive || onKeyDown ? handleKeyDown : undefined}
+      // Deliberately does NOT override the implicit `row` role. Giving a <tr>
+      // role="link"/"button" removes it from the table structure for assistive
+      // tech, costing the "row 3 of 10, column Customer" context that matters
+      // most in a dense ERP grid — a worse trade than the one it buys. The row
+      // is made focusable and Enter/Space-activatable instead. The fully
+      // conformant pattern is a real link in each row's primary cell; that is a
+      // larger change across ~21 row components and is tracked as follow-up.
+      role={role}
+      tabIndex={tabIndex ?? (isInteractive ? 0 : undefined)}
+      {...props}
+    />
+  )
+})
 TableRow.displayName = "TableRow"
 
 const TableHead = React.forwardRef<

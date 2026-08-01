@@ -717,7 +717,7 @@ function SectionCard({
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <button type="button" onClick={onToggleCollapse}
+        <button type="button" aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`} onClick={onToggleCollapse}
           className="shrink-0 text-muted-foreground hover:text-foreground">
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
@@ -912,7 +912,7 @@ function FieldRow({
           {isSystem
             ? <Lock className="h-3.5 w-3.5 text-muted-foreground/30" />
             : (
-              <button onClick={onDelete} disabled={saving}
+              <button type="button" aria-label={`Delete ${field.label}`} onClick={onDelete} disabled={saving}
                 className="text-muted-foreground hover:text-destructive transition-colors">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

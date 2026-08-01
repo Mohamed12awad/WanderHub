@@ -126,7 +126,7 @@ export default function CostCentersSettings() {
         renderRow={(costCenter, handleDelete) => (
           <TableRow key={costCenter._id}>
             <TableCell className="font-mono text-xs font-medium">{costCenter.code}</TableCell>
-            <TableCell className="font-medium">{costCenter.name}</TableCell>
+            <TableCell dir="auto" className="font-medium">{costCenter.name}</TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {costCenter.parent ? `${costCenter.parent.code} — ${costCenter.parent.name}` : "—"}
             </TableCell>
@@ -137,10 +137,10 @@ export default function CostCentersSettings() {
             </TableCell>
             <TableCell onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(costCenter)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${costCenter.name}`} onClick={() => openEdit(costCenter)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(costCenter._id)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${costCenter.name}`} onClick={() => handleDelete(costCenter._id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>

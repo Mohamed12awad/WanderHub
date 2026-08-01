@@ -58,7 +58,7 @@ const VendorPaymentRow: React.FC<{
       <TableCell className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
         {new Date(p.date).toLocaleDateString()}
       </TableCell>
-      <TableCell>
+      <TableCell dir="auto">
         <Link
           to={`/procurement/suppliers/${p.bill?.supplier?._id}`}
           className="text-primary hover:underline text-sm"
@@ -67,7 +67,7 @@ const VendorPaymentRow: React.FC<{
           {p.bill?.supplier?.name ?? "—"}
         </Link>
       </TableCell>
-      <TableCell>
+      <TableCell dir="auto">
         <Link
           to={`/procurement/bills/${p.bill?._id}`}
           className="font-mono text-xs text-primary hover:underline"
@@ -76,7 +76,7 @@ const VendorPaymentRow: React.FC<{
           {p.bill?.billNumber ?? "—"}
         </Link>
       </TableCell>
-      <TableCell className="text-right font-medium tabular-nums">
+      <TableCell dir="auto" className="text-right font-medium tabular-nums">
         {p.amount.toLocaleString()}{" "}
         <span className="text-xs text-muted-foreground">{p.currency}</span>
       </TableCell>
@@ -85,10 +85,10 @@ const VendorPaymentRow: React.FC<{
           {METHOD_LABELS[p.method] ?? p.method}
         </Badge>
       </TableCell>
-      <TableCell className="text-sm text-muted-foreground">
+      <TableCell dir="auto" className="text-sm text-muted-foreground">
         {p.reference ?? "—"}
       </TableCell>
-      <TableCell className="text-sm text-muted-foreground">
+      <TableCell dir="auto" className="text-sm text-muted-foreground">
         {p.createdBy?.name ?? "—"}
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>

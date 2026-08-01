@@ -137,6 +137,7 @@ const ExpenseLineTable: React.FC<Props> = ({ lines, onChange, error }) => {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive"
+                    aria-label={`Remove expense line ${idx + 1}`}
                     onClick={() => removeRow(idx)}
                     disabled={lines.length === 1}
                   >

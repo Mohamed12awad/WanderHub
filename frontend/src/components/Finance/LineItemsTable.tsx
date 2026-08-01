@@ -202,6 +202,7 @@ const LineItemsTable: React.FC<Props> = ({ items, onChange, currency = "USD" }) 
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive"
+                    aria-label={`Remove line item ${idx + 1}`}
                     onClick={() => removeRow(idx)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

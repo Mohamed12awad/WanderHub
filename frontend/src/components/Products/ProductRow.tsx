@@ -30,12 +30,12 @@ const ProductRow: React.FC<ProductRowProps> = ({
 
   return (
     <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/products/${id}`)}>
-      <TableCell className="font-medium">{name}</TableCell>
+      <TableCell dir="auto" className="font-medium">{name}</TableCell>
       <TableCell className="">
         <Badge variant="outline">{type}</Badge>
       </TableCell>
       <TableCell className="font-medium tabular-nums">{capacity}</TableCell>
-      <TableCell className="text-foreground/70 capitalize">{location}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70 capitalize">{location}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>

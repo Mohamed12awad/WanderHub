@@ -162,6 +162,7 @@ export default function EmailConfigSettings() {
                   />
                   <button
                     type="button"
+                    aria-label={showPass ? "Hide SMTP password" : "Show SMTP password"}
                     onClick={() => setShowPass((p) => !p)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >

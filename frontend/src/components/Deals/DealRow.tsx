@@ -49,8 +49,8 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority
   return (
     <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => navigate(`/deals/${id}`)}>
       {selectionCell}
-      <TableCell className="font-medium">{title}</TableCell>
-      <TableCell className="text-foreground/70">{customer}</TableCell>
+      <TableCell dir="auto" className="font-medium">{title}</TableCell>
+      <TableCell dir="auto" className="text-foreground/70">{customer}</TableCell>
       <TableCell>
         <Badge className={`${STATUS_COLORS[status] ?? ""} capitalize w-fit`} variant="outline">
           {status}
@@ -63,8 +63,8 @@ const DealRow: React.FC<DealRowProps> = ({ id, title, customer, status, priority
           </Badge>
         ) : <span className="text-muted-foreground">—</span>}
       </TableCell>
-      <TableCell className="hidden lg:table-cell text-foreground/70 text-sm">{owner ?? "—"}</TableCell>
-      <TableCell className="font-medium tabular-nums">{value}</TableCell>
+      <TableCell dir="auto" className="hidden lg:table-cell text-foreground/70 text-sm">{owner ?? "—"}</TableCell>
+      <TableCell dir="auto" className="font-medium tabular-nums">{value}</TableCell>
       <TableCell className="text-muted-foreground text-xs tabular-nums">{date}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
