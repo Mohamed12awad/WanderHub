@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { GenericTable } from "@/components/common/GenericTable";
-import UserRow from "./UserRow";
+import UserActions from "./UserActions";
 import UserDialog from "./UserDialog";
 import { deleteUser, getUsers } from "@/utils/api";
 import { User } from "@/types/types";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Badge } from "@/components/ui/badge";
 
 const USER_FILTERS = [
   { label: "Phone", field: "phone", type: "text" as const },
@@ -26,8 +27,41 @@ export function Users() {
         queryKey="users"
         fetchData={({ page, limit, q, filters, sort, dir }) => getUsers({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })}
         deleteData={deleteUser}
-        headers={u.headers}
-        sortableHeaders={["Name", "Created"]}
+        columns={[
+          { id: "name", header: u.headers[0], kind: "text", hideable: false, cell: (item) => <span className="font-medium">{item.name}</span> },
+          { id: "email", header: u.headers[1], kind: "text", cell: (item) => <span className="text-foreground/70">{item.email}</span> },
+          { id: "role", header: u.headers[2], kind: "text", cell: (item) => <span className="text-foreground/70 capitalize">{item.role?.name ?? "—"}</span> },
+          {
+            id: "status",
+            header: u.headers[3],
+            kind: "status",
+            cell: (item) => (
+              <Badge
+                variant="outline"
+                className={item.active
+                  ? "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
+                  : "bg-slate-400 text-white border-slate-400 dark:bg-slate-600 dark:border-slate-600"}
+              >
+                {item.active ? "Active" : "Inactive"}
+              </Badge>
+            ),
+          },
+          {
+            id: "createdAt",
+            header: u.headers[4],
+            kind: "date",
+            cell: (item) => <span className="text-muted-foreground text-xs tabular-nums">{formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>,
+          },
+        ]}
+        onRowClick={(item) => openEdit(item._id)}
+        renderActions={(item, handleDelete) => (
+          <UserActions
+            id={item._id}
+            active={item.active}
+            handleDelete={handleDelete}
+            onEdit={openEdit}
+          />
+        )}
         quickStatusFilter={{
           field: "active",
           options: [
@@ -35,19 +69,6 @@ export function Users() {
             { value: "false", label: "Inactive" },
           ],
         }}
-        renderRow={(item, handleDelete) => (
-          <UserRow
-            key={item._id}
-            id={item._id}
-            name={item.name}
-            email={item.email}
-            role={item.role?.name ?? "—"}
-            active={item.active}
-            date={formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-            handleDelete={handleDelete}
-            onEdit={openEdit}
-          />
-        )}
         title={u.title}
         description={u.description}
         addLink="/users/add"

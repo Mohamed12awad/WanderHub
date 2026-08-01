@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
-import { ReceiptText, CircleDollarSign, AlertCircle } from "lucide-react";
+import { ReceiptText, CircleDollarSign, AlertCircle, MoreHorizontal, Edit, ArrowRightLeft, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getQuotes, getInvoices, getInvoiceSummary, deleteQuote, deleteInvoice, convertQuoteToInvoice,
@@ -13,8 +13,11 @@ import QuotesBoard from "@/components/Finance/QuotesBoard";
 import { useAuth } from "@/contexts/authContext";
 import { Quote, Invoice, QuoteStatus, InvoiceStatus } from "@/types/types";
 import { useToast } from "@/components/ui/use-toast";
-import QuoteRow from "@/components/Finance/QuoteRow";
-import InvoiceRow from "@/components/Finance/InvoiceRow";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FinanceStatusBadge } from "@/components/Finance/FinanceStatusBadge";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -34,22 +37,20 @@ type TableParams = {
   dir?: "asc" | "desc";
 };
 
-function serverParams(params: TableParams, sortMap: Record<string, string>) {
-  const { filters = {}, sort, dir, ...pageParams } = params;
-  const serverSort = sort ? sortMap[sort] : undefined;
+function serverParams(params: TableParams) {
+  const { filters = {}, ...pageParams } = params;
   return {
     ...pageParams,
     ...filters,
-    ...(serverSort ? { sort: serverSort, dir } : {}),
   };
 }
 
-function fetchQuotesForTable(params: TableParams, sortMap: Record<string, string>) {
-  return getQuotes(serverParams(params, sortMap));
+function fetchQuotesForTable(params: TableParams) {
+  return getQuotes(serverParams(params));
 }
 
-function fetchInvoicesForTable(params: TableParams, sortMap: Record<string, string>) {
-  return getInvoices(serverParams(params, sortMap));
+function fetchInvoicesForTable(params: TableParams) {
+  return getInvoices(serverParams(params));
 }
 
 // ── Invoice summary bar ───────────────────────────────────────────────────────
@@ -121,22 +122,12 @@ export function QuotesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate } = useLanguage();
   const f = tr.finance;
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'quotes:delete');
   const [quotesView, setQuotesView] = useState<"list" | "board">("list");
   const quotesSwitch = <ViewSwitch active={quotesView} onChange={setQuotesView} />;
 
-  // GenericTable emits translated header labels; map them to stable API fields.
-  const headers = useMemo(
-    () => [f.quoteNumber, f.titleHeader, f.customer, f.status, f.approval, f.amount, f.validUntil, tr.common.created],
-    [tr],
-  );
-  const sortableHeaders = useMemo(() => [f.quoteNumber, f.amount, f.validUntil, tr.common.created], [tr]);
-  const sortMap = useMemo<Record<string, string>>(
-    () => ({ [f.quoteNumber]: "quoteNumber", [f.amount]: "total", [f.validUntil]: "validUntil", [tr.common.created]: "createdAt" }),
-    [tr],
-  );
   const filterConfigs = useMemo<FilterConfig[]>(() => [
     { label: f.currency, field: "currency", type: "select", options: CURRENCIES.map((c) => ({ label: c, value: c })) },
     { label: f.approvalStatus, field: "approvalStatus", type: "select", options: APPROVAL_STATUSES.map((s) => ({ label: f.approvalStatuses[s], value: s })) },
@@ -162,24 +153,51 @@ export function QuotesPage() {
     <GenericTable<Quote>
       queryKey="quotes-gt"
       headerExtra={quotesSwitch}
-      fetchData={(p) => fetchQuotesForTable(p, sortMap)}
+      fetchData={fetchQuotesForTable}
       deleteData={deleteQuote}
-      headers={headers}
-      sortableHeaders={sortableHeaders}
+      columns={[
+        { id: "quoteNumber", header: f.quoteNumber, sortKey: "quoteNumber", kind: "text", hideable: false, cell: (quote) => <span className="font-mono text-xs text-muted-foreground">{quote.quoteNumber}</span> },
+        { id: "title", header: f.titleHeader, kind: "text", cell: (quote) => <span className="font-medium max-w-[180px] truncate">{quote.title}</span> },
+        {
+          id: "customer",
+          header: f.customer,
+          kind: "text",
+          cell: (quote) => <Link to={`/customers/${quote.customer._id}`} className="text-primary hover:underline text-sm" onClick={(event) => event.stopPropagation()}>{quote.customer.name}</Link>,
+        },
+        { id: "status", header: f.status, kind: "status", cell: (quote) => <FinanceStatusBadge status={quote.status} type="quote" /> },
+        {
+          id: "approval",
+          header: f.approval,
+          kind: "status",
+          cell: (quote) => quote.convertedToInvoice ? (
+            <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">Converted</Badge>
+          ) : <span className="text-xs text-muted-foreground capitalize">{quote.approvalStatus ?? "—"}</span>,
+        },
+        { id: "total", header: f.amount, sortKey: "total", kind: "number", cell: (quote) => <span className="font-medium">{formatCurrency(quote.total, quote.currency)}</span> },
+        { id: "validUntil", header: f.validUntil, sortKey: "validUntil", kind: "date", cell: (quote) => <span className="text-muted-foreground text-xs tabular-nums">{quote.validUntil ? formatDate(quote.validUntil) : "—"}</span> },
+        { id: "createdAt", header: tr.common.created, sortKey: "createdAt", kind: "date", cell: (quote) => <span className="text-muted-foreground text-xs tabular-nums">{formatDate(quote.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span> },
+      ]}
+      onRowClick={(quote) => navigate(`/finance/quotes/${quote._id}`)}
+      renderActions={(quote, handleDelete) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5" /><span className="sr-only">Actions</span></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate(`/finance/quotes/${quote._id}`)}>View</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/finance/quotes/${quote._id}/edit`)}><Edit className="h-3.5 w-3.5 me-2" />Edit</DropdownMenuItem>
+            {!quote.convertedToInvoice && <DropdownMenuItem onClick={() => handleConvert(quote._id)}><ArrowRightLeft className="h-3.5 w-3.5 me-2" />Convert to Invoice</DropdownMenuItem>}
+            {canDelete && (
+              <><DropdownMenuSeparator /><DropdownMenuItem onClick={() => handleDelete(quote._id)} className="text-destructive focus:text-destructive"><Trash2 className="h-3.5 w-3.5 me-2" />Delete</DropdownMenuItem></>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       quickStatusFilter={{
         field: "status",
         options: QUOTE_STATUSES.map((s) => ({ value: s, label: f.quoteStatuses[s] })),
       }}
       filterConfigs={filterConfigs}
-      renderRow={(item, handleDelete) => (
-        <QuoteRow
-          key={item._id}
-          item={item}
-          handleDelete={handleDelete}
-          handleConvert={handleConvert}
-          canDelete={canDelete}
-        />
-      )}
       title={f.quotes}
       description={f.quotesDescription}
       addLink="/finance/quotes/new"
@@ -193,8 +211,9 @@ export function QuotesPage() {
 
 export function InvoicesPage() {
   const { user } = useAuth();
-  const { tr } = useLanguage();
+  const { tr, formatCurrency, formatDate } = useLanguage();
   const f = tr.finance;
+  const navigate = useNavigate();
   const canDelete = (user?.permissions ?? []).some((p) => p === '*' || p === 'invoices:delete');
 
   const { data: summaryData } = useQuery({
@@ -204,15 +223,6 @@ export function InvoicesPage() {
   });
   const summary: InvoiceSummary | undefined = summaryData?.data;
 
-  const headers = useMemo(
-    () => [f.invoiceNumber, f.titleHeader, f.customer, f.status, f.total, f.outstanding, f.dueDate],
-    [tr],
-  );
-  const sortableHeaders = useMemo(() => [f.invoiceNumber, f.total, f.dueDate], [tr]);
-  const sortMap = useMemo<Record<string, string>>(
-    () => ({ [f.invoiceNumber]: "invoiceNumber", [f.total]: "total", [f.dueDate]: "dueDate" }),
-    [tr],
-  );
   const filterConfigs = useMemo<FilterConfig[]>(() => [
     { label: f.currency, field: "currency", type: "select", options: CURRENCIES.map((c) => ({ label: c, value: c })) },
     { label: f.approvalStatus, field: "approvalStatus", type: "select", options: APPROVAL_STATUSES.map((s) => ({ label: f.approvalStatuses[s], value: s })) },
@@ -225,24 +235,52 @@ export function InvoicesPage() {
   return (
     <GenericTable<Invoice>
       queryKey="invoices-gt"
-      fetchData={(p) => fetchInvoicesForTable(p, sortMap)}
+      fetchData={fetchInvoicesForTable}
       deleteData={deleteInvoice}
-      headers={headers}
-      sortableHeaders={sortableHeaders}
+      columns={[
+        { id: "invoiceNumber", header: f.invoiceNumber, sortKey: "invoiceNumber", kind: "text", hideable: false, cell: (invoice) => <span className="font-mono text-xs text-muted-foreground">{invoice.invoiceNumber}</span> },
+        { id: "title", header: f.titleHeader, kind: "text", cell: (invoice) => <span className="font-medium max-w-[180px] truncate">{invoice.title}</span> },
+        {
+          id: "customer",
+          header: f.customer,
+          kind: "text",
+          cell: (invoice) => <Link to={`/customers/${invoice.customer._id}`} className="text-primary hover:underline text-sm" onClick={(event) => event.stopPropagation()}>{invoice.customer.name}</Link>,
+        },
+        { id: "status", header: f.status, kind: "status", cell: (invoice) => <FinanceStatusBadge status={invoice.status} type="invoice" /> },
+        { id: "total", header: f.total, sortKey: "total", kind: "number", cell: (invoice) => <span className="font-medium">{formatCurrency(invoice.total, invoice.currency)}</span> },
+        {
+          id: "outstanding",
+          header: f.outstanding,
+          kind: "number",
+          cell: (invoice) => {
+            const outstanding = invoice.total - invoice.totalPaid;
+            const isOverdue = invoice.status === "overdue";
+            return <span className={`font-medium ${outstanding > 0 ? isOverdue ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>{formatCurrency(outstanding, invoice.currency)}</span>;
+          },
+        },
+        { id: "dueDate", header: f.dueDate, sortKey: "dueDate", kind: "date", cell: (invoice) => <span className="text-muted-foreground text-xs tabular-nums">{invoice.dueDate ? formatDate(invoice.dueDate) : "—"}</span> },
+      ]}
+      onRowClick={(invoice) => navigate(`/finance/invoices/${invoice._id}`)}
+      renderActions={(invoice, handleDelete) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5" /><span className="sr-only">Actions</span></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate(`/finance/invoices/${invoice._id}`)}>View</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/finance/invoices/${invoice._id}/edit`)}><Edit className="h-3.5 w-3.5 me-2" />Edit</DropdownMenuItem>
+            {canDelete && (
+              <><DropdownMenuSeparator /><DropdownMenuItem onClick={() => handleDelete(invoice._id)} className="text-destructive focus:text-destructive"><Trash2 className="h-3.5 w-3.5 me-2" />Delete</DropdownMenuItem></>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       quickStatusFilter={{
         field: "status",
         options: INVOICE_STATUSES.map((s) => ({ value: s, label: f.invoiceStatuses[s] })),
       }}
       filterConfigs={filterConfigs}
       topContent={summary?.hasInvoices ? <InvoiceSummaryBar summary={summary} /> : undefined}
-      renderRow={(item, handleDelete) => (
-        <InvoiceRow
-          key={item._id}
-          item={item}
-          handleDelete={handleDelete}
-          canDelete={canDelete}
-        />
-      )}
       title={f.invoices}
       description={f.invoicesDescription}
       addLink="/finance/invoices/new"

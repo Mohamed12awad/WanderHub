@@ -7,7 +7,6 @@ import { Task } from "@/types/types";
 import type { ReactNode } from "react";
 import { GenericTable, type FilterConfig } from "@/components/common/GenericTable";
 import { AddTaskPanel } from "@/components/Tasks/AddTaskPanel";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -56,7 +55,58 @@ export function TasksList({ headerExtra }: { headerExtra?: ReactNode }) {
         headerExtra={headerExtra}
         fetchData={({ page, limit, q, filters }) => getTasks({ page, limit, q, ...filters })}
         deleteData={async (id) => { await deleteTask(id); refetch(); }}
-        headers={["", "Task", "Status", "Priority", "Project", "Due", "Assignee"]}
+        columns={[
+          {
+            id: "completion",
+            header: "",
+            mobileLabel: "Complete",
+            kind: "actions",
+            hideable: false,
+            cell: (task) => (
+              <button
+                type="button"
+                aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"}: ${task.title}`}
+                onClick={() => complete(task._id)}
+                className={cn(
+                  "flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors",
+                  task.status === "done" ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40 hover:border-primary",
+                )}
+              >
+                {task.status === "done" && <Check className="h-2.5 w-2.5 text-white" />}
+              </button>
+            ),
+          },
+          { id: "title", header: "Task", kind: "text", hideable: false, cell: (task) => <span className={cn("font-medium max-w-xs truncate", task.status === "done" && "line-through text-muted-foreground")}>{task.title}</span> },
+          { id: "status", header: "Status", kind: "status", cell: (task) => <Badge variant="outline" className={cn("border-0", STATUS_BADGE[task.status])}>{t.statuses[task.status] ?? task.status}</Badge> },
+          { id: "priority", header: "Priority", kind: "status", cell: (task) => <Badge variant="secondary" className={cn("text-xs", PRIORITY_STYLE[task.priority])}>{t.priorities[task.priority]}</Badge> },
+          {
+            id: "project",
+            header: "Project",
+            kind: "text",
+            cell: (task) => task.project ? (
+              <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary hover:underline">
+                <FolderKanban className="h-3 w-3" />{task.project.name}
+              </Link>
+            ) : "—",
+          },
+          {
+            id: "dueDate",
+            header: "Due",
+            kind: "date",
+            cell: (task) => {
+              const overdue = task.dueDate && task.status !== "done" && task.status !== "cancelled" && new Date(task.dueDate) < new Date();
+              return <span className={cn("text-xs", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>{task.dueDate ? formatDate(task.dueDate) : "—"}</span>;
+            },
+          },
+          { id: "assignee", header: "Assignee", kind: "text", cell: (task) => <span className="text-xs text-muted-foreground">{task.assignedTo?.name ?? "—"}</span> },
+        ]}
+        renderActions={(task, handleDelete) => (
+          <div className="flex gap-0.5">
+            <button type="button" onClick={() => openEdit(task)} className="p-1 rounded hover:bg-muted" aria-label={`Edit ${task.title}`} title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button type="button" onClick={() => openClone(task)} className="p-1 rounded hover:bg-muted" aria-label={`Clone ${task.title}`} title="Clone"><Copy className="h-3.5 w-3.5 text-muted-foreground" /></button>
+            <button type="button" onClick={() => handleDelete(task._id)} className="p-1 rounded hover:bg-muted hover:text-destructive" aria-label={`Delete ${task.title}`} title="Delete"><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
+          </div>
+        )}
         title={t.title}
         description={t.description}
         addLabel={t.add}
@@ -70,33 +120,6 @@ export function TasksList({ headerExtra }: { headerExtra?: ReactNode }) {
         bulkConfig={{
           entity: "tasks",
           statusOptions: Object.entries(t.statuses).map(([value, label]) => ({ value, label: label as string })),
-        }}
-        renderRow={(task, handleDelete) => {
-          const overdue = task.dueDate && task.status !== "done" && task.status !== "cancelled" && new Date(task.dueDate) < new Date();
-          return (
-            <TableRow key={task._id} className={task.status === "done" ? "opacity-60" : ""}>
-              <TableCell>
-                <button type="button" aria-label={`${task.status === "done" ? "Mark incomplete" : "Mark complete"}: ${task.title}`} onClick={() => complete(task._id)}
-                  className={cn("flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors",
-                    task.status === "done" ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground/40 hover:border-primary")}>
-                  {task.status === "done" && <Check className="h-2.5 w-2.5 text-white" />}
-                </button>
-              </TableCell>
-              <TableCell dir="auto" className={cn("font-medium max-w-xs truncate", task.status === "done" && "line-through text-muted-foreground")}>{task.title}</TableCell>
-              <TableCell><Badge variant="outline" className={cn("border-0", STATUS_BADGE[task.status])}>{t.statuses[task.status] ?? task.status}</Badge></TableCell>
-              <TableCell><Badge variant="secondary" className={cn("text-xs", PRIORITY_STYLE[task.priority])}>{t.priorities[task.priority]}</Badge></TableCell>
-              <TableCell dir="auto" className="text-sm text-muted-foreground">{task.project ? <Link to={`/projects/${task.project._id}`} className="inline-flex items-center gap-1 hover:text-primary hover:underline"><FolderKanban className="h-3 w-3" />{task.project.name}</Link> : "—"}</TableCell>
-              <TableCell className={cn("text-xs", overdue ? "text-destructive font-medium" : "text-muted-foreground")}>{task.dueDate ? formatDate(task.dueDate) : "—"}</TableCell>
-              <TableCell dir="auto" className="text-xs text-muted-foreground">{task.assignedTo?.name ?? "—"}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <div className="flex gap-0.5">
-                  <button onClick={() => openEdit(task)} className="p-1 rounded hover:bg-muted" title="Edit"><Pencil className="h-3.5 w-3.5 text-muted-foreground" /></button>
-                  <button onClick={() => openClone(task)} className="p-1 rounded hover:bg-muted" title="Clone"><Copy className="h-3.5 w-3.5 text-muted-foreground" /></button>
-                  <button onClick={() => handleDelete(task._id)} className="p-1 rounded hover:bg-muted hover:text-destructive" title="Delete"><Trash2 className="h-3.5 w-3.5 text-muted-foreground" /></button>
-                </div>
-              </TableCell>
-            </TableRow>
-          );
         }}
       />
 

@@ -1,9 +1,24 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { LanguageProvider, useLanguage } from "../LanguageContext";
-import InvoiceRow from "@/components/Finance/InvoiceRow";
+import { InvoicesPage } from "@/pages/Finance";
 import type { Invoice } from "@/types/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getInvoices, getInvoiceSummary } from "@/utils/api";
+
+vi.mock("@/contexts/authContext", () => ({
+  useAuth: () => ({ user: { permissions: [] } }),
+}));
+
+vi.mock("@/utils/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/api")>();
+  return {
+    ...actual,
+    getInvoices: vi.fn(),
+    getInvoiceSummary: vi.fn(),
+  };
+});
 
 const TEST_DATE = "2026-08-05T12:00:00";
 
@@ -39,7 +54,7 @@ describe("locale-aware formatters", () => {
     expect(screen.getByTestId("number")).toHaveTextContent("1,234,567.89");
   });
 
-  it("renders an Arabic invoice date cell instead of the browser-default numeric form", () => {
+  it("renders an Arabic invoice date cell instead of the browser-default numeric form", async () => {
     localStorage.setItem("lang", "ar");
     const invoice: Invoice = {
       _id: "invoice-1",
@@ -59,15 +74,19 @@ describe("locale-aware formatters", () => {
       createdAt: TEST_DATE,
     };
 
+    vi.mocked(getInvoices).mockResolvedValue({ data: { data: [invoice], total: 1, page: 1, pages: 1 } } as never);
+    vi.mocked(getInvoiceSummary).mockResolvedValue({ data: { hasInvoices: false, invoiced: [], collected: [], outstanding: [], overdue: 0 } } as never);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
     render(
-      <LanguageProvider>
-        <MemoryRouter>
-          <table><tbody><InvoiceRow item={invoice} handleDelete={() => {}} canDelete={false} /></tbody></table>
-        </MemoryRouter>
-      </LanguageProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <LanguageProvider><InvoicesPage /></LanguageProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
     );
 
-    const dateCell = screen.getByText("٥ أغسطس ٢٠٢٦");
+    const dateCell = await screen.findByText("٥ أغسطس ٢٠٢٦");
     expect(dateCell).toBeInTheDocument();
     expect(dateCell).not.toHaveTextContent("8/5/2026");
   });

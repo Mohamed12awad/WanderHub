@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { Pencil, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -16,8 +15,6 @@ interface Category { _id: string; createdAt: string; name: string; code?: string
 interface FormState { name: string; code: string; costMethod: string }
 const emptyForm = (): FormState => ({ name: "", code: "", costMethod: "" });
 const METHOD_LABEL: Record<string, string> = { weighted_average: "Weighted Avg", fifo: "FIFO" };
-
-const HEADERS = ["Name", "Cost method", "Products"];
 
 export default function ProductCategoriesSettings() {
   const { toast } = useToast();
@@ -57,7 +54,17 @@ export default function ProductCategoriesSettings() {
         queryKey="product-categories"
         fetchData={({ page, limit, q, filters }) => getProductCategories({ page, limit, q, ...filters })}
         deleteData={async (id) => { await deleteProductCategory(id); invalidate(); }}
-        headers={HEADERS}
+        columns={[
+          { id: "name", header: "Name", kind: "text", hideable: false, cell: (category) => <span className="font-medium">{category.name}{category.code && <span className="ms-2 font-mono text-xs text-muted-foreground">{category.code}</span>}</span> },
+          { id: "costMethod", header: "Cost method", kind: "status", cell: (category) => category.costMethod ? <Badge variant="outline">{METHOD_LABEL[category.costMethod] ?? category.costMethod}</Badge> : <span className="text-xs text-muted-foreground">Org default</span> },
+          { id: "productCount", header: "Products", kind: "number", cell: (category) => <span className="text-sm text-muted-foreground">{category._count?.products ?? 0}</span> },
+        ]}
+        renderActions={(category, handleDelete) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${category.name}`} onClick={() => openEdit(category)}><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${category.name}`} onClick={() => handleDelete(category._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        )}
         title="Product Categories"
         description="Group products and set their inventory cost method (overrides the org default)."
         addLabel="Add Category"
@@ -70,21 +77,6 @@ export default function ProductCategoriesSettings() {
           ],
         }}
         emptyMessage="No categories yet."
-        renderRow={(c, handleDelete) => (
-          <TableRow key={c._id}>
-            <TableCell dir="auto" className="font-medium">{c.name}{c.code && <span className="ms-2 font-mono text-xs text-muted-foreground">{c.code}</span>}</TableCell>
-            <TableCell>
-              {c.costMethod ? <Badge variant="outline">{METHOD_LABEL[c.costMethod] ?? c.costMethod}</Badge> : <span className="text-xs text-muted-foreground">Org default</span>}
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c._count?.products ?? 0}</TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${c.name}`} onClick={() => handleDelete(c._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>

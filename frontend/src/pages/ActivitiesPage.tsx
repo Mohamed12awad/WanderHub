@@ -5,7 +5,6 @@ import { getAllActivities, updateActivity, deleteActivity } from "@/utils/api";
 import { Activity, ActivityType } from "@/types/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { CheckCircle2, Circle, ExternalLink, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GenericTable } from "@/components/common/GenericTable";
@@ -31,8 +30,6 @@ const ENTITY_ROUTES: Record<string, string> = {
   Invoice: "/finance/invoices",
   Quote: "/finance/quotes",
 };
-
-const ACTIVITY_HEADERS = ["Type", "Activity", "Linked To", "Date", "Status"];
 
 const ACTIVITY_TYPE_FILTER = [
   {
@@ -84,7 +81,107 @@ export function ActivitiesPage() {
         queryKey="activities-all"
         fetchData={({ page, limit, q, filters }) => getAllActivities({ page, limit, q, ...filters })}
         deleteData={deleteActivity}
-        headers={ACTIVITY_HEADERS}
+        columns={[
+          {
+            id: "type",
+            header: "Type",
+            kind: "text",
+            cell: (a) => (
+              <span className="inline-flex items-center gap-1.5 capitalize text-sm">
+                <span className="text-base">{TYPE_EMOJIS[a.type]}</span>
+                {a.type}
+              </span>
+            ),
+          },
+          {
+            id: "activity",
+            header: "Activity",
+            kind: "text",
+            cell: (a) => {
+              const done = a.status === "completed";
+              return (
+                <div dir="auto" className="max-w-[22rem]">
+                  <span className={cn("font-medium", done && "line-through text-muted-foreground")}>{a.title}</span>
+                  {a.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>}
+                </div>
+              );
+            },
+          },
+          {
+            id: "linkedTo",
+            header: "Linked To",
+            kind: "text",
+            cell: (a) => {
+              const entity = entityLink(a);
+              return entity ? (
+                <Link
+                  to={entity.href}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  {entity.label}
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </Link>
+              ) : <span className="text-muted-foreground">—</span>;
+            },
+          },
+          {
+            id: "date",
+            header: "Date",
+            kind: "date",
+            cell: (a) => (
+              <span className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
+                {formatDate(a.date, { day: "2-digit", month: "short", year: "numeric" })}
+                {a.createdBy && <span className="block text-[10px]">by {a.createdBy.name}</span>}
+              </span>
+            ),
+          },
+          {
+            id: "status",
+            header: "Status",
+            kind: "status",
+            cell: (a) => {
+              const done = a.status === "completed";
+              return (
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px] capitalize", done ? "border-emerald-500 text-emerald-600" : "border-amber-500 text-amber-600")}
+                >
+                  {a.status}
+                </Badge>
+              );
+            },
+          },
+        ]}
+        onRowClick={(a) => { setDetail(a); setDetailOpen(true); }}
+        renderActions={(a, handleDelete) => {
+          const done = a.status === "completed";
+          return (
+            <div className="flex items-center gap-0.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn("h-7 w-7", done && "text-emerald-600")}
+                aria-label={done ? "Mark pending" : "Mark done"}
+                title={done ? "Mark pending" : "Mark done"}
+                onClick={() => toggleMut.mutate(a)}
+                disabled={toggleMut.isPending}
+              >
+                {done ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                aria-label="Delete"
+                title="Delete"
+                onClick={() => handleDelete(a._id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        }}
         title="Activities"
         description="Calls, meetings, emails and notes logged across the workspace."
         emptyMessage="No activities found."
@@ -96,85 +193,6 @@ export function ActivitiesPage() {
             { value: "pending", label: "Pending" },
             { value: "completed", label: "Completed" },
           ],
-        }}
-        renderRow={(a, handleDelete) => {
-          const entity = entityLink(a);
-          const done = a.status === "completed";
-          return (
-            <TableRow
-              key={a._id}
-              className={cn("cursor-pointer hover:bg-muted/40", done && "opacity-70")}
-              onClick={() => { setDetail(a); setDetailOpen(true); }}
-            >
-              <TableCell>
-                <span className="inline-flex items-center gap-1.5 capitalize text-sm">
-                  <span className="text-base">{TYPE_EMOJIS[a.type]}</span>
-                  {a.type}
-                </span>
-              </TableCell>
-              <TableCell dir="auto" className="max-w-[22rem]">
-                <span className={cn("font-medium", done && "line-through text-muted-foreground")}>
-                  {a.title}
-                </span>
-                {a.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.description}</p>
-                )}
-              </TableCell>
-              <TableCell dir="auto">
-                {entity ? (
-                  <Link
-                    to={entity.href}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    {entity.label}
-                    <ExternalLink className="h-2.5 w-2.5" />
-                  </Link>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-xs tabular-nums whitespace-nowrap">
-                {formatDate(a.date, { day: "2-digit", month: "short", year: "numeric" })}
-                {a.createdBy && <span className="block text-[10px]">by {a.createdBy.name}</span>}
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] capitalize",
-                    done ? "border-emerald-500 text-emerald-600" : "border-amber-500 text-amber-600",
-                  )}
-                >
-                  {a.status}
-                </Badge>
-              </TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn("h-7 w-7", done && "text-emerald-600")}
-                    title={done ? "Mark pending" : "Mark done"}
-                    onClick={() => toggleMut.mutate(a)}
-                    disabled={toggleMut.isPending}
-                  >
-                    {done ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
-                    title="Delete"
-                    onClick={() => handleDelete(a._id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          );
         }}
       />
 

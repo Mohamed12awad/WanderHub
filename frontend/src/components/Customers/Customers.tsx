@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import { GenericTable } from "@/components/common/GenericTable";
-import CustomerRow from "./customerRow";
+import CustomerActions from "./CustomerActions";
 import { deleteCustomer, getCustomers } from "@/utils/api";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 type Customer = {
   _id: string;
@@ -14,8 +16,16 @@ type Customer = {
   createdAt: string;
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  active: "bg-emerald-500 text-white border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600",
+  inactive: "bg-slate-400 text-white border-slate-400 dark:bg-slate-600 dark:border-slate-600",
+  lead: "bg-sky-500 text-white border-sky-500 dark:bg-sky-600 dark:border-sky-600",
+  prospect: "bg-violet-500 text-white border-violet-500 dark:bg-violet-600 dark:border-violet-600",
+};
+
 export function Customers() {
-  const { tr } = useLanguage();
+  const { tr, formatDate } = useLanguage();
+  const navigate = useNavigate();
   const c = tr.contacts;
 
   const CUSTOMER_FILTERS = useMemo(() => [
@@ -40,20 +50,19 @@ export function Customers() {
         getCustomers({ page, limit, q, ...(sort ? { sort, dir } : {}), ...filters })
       }
       deleteData={deleteCustomer}
-      headers={c.headers}
-      sortableHeaders={["Name", "Created"]}
+      columns={[
+        { id: "name", header: c.headers[0], kind: "text", hideable: false, cell: (item) => <span className="font-medium">{item.name}</span> },
+        { id: "status", header: c.headers[1], kind: "status", cell: (item) => <Badge variant="outline" className={`${STATUS_COLORS[item.status] ?? ""} capitalize w-fit`}>{c.statuses?.[item.status] ?? item.status}</Badge> },
+        { id: "phone", header: c.headers[2], kind: "text", cell: (item) => <span className="text-foreground/70">{item.phone}</span> },
+        { id: "location", header: c.headers[3], kind: "text", cell: (item) => <span className="text-foreground/70 capitalize">{item.location}</span> },
+        { id: "createdAt", header: c.headers[4], kind: "date", cell: (item) => <span className="text-muted-foreground text-xs tabular-nums">{formatDate(item.createdAt, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span> },
+      ]}
+      onRowClick={(item) => navigate(`/customers/${item._id}`)}
+      renderActions={(item, handleDelete) => <CustomerActions item={item} handleDelete={handleDelete} />}
       quickStatusFilter={{
         field: "status",
         options: Object.entries(c.statuses).map(([value, label]) => ({ value, label })),
       }}
-      renderRow={(item, handleDelete, selectionCell) => (
-        <CustomerRow
-          key={item._id}
-          item={item}
-          handleDelete={handleDelete}
-          selectionCell={selectionCell}
-        />
-      )}
       title={c.title}
       description={c.description}
       addLink="/customers/add"

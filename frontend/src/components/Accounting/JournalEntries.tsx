@@ -8,7 +8,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -56,10 +55,6 @@ export default function JournalEntries() {
   const navigate = useNavigate();
   const { tr, formatDate, formatNumber } = useLanguage();
   const a = tr.accounting;
-  const headers = useMemo(
-    () => [a.headers.entryNumber, a.headers.date, a.headers.memo, a.headers.source, a.headers.status, a.headers.amount],
-    [a],
-  );
   const sourceOptions = useMemo(() => SOURCE_KEYS.map((value) => ({ value, label: a.sources[value] })), [a]);
   const statusOptions = useMemo(() => STATUS_KEYS.map((value) => ({ value, label: a.statuses[value] })), [a]);
   const [open, setOpen] = useState(false);
@@ -129,7 +124,42 @@ export default function JournalEntries() {
             sourceType: filters?.sourceType || undefined,
           })
         }
-        headers={headers}
+        columns={[
+          {
+            id: "entryNumber",
+            header: a.headers.entryNumber,
+            kind: "text",
+            cell: (entry) => (
+              <Link
+                to={`/accounting/journal/${entry._id}`}
+                className="font-mono text-xs text-primary hover:underline"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {entry.entryNumber}
+              </Link>
+            ),
+          },
+          { id: "date", header: a.headers.date, kind: "date", cell: (entry) => <span className="text-xs">{formatDate(entry.date)}</span> },
+          { id: "memo", header: a.headers.memo, kind: "text", cell: (entry) => entry.memo ?? <span className="text-muted-foreground">—</span> },
+          { id: "source", header: a.headers.source, kind: "text", cell: (entry) => <span className="text-xs text-muted-foreground">{a.sources[entry.sourceType] ?? entry.sourceType}</span> },
+          {
+            id: "status",
+            header: a.headers.status,
+            kind: "status",
+            cell: (entry) => <Badge variant="outline" className={`capitalize border-0 ${STATUS_BADGE[entry.status] ?? ""}`}>{a.statuses[entry.status] ?? entry.status}</Badge>,
+          },
+          {
+            id: "amount",
+            header: a.headers.amount,
+            kind: "number",
+            cell: (entry) => (
+              <span className="font-mono text-sm">
+                {formatNumber(entry.lines.reduce((sum, line) => sum + (parseFloat(line.debit) || 0), 0), { minimumFractionDigits: 2 })}
+              </span>
+            ),
+          },
+        ]}
+        onRowClick={(entry) => navigate(`/accounting/journal/${entry._id}`)}
         title={a.journal}
         description={a.journalDescription}
         addLabel={a.newEntry}
@@ -139,36 +169,6 @@ export default function JournalEntries() {
           { label: a.headers.source, field: "sourceType", type: "select", options: sourceOptions },
         ]}
         emptyMessage={a.noJournalEntries}
-        renderRow={(e) => {
-          const amount = e.lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
-          return (
-            <TableRow
-              key={e._id}
-              className="cursor-pointer hover:bg-muted/40"
-              onClick={() => navigate(`/accounting/journal/${e._id}`)}
-            >
-              <TableCell className="font-mono text-xs">
-                <Link
-                  to={`/accounting/journal/${e._id}`}
-                  className="text-primary hover:underline"
-                  onClick={(ev) => ev.stopPropagation()}
-                >
-                  {e.entryNumber}
-                </Link>
-              </TableCell>
-              <TableCell className="text-xs">{formatDate(e.date)}</TableCell>
-              <TableCell className="text-sm">{e.memo ?? <span className="text-muted-foreground">—</span>}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{a.sources[e.sourceType] ?? e.sourceType}</TableCell>
-              <TableCell>
-                <Badge variant="outline" className={`capitalize border-0 ${STATUS_BADGE[e.status] ?? ""}`}>{a.statuses[e.status] ?? e.status}</Badge>
-              </TableCell>
-              <TableCell className="text-right font-mono text-sm tabular-nums">
-                {formatNumber(amount, { minimumFractionDigits: 2 })}
-              </TableCell>
-              <TableCell />
-            </TableRow>
-          );
-        }}
       />
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>

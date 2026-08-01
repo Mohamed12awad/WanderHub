@@ -140,34 +140,32 @@ export function Inventory() {
         queryKey="inventory"
         fetchData={({ page, limit, q, filters }) => getInventory({ page, limit, q, ...filters })}
         filterConfigs={warehouseFilter}
-        headers={inv.headers}
+        columns={[
+          { id: "product", header: inv.headers[0], kind: "text", hideable: false, cell: (item) => <span className="font-medium">{item.product?.name ?? item.productId}</span> },
+          { id: "warehouse", header: inv.headers[1], kind: "text", cell: (item) => <span className="text-sm">{item.warehouse?.name ?? "—"}</span> },
+          { id: "location", header: inv.headers[2], kind: "text", cell: (item) => <span className="text-sm text-muted-foreground">{item.location ?? "—"}</span> },
+          { id: "quantityOnHand", header: inv.headers[3], kind: "number", cell: (item) => <span className="font-mono">{item.quantityOnHand}</span> },
+          { id: "reorderLevel", header: inv.headers[4], kind: "number", cell: (item) => <span className="font-mono">{item.reorderLevel}</span> },
+          {
+            id: "status",
+            header: inv.headers[5],
+            kind: "status",
+            cell: (item) => item.lowStock ? <Badge variant="destructive">{inv.lowStock}</Badge> : <Badge variant="outline">{inv.ok}</Badge>,
+          },
+        ]}
+        renderActions={(item) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${inv.adjust}: ${item.product?.name ?? item.productId}`} title={inv.adjust} onClick={() => openAdjust(item)}>
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${inv.movements}: ${item.product?.name ?? item.productId}`} title={inv.movements} onClick={() => { setMovementsFor(item); setMovePage(0); }}>
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
         title={inv.title}
         description={inv.description}
         emptyMessage={inv.empty}
-        renderRow={(it) => (
-          <TableRow key={it._id}>
-            <TableCell dir="auto" className="font-medium">{it.product?.name ?? it.productId}</TableCell>
-            <TableCell dir="auto" className="text-sm">{it.warehouse?.name ?? "—"}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{it.location ?? "—"}</TableCell>
-            <TableCell className="text-right font-mono">{it.quantityOnHand}</TableCell>
-            <TableCell className="text-right font-mono">{it.reorderLevel}</TableCell>
-            <TableCell>
-              {it.lowStock
-                ? <Badge variant="destructive">{inv.lowStock}</Badge>
-                : <Badge variant="outline">{inv.ok}</Badge>}
-            </TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" title={inv.adjust} onClick={() => openAdjust(it)}>
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" title={inv.movements} onClick={() => { setMovementsFor(it); setMovePage(0); }}>
-                  <History className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )}
       />
 
       {/* Adjust dialog */}

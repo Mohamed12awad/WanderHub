@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { AsyncSearchableSelect } from "@/components/common/combobox";
 import { GenericTable } from "@/components/common/GenericTable";
 import { useToast } from "@/components/ui/use-toast";
@@ -35,8 +34,6 @@ const emptyForm = (): FormState => ({
   parentLabel: "",
   isActive: "true",
 });
-
-const HEADERS = ["Code", "Name", "Parent", "Status"];
 
 export default function CostCentersSettings() {
   const { toast } = useToast();
@@ -110,7 +107,18 @@ export default function CostCentersSettings() {
           await deleteCostCenter(id);
           invalidate();
         }}
-        headers={HEADERS}
+        columns={[
+          { id: "code", header: "Code", kind: "text", hideable: false, cell: (costCenter) => <span className="font-mono text-xs font-medium">{costCenter.code}</span> },
+          { id: "name", header: "Name", kind: "text", cell: (costCenter) => <span className="font-medium">{costCenter.name}</span> },
+          { id: "parent", header: "Parent", kind: "text", cell: (costCenter) => <span className="text-sm text-muted-foreground">{costCenter.parent ? `${costCenter.parent.code} — ${costCenter.parent.name}` : "—"}</span> },
+          { id: "status", header: "Status", kind: "status", cell: (costCenter) => <Badge variant={costCenter.isActive === false ? "outline" : "default"}>{costCenter.isActive === false ? "Inactive" : "Active"}</Badge> },
+        ]}
+        renderActions={(costCenter, handleDelete) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${costCenter.name}`} onClick={() => openEdit(costCenter)}><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${costCenter.name}`} onClick={() => handleDelete(costCenter._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        )}
         title="Cost Centers"
         description="Manage analytic cost centers used on invoices, vendor bills, expense reports, and GL lines."
         addLabel="Add Cost Center"
@@ -123,30 +131,6 @@ export default function CostCentersSettings() {
             { value: "false", label: "Inactive" },
           ],
         }}
-        renderRow={(costCenter, handleDelete) => (
-          <TableRow key={costCenter._id}>
-            <TableCell className="font-mono text-xs font-medium">{costCenter.code}</TableCell>
-            <TableCell dir="auto" className="font-medium">{costCenter.name}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {costCenter.parent ? `${costCenter.parent.code} — ${costCenter.parent.name}` : "—"}
-            </TableCell>
-            <TableCell>
-              <Badge variant={costCenter.isActive === false ? "outline" : "default"}>
-                {costCenter.isActive === false ? "Inactive" : "Active"}
-              </Badge>
-            </TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${costCenter.name}`} onClick={() => openEdit(costCenter)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${costCenter.name}`} onClick={() => handleDelete(costCenter._id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>

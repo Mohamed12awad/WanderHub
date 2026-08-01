@@ -7,7 +7,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,10 +60,6 @@ export default function ChartOfAccounts() {
   const navigate = useNavigate();
   const { tr } = useLanguage();
   const a = tr.accounting;
-  const headers = useMemo(
-    () => [a.headers.code, a.headers.name, a.headers.type, a.headers.normal, a.headers.currency, a.headers.linkedCash],
-    [a],
-  );
   const typeOptions = useMemo(
     () => ACCOUNT_TYPES.map((value) => ({ value, label: a.accountTypes[value] })),
     [a],
@@ -116,7 +111,64 @@ export default function ChartOfAccounts() {
         queryKey="coa"
         fetchData={() => getChartOfAccounts()}
         deleteData={async (id) => { await deleteChartOfAccount(id); invalidate(); }}
-        headers={headers}
+        columns={[
+          {
+            id: "code",
+            header: a.headers.code,
+            kind: "text",
+            hideable: false,
+            cell: (row) => <span className={`font-mono text-xs ${row.isActive ? "" : "opacity-50"}`} title={a.viewAccountLedger}>{row.code}</span>,
+          },
+          {
+            id: "name",
+            header: a.headers.name,
+            kind: "text",
+            cell: (row) => (
+              <div className={`flex min-w-0 items-center gap-1 ${row.isActive ? "" : "opacity-50"}`} style={{ paddingInlineStart: `${row.treeDepth * 1.25}rem` }}>
+                {row.treeHasChildren ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    aria-expanded={row.treeExpanded}
+                    aria-label={(row.treeExpanded ? a.collapseAccount : a.expandAccount)(`${row.code} ${row.name}`)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setCollapsedIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(row._id)) next.delete(row._id);
+                        else next.add(row._id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${row.treeExpanded ? "rotate-90 rtl:rotate-90" : "rtl:rotate-180"}`} />
+                  </Button>
+                ) : <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
+                <span dir="auto" className={`min-w-0 truncate ${row.treeDepth === 0 ? "font-semibold" : ""}`}>
+                  {row.name}{!row.isActive && <span className="ms-2 text-[10px] text-muted-foreground">({a.statuses.inactive})</span>}
+                </span>
+              </div>
+            ),
+          },
+          {
+            id: "type",
+            header: a.headers.type,
+            kind: "status",
+            cell: (row) => <Badge variant="outline" className={`capitalize border-0 ${TYPE_BADGE[row.type]} ${row.isActive ? "" : "opacity-50"}`}>{a.accountTypes[row.type]}</Badge>,
+          },
+          { id: "normalBalance", header: a.headers.normal, kind: "text", cell: (row) => <span className={`capitalize text-xs text-muted-foreground ${row.isActive ? "" : "opacity-50"}`}>{a.normalBalances[row.normalBalance]}</span> },
+          { id: "currency", header: a.headers.currency, kind: "text", cell: (row) => <span className={`text-xs ${row.isActive ? "" : "opacity-50"}`}>{row.currency}</span> },
+          { id: "linkedCash", header: a.headers.linkedCash, kind: "text", cell: (row) => <span className={`text-xs text-muted-foreground ${row.isActive ? "" : "opacity-50"}`}>{row.cashAccount?.name ?? "—"}</span> },
+        ]}
+        onRowClick={(row) => navigate(`/accounting/chart-of-accounts/${row._id}`)}
+        renderActions={(row, handleDelete) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${tr.common.edit} ${row.code} ${row.name}`} onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`${tr.common.delete} ${row.code} ${row.name}`} onClick={() => handleDelete(row._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        )}
         title={a.chartOfAccounts}
         description={a.chartDescription}
         addLabel={a.addAccount}
@@ -143,56 +195,6 @@ export default function ChartOfAccounts() {
             : tree;
           return flattenAccountTree(visibleTree, collapsedIds, Boolean(query || accountType));
         }}
-        renderRow={(row, handleDelete) => (
-          <TableRow
-            key={row._id}
-            className={`cursor-pointer hover:bg-muted/40 ${row.isActive ? "" : "opacity-50"}`}
-            onClick={() => navigate(`/accounting/chart-of-accounts/${row._id}`)}
-            title={a.viewAccountLedger}
-          >
-            <TableCell dir="auto" className="font-mono text-xs">{row.code}</TableCell>
-            <TableCell className={row.treeDepth === 0 ? "font-semibold" : undefined}>
-              <div className="flex min-w-0 items-center gap-1" style={{ paddingInlineStart: `${row.treeDepth * 1.25}rem` }}>
-                {row.treeHasChildren ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0"
-                    aria-expanded={row.treeExpanded}
-                    aria-label={(row.treeExpanded ? a.collapseAccount : a.expandAccount)(`${row.code} ${row.name}`)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setCollapsedIds((current) => {
-                        const next = new Set(current);
-                        if (next.has(row._id)) next.delete(row._id);
-                        else next.add(row._id);
-                        return next;
-                      });
-                    }}
-                  >
-                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${row.treeExpanded ? "rotate-90 rtl:rotate-90" : "rtl:rotate-180"}`} />
-                  </Button>
-                ) : (
-                  <span className="h-6 w-6 shrink-0" aria-hidden="true" />
-                )}
-                <span dir="auto" className="min-w-0 truncate">
-                  {row.name}{!row.isActive && <span className="ms-2 text-[10px] text-muted-foreground">({a.statuses.inactive})</span>}
-                </span>
-              </div>
-            </TableCell>
-            <TableCell><Badge variant="outline" className={`capitalize border-0 ${TYPE_BADGE[row.type]}`}>{a.accountTypes[row.type]}</Badge></TableCell>
-            <TableCell className="capitalize text-xs text-muted-foreground">{a.normalBalances[row.normalBalance]}</TableCell>
-            <TableCell dir="auto" className="text-xs">{row.currency}</TableCell>
-            <TableCell dir="auto" className="text-xs text-muted-foreground">{row.cashAccount?.name ?? "—"}</TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`${tr.common.edit} ${row.code} ${row.name}`} onClick={() => openEdit(row)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`${tr.common.delete} ${row.code} ${row.name}`} onClick={() => handleDelete(row._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

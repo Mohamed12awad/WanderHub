@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TableCell, TableRow } from "@/components/ui/table";
 import { Pencil, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,8 +13,6 @@ import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse, type 
 interface Warehouse { _id: string; createdAt: string; name: string; code: string; isDefault: boolean; isActive: boolean }
 interface FormState { name: string; code: string; isDefault: boolean; isActive: boolean }
 const emptyForm = (): FormState => ({ name: "", code: "", isDefault: false, isActive: true });
-
-const HEADERS = ["Code", "Name", "Flags"];
 
 export default function Warehouses() {
   const { toast } = useToast();
@@ -56,7 +53,27 @@ export default function Warehouses() {
         queryKey="warehouses"
         fetchData={({ page, limit, q, filters }) => getWarehouses({ page, limit, q, ...filters })}
         deleteData={async (id) => { await deleteWarehouse(id); invalidate(); }}
-        headers={HEADERS}
+        columns={[
+          { id: "code", header: "Code", kind: "text", hideable: false, cell: (warehouse) => <span className={`font-mono text-xs ${warehouse.isActive ? "" : "opacity-50"}`}>{warehouse.code}</span> },
+          { id: "name", header: "Name", kind: "text", cell: (warehouse) => <span className={`font-medium ${warehouse.isActive ? "" : "opacity-50"}`}>{warehouse.name}</span> },
+          {
+            id: "flags",
+            header: "Flags",
+            kind: "status",
+            cell: (warehouse) => (
+              <span className={`space-x-1 ${warehouse.isActive ? "" : "opacity-50"}`}>
+                {warehouse.isDefault && <Badge variant="outline" className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Default</Badge>}
+                {!warehouse.isActive && <Badge variant="outline">Inactive</Badge>}
+              </span>
+            ),
+          },
+        ]}
+        renderActions={(warehouse, handleDelete) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${warehouse.code} ${warehouse.name}`} onClick={() => openEdit(warehouse)}><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${warehouse.code} ${warehouse.name}`} disabled={warehouse.isDefault} onClick={() => handleDelete(warehouse._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        )}
         title="Warehouses"
         description="Physical stock locations. Stock is held per (product, warehouse)."
         addLabel="Add Warehouse"
@@ -69,22 +86,6 @@ export default function Warehouses() {
           ],
         }}
         emptyMessage="No warehouses yet."
-        renderRow={(w, handleDelete) => (
-          <TableRow key={w._id} className={w.isActive ? "" : "opacity-50"}>
-            <TableCell dir="auto" className="font-mono text-xs">{w.code}</TableCell>
-            <TableCell dir="auto" className="font-medium">{w.name}</TableCell>
-            <TableCell className="space-x-1">
-              {w.isDefault && <Badge variant="outline" className="border-0 bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">Default</Badge>}
-              {!w.isActive && <Badge variant="outline">Inactive</Badge>}
-            </TableCell>
-            <TableCell onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${w.code} ${w.name}`} onClick={() => openEdit(w)}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" aria-label={`Delete ${w.code} ${w.name}`} disabled={w.isDefault} onClick={() => handleDelete(w._id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        )}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
