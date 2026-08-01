@@ -199,19 +199,21 @@ export class ExpensesService {
 
     const steps = await this.approvals.listSteps('ExpenseReport', id);
     if (steps.length) {
-      const result = await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'approve');
-      const finalApproved = result.status === 'approved';
       const updated = await this.prisma.$transaction(async (tx) => {
+        // The step advance shares the transaction with the document update and
+        // the GL post, so a posting failure cannot leave the step consumed.
+        const result = await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'approve', undefined, [], tx);
+        const finalApproved = result.status === 'approved';
         const changed = await tx.expenseReport.update({
           where: { id },
           data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
           include: EXPENSE_REPORT_INCLUDE,
         });
         if (finalApproved) await this.postExpenseIssued(id, userId, tx);
-        return changed;
+        return { changed, status: result.status };
       });
-      await this.timeline.log('expense.approved', `Expense report "${report.title}" approval advanced (${result.status})`, id, 'Expense', {}, userId);
-      return toClient(updated);
+      await this.timeline.log('expense.approved', `Expense report "${report.title}" approval advanced (${updated.status})`, id, 'Expense', {}, userId);
+      return toClient(updated.changed);
     }
 
     const { approverRoles } = await this.getApprovalConfig('expenses');
@@ -238,8 +240,8 @@ export class ExpensesService {
 
     const steps = await this.approvals.listSteps('ExpenseReport', id);
     if (steps.length) {
-      await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'reject', reason);
       const updated = await this.prisma.$transaction(async (tx) => {
+        await this.approvals.act('ExpenseReport', id, userId, userRole, report.userId, 'reject', reason, [], tx);
         // Reverse the issued GL entry that approval posted (idempotent no-op when
         // nothing was posted). A later re-approval re-posts under a versioned id.
         await this.posting.reverseLive('ExpenseReport', id, { createdById: userId }, tx);

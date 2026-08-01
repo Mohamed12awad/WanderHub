@@ -80,8 +80,8 @@ export class ApprovalService {
     await db.approvalStep.deleteMany({ where: { entityType, entityId } });
   }
 
-  async listSteps(entityType: string, entityId: string) {
-    return this.prisma.approvalStep.findMany({
+  async listSteps(entityType: string, entityId: string, db: Db = this.prisma) {
+    return db.approvalStep.findMany({
       where: { entityType, entityId },
       orderBy: { sequence: 'asc' },
     });
@@ -107,13 +107,14 @@ export class ApprovalService {
     decision: ApprovalDecision,
     comment?: string,
     userPermissions: string[] = [],
+    db: Db = this.prisma,
   ): Promise<{ status: OverallStatus; finalApproverId?: string }> {
     // Separation of duties: the creator can't act on their own item — except
     // users with wildcard permissions (superpower override).
     if (creatorId && creatorId === userId && !userPermissions.includes('*')) {
       throw new ForbiddenException(`You cannot ${decision} an item you created`);
     }
-    const steps = await this.listSteps(entityType, entityId);
+    const steps = await this.listSteps(entityType, entityId, db);
     const current = steps.find((s) => s.status === 'pending');
     if (!current) {
       const rejected = steps.some((s) => s.status === 'rejected');
@@ -124,14 +125,14 @@ export class ApprovalService {
     }
 
     if (decision === 'reject') {
-      await this.prisma.approvalStep.update({
+      await db.approvalStep.update({
         where: { id: current.id },
         data: { status: 'rejected', actedById: userId, actedAt: new Date(), comment },
       });
       return { status: 'rejected', finalApproverId: userId };
     }
 
-    await this.prisma.approvalStep.update({
+    await db.approvalStep.update({
       where: { id: current.id },
       data: { status: 'approved', actedById: userId, actedAt: new Date(), comment },
     });

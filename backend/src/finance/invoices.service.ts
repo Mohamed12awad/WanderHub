@@ -362,9 +362,14 @@ export class InvoicesService {
     // the document to 'approved'; earlier steps leave it pending.
     const steps = await this.approvals.listSteps('Invoice', id);
     if (steps.length) {
-      const result = await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'approve', undefined, userPermissions);
-      const finalApproved = result.status === 'approved';
+      // The step advance is part of the same transaction as the document update
+      // and the GL post: if posting fails, the approval must not stand either,
+      // or a retry is rejected as already-acted (audit 2026-08 residual).
       const updated = await this.prisma.$transaction(async (tx) => {
+        const result = await this.approvals.act(
+          'Invoice', id, userId, userRole, invoice.createdById, 'approve', undefined, userPermissions, tx,
+        );
+        const finalApproved = result.status === 'approved';
         const changed = await tx.invoice.update({
           where: { id },
           data: { approvalStatus: result.status, ...(finalApproved ? { approvedById: userId, approvedAt: new Date(), rejectionReason: null } : {}) },
@@ -399,8 +404,10 @@ export class InvoicesService {
 
     const steps = await this.approvals.listSteps('Invoice', id);
     if (steps.length) {
-      await this.approvals.act('Invoice', id, userId, userRole, invoice.createdById, 'reject', reason, userPermissions);
       const updated = await this.prisma.$transaction(async (tx) => {
+        await this.approvals.act(
+          'Invoice', id, userId, userRole, invoice.createdById, 'reject', reason, userPermissions, tx,
+        );
         // Reverse the issued GL entry that approval posted (idempotent no-op when
         // nothing was posted). A later re-approval re-posts under a versioned id.
         await this.posting.reverseLive('Invoice', id, { createdById: userId }, tx);

@@ -248,9 +248,11 @@ export class VendorBillsService {
 
     const steps = await this.approvals.listSteps('VendorBill', id);
     if (steps.length) {
-      const result = await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'approve');
-      const finalApproved = result.status === 'approved';
       const updated = await this.prisma.$transaction(async (tx) => {
+        // The step advance shares the transaction with the document update and
+        // the GL post, so a posting failure cannot leave the step consumed.
+        const result = await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'approve', undefined, [], tx);
+        const finalApproved = result.status === 'approved';
         const changed = await tx.vendorBill.update({
           where: { id },
           data: {
@@ -262,10 +264,10 @@ export class VendorBillsService {
           include: BILL_INCLUDE,
         });
         if (finalApproved) await this.postBillIssued(id, userId, tx);
-        return changed;
+        return { changed, status: result.status };
       });
-      await this.timeline.log('bill.approved', `Vendor Bill approval advanced (${result.status})`, id, 'VendorBill', {}, userId);
-      return toClient(updated);
+      await this.timeline.log('bill.approved', `Vendor Bill approval advanced (${updated.status})`, id, 'VendorBill', {}, userId);
+      return toClient(updated.changed);
     }
 
     const { enabled, approverRoles } = await this.getApprovalConfig();
@@ -299,8 +301,8 @@ export class VendorBillsService {
 
     const steps = await this.approvals.listSteps('VendorBill', id);
     if (steps.length) {
-      await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'reject', reason);
       const updated = await this.prisma.$transaction(async (tx) => {
+        await this.approvals.act('VendorBill', id, userId, userRole, bill.createdById, 'reject', reason, [], tx);
         // Reverse the issued GL entry that approval posted (idempotent no-op when
         // nothing was posted). A later re-approval re-posts under a versioned id.
         await this.posting.reverseLive('VendorBill', id, { createdById: userId }, tx);
