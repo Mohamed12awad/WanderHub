@@ -132,6 +132,7 @@
     <div class="fact"><dt>Worst measured ratio</dt><dd>1.99:1</dd></div>
     <div class="fact"><dt>Frames validated</dt><dd>40 of 42</dd></div>
     <div class="fact"><dt>Reflow failures</dt><dd>0</dd></div>
+    <div class="fact"><dt>Roadmap items closed</dt><dd>9 of 11</dd></div>
   </dl>
 
   <hr class="rule" />
@@ -245,9 +246,12 @@
         <tr><td>Chart of Accounts tree</td><td class="wide">29 accounts over 3 pages → one expandable tree</td><td><span class="tag pass">Done</span></td></tr>
         <tr><td>Date &amp; number localisation</td><td class="wide">228 sites routed through the app locale — Arabic showed English months and Western digits</td><td><span class="tag pass">Done</span></td></tr>
         <tr><td>Column contract</td><td class="wide">Prerequisite for sizing, visibility and ordering — the old API related header to cell by array index</td><td><span class="tag pass">Done</span></td></tr>
-        <tr><td>Density &amp; proportional columns</td><td class="wide">Rows-per-page still defaults to 10; titles truncate while space sits unused</td><td><span class="tag fail">Open</span></td></tr>
-        <tr><td>Column visibility &amp; order</td><td class="wide">Unblocked by the contract; not yet built</td><td><span class="tag fail">Open</span></td></tr>
-        <tr><td>Inline edit on line-item grids</td><td class="wide">Keyboard-first entry for invoice and expense lines</td><td><span class="tag fail">Open</span></td></tr>
+        <tr><td>Density &amp; proportional columns</td><td class="wide">Rows per page 10 &rarr; 25/50, plus a comfortable/compact preference. Proportional sizing shipped with the contract</td><td><span class="tag pass">Done</span></td></tr>
+        <tr><td>Column visibility &amp; order</td><td class="wide">Versioned layouts; per-table localStorage kept separate from named saved views</td><td><span class="tag pass">Done</span></td></tr>
+        <tr><td>Inline edit on line-item grids</td><td class="wide">Found a real defect while doing it: Enter submitted the whole document from any cell, on all six forms</td><td><span class="tag pass">Done</span></td></tr>
+        <tr><td>Payment dialog dismissal</td><td class="wide">A stray click discarded a part-entered payment; also labelled two fields that had none</td><td><span class="tag pass">Done</span></td></tr>
+        <tr><td>Conformant row links</td><td class="wide">A real link in each row&rsquo;s primary cell, ~21 components &mdash; the focusable-row pattern remains a documented compromise</td><td><span class="tag fail">Open</span></td></tr>
+        <tr><td>Guards on the other dialogs</td><td class="wide">No other dialog guards unsaved input; three stack more than two deep</td><td><span class="tag fail">Open</span></td></tr>
         <tr><td>Virtualised tables</td><td class="wide">Dropped — pages already cap at 100 rendered rows, so there was nothing to virtualise</td><td><span class="tag pass">N/A</span></td></tr>
       </tbody>
     </table>
