@@ -174,8 +174,10 @@ export class PostingService {
       const cur = l.currency ?? base;
       let baseAmount = l.baseAmount;
       if (baseAmount === undefined) {
-        const bd = await this.currency.toBase(l.debit ?? 0, cur, l.rate);
-        const bc = await this.currency.toBase(l.credit ?? 0, cur, l.rate);
+        // Strict: refuse to post a foreign-currency leg with no known rate
+        // rather than silently booking base-currency units (audit 2026-08 P0).
+        const bd = await this.currency.toBaseOrThrow(l.debit ?? 0, cur, l.rate);
+        const bc = await this.currency.toBaseOrThrow(l.credit ?? 0, cur, l.rate);
         baseAmount = bd - bc;
       }
       lines.push({

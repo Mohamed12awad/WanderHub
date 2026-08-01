@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceConfigService } from './workspace-config.service';
 
@@ -34,12 +34,40 @@ export class CurrencyService {
     return rates;
   }
 
-  /** Convert a single amount in `currency` to base currency. */
+  /**
+   * Convert a single amount in `currency` to base currency, passing the amount
+   * through unchanged when no rate is known.
+   *
+   * This lenient behaviour is deliberate for *reporting* aggregates, where a
+   * missing rate should not collapse a dashboard total to zero. It is NOT safe
+   * for posting to the ledger — use `toBaseOrThrow()` there.
+   */
   async toBase(amount: number, currency: string, rateOverride?: number | null): Promise<number> {
     const base = await this.getBaseCurrency();
     if (currency === base) return amount;
     const rate = rateOverride ?? (await this.getRates())[currency];
     return rate ? amount * rate : amount;
+  }
+
+  /**
+   * Strict conversion for the posting path.
+   *
+   * Audit 2026-08 (P0): the GL used the lenient `toBase()`, so a foreign-currency
+   * document with no rate on file posted 1:1 — a USD 1,000 invoice booked AR as
+   * EGP 1,000 instead of ~50,000. Nothing detected it, because every leg was
+   * wrong by the same factor and the entry still balanced. Refuse to guess.
+   */
+  async toBaseOrThrow(amount: number, currency: string, rateOverride?: number | null): Promise<number> {
+    const base = await this.getBaseCurrency();
+    if (currency === base) return amount;
+    const rate = rateOverride ?? (await this.getRates())[currency];
+    if (!rate) {
+      throw new BadRequestException(
+        `No exchange rate for ${currency} → ${base}. Record one (Settings → Exchange Rates) ` +
+          `dated on or before the document, or set the document's exchange rate, before posting.`,
+      );
+    }
+    return amount * rate;
   }
 
   /**

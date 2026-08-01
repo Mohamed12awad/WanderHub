@@ -32,6 +32,8 @@ function make(opts: MakeOpts = {}) {
   const currency: any = {
     getBaseCurrency: jest.fn().mockResolvedValue('EGP'),
     toBase: jest.fn().mockImplementation((a: number, c: string, r?: number | null) => Promise.resolve(toBase(a, c, r))),
+    // Strict variant used by the posting path (see CurrencyService.toBaseOrThrow).
+    toBaseOrThrow: jest.fn().mockImplementation((a: number, c: string, r?: number | null) => Promise.resolve(toBase(a, c, r))),
     convert: jest.fn().mockImplementation(async (
       amount: number,
       from: string,
@@ -253,7 +255,7 @@ describe('PostingService.postVendorBillPayment — cross-currency settlement', (
 
 describe('PostingService.postInvoiceIssued — exchange-rate validation', () => {
   // Audit P0: a missing rate silently falls back to 1:1 (currency.service.ts:42).
-  it.failing('foreign-currency invoice posting rejects a missing exchange rate', async () => {
+  it('foreign-currency invoice posting rejects a missing exchange rate', async () => {
     const { svc, prisma } = make({
       glConfig: { glEnabled: true, defaultArAccount: '1200', defaultIncomeAccount: '4100' },
     });
