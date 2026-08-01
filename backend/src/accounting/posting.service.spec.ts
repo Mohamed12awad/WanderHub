@@ -172,7 +172,7 @@ describe('PostingService.postInvoicePayment — realized FX', () => {
   });
 
   // Audit P0: payment units are reused as document-currency units (posting.service.ts:390-392).
-  it.failing('cross-currency invoice payment relieves AR by the document amount without an FX line', async () => {
+  it('cross-currency invoice payment relieves AR by the document amount without an FX line', async () => {
     const { svc, created } = make({
       glConfig: { glEnabled: true, defaultArAccount: '1200', defaultFxGainLossAccount: '4900' },
     });
@@ -235,7 +235,7 @@ describe('PostingService.reverse', () => {
 
 describe('PostingService.postVendorBillPayment — cross-currency settlement', () => {
   // Audit P0: payment units are reused as document-currency units (posting.service.ts:592-594).
-  it.failing('cross-currency vendor payment relieves AP by the document amount without an FX line', async () => {
+  it('cross-currency vendor payment relieves AP by the document amount without an FX line', async () => {
     const { svc, created } = make({
       glConfig: { glEnabled: true, defaultApAccount: '2100', defaultFxGainLossAccount: '4900' },
     });

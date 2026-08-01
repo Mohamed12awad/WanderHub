@@ -401,13 +401,28 @@ export class PostingService {
 
     // Cash arrives at the payment-date rate; AR is relieved at the invoice's
     // historical rate. The base-currency difference is realized FX.
-    const baseCash = await this.currency.toBase(amount, payment.currency);
-    const baseAr = await this.currency.toBase(amount, invoice.currency, invoice.exchangeRate);
+    //
+    // Audit 2026-08 (P0): `amount` is denominated in the PAYMENT currency, but
+    // was previously used as the AR quantity too. When the two differ — which
+    // `recordPayment` explicitly allows — AR was relieved by the payment's
+    // numeric value re-priced at the invoice's rate. An EGP 5,000 payment
+    // against a USD 100 invoice booked at 50 credited AR 5,000 × 50 = EGP
+    // 250,000 and invented an EGP 245,000 FX loss to balance it. Convert into
+    // document currency first, then relieve AR at the historical rate.
+    const applied = await this.currency.convert(
+      amount,
+      payment.currency,
+      invoice.currency,
+      undefined,
+      invoice.exchangeRate,
+    );
+    const baseCash = await this.currency.toBaseOrThrow(amount, payment.currency);
+    const baseAr = await this.currency.toBaseOrThrow(applied, invoice.currency, invoice.exchangeRate);
     const fx = baseCash - baseAr; // >0 = gain, <0 = loss
 
     const lines: PostLine[] = [
       { accountId: cash, debit: amount, currency: payment.currency, baseAmount: baseCash, customerId: invoice.customerId, memo: `Payment ${invoice.invoiceNumber}` },
-      { accountId: ar, credit: amount, currency: invoice.currency, baseAmount: -baseAr, customerId: invoice.customerId },
+      { accountId: ar, credit: applied, currency: invoice.currency, baseAmount: -baseAr, customerId: invoice.customerId },
     ];
     if (Math.abs(fx) > POST_TOLERANCE) {
       const fxAcc = await this.requireCode(gl.defaultFxGainLossAccount, 'FX Gain/Loss', db);
@@ -603,12 +618,23 @@ export class PostingService {
     // Cash leaves at the payment-date rate; AP is relieved at the bill's recorded
     // historical rate. The base-currency difference is realized FX (mirrors
     // postInvoicePayment). Relieving AP at the current rate would never clear it.
-    const baseCash = await this.currency.toBase(amount, payment.currency);
-    const baseAp = await this.currency.toBase(amount, bill.currency, bill.exchangeRate);
+    //
+    // Audit 2026-08 (P0): same cross-currency defect as the AR side — `amount`
+    // is in the PAYMENT currency and was reused as the AP quantity. Convert
+    // into document currency before relieving AP.
+    const applied = await this.currency.convert(
+      amount,
+      payment.currency,
+      bill.currency,
+      undefined,
+      bill.exchangeRate,
+    );
+    const baseCash = await this.currency.toBaseOrThrow(amount, payment.currency);
+    const baseAp = await this.currency.toBaseOrThrow(applied, bill.currency, bill.exchangeRate);
     const fx = baseAp - baseCash;
 
     const lines: PostLine[] = [
-      { accountId: ap, debit: amount, currency: bill.currency, baseAmount: baseAp, rate: bill.exchangeRate, supplierId: bill.supplierId, memo: `Payment ${bill.billNumber}` },
+      { accountId: ap, debit: applied, currency: bill.currency, baseAmount: baseAp, rate: bill.exchangeRate, supplierId: bill.supplierId, memo: `Payment ${bill.billNumber}` },
       { accountId: cash, credit: amount, currency: payment.currency, baseAmount: -baseCash, supplierId: bill.supplierId },
     ];
     if (Math.abs(fx) > POST_TOLERANCE) {
