@@ -103,6 +103,13 @@ type GenericTableProps<T extends DataItem> = {
   onRowClick?: (item: T) => void;
   /** Trailing per-row actions cell, used only with `columns`. */
   renderActions?: (item: T, handleDelete: (id: string) => void) => ReactNode;
+  /**
+   * Row-level presentation driven by the record's own state — a dimmed inactive
+   * account, an overdue invoice. Used only with `columns`. Without it a caller
+   * has to repeat the same conditional class in every `cell`, which is how the
+   * six copies of `isActive ? "" : "opacity-50"` in Chart of Accounts appeared.
+   */
+  rowClassName?: (item: T) => string | undefined;
   headers?: string[];
   sortableHeaders?: string[];
   renderRow?: (item: T, handleDelete: (id: string) => void, selectionCell?: React.ReactNode) => JSX.Element;
@@ -203,6 +210,7 @@ export function GenericTable<T extends DataItem>({
   columns,
   onRowClick,
   renderActions,
+  rowClassName,
   headers: legacyHeaders,
   sortableHeaders,
   renderRow,
@@ -903,7 +911,10 @@ export function GenericTable<T extends DataItem>({
               <TableRow
                 key={item._id}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
-                className="max-md:block max-md:border max-md:rounded-md max-md:mb-2 max-md:bg-card max-md:shadow-sm max-md:overflow-hidden"
+                className={cn(
+                  "max-md:block max-md:border max-md:rounded-md max-md:mb-2 max-md:bg-card max-md:shadow-sm max-md:overflow-hidden",
+                  rowClassName?.(item),
+                )}
               >
                 {bulkConfig && (
                   <TableCell onClick={(e) => e.stopPropagation()} className={cn(SELECTION_CELL_CLASS, "max-md:py-2 max-md:px-3")}>

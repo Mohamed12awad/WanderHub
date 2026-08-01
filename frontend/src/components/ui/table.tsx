@@ -88,6 +88,13 @@ const TableRow = React.forwardRef<
       ref={ref}
       className={cn(
         "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+        // Derived from `onClick` rather than passed in by each caller: the row
+        // components that used to supply `cursor-pointer` themselves were
+        // deleted in the column migration, and the affordance went with them.
+        // Deriving it here means a clickable row can never look inert again.
+        // The UA focus outline is deliberately left in place and supplemented,
+        // not replaced — `ring` is a box-shadow, which <tr> paints unreliably.
+        isInteractive && "cursor-pointer focus-visible:bg-muted",
         className
       )}
       onClick={isInteractive ? handleClick : undefined}

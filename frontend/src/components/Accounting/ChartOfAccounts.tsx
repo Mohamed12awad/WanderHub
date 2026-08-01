@@ -117,14 +117,14 @@ export default function ChartOfAccounts() {
             header: a.headers.code,
             kind: "text",
             hideable: false,
-            cell: (row) => <span className={`font-mono text-xs ${row.isActive ? "" : "opacity-50"}`} title={a.viewAccountLedger}>{row.code}</span>,
+            cell: (row) => <span className="font-mono text-xs" title={a.viewAccountLedger}>{row.code}</span>,
           },
           {
             id: "name",
             header: a.headers.name,
             kind: "text",
             cell: (row) => (
-              <div className={`flex min-w-0 items-center gap-1 ${row.isActive ? "" : "opacity-50"}`} style={{ paddingInlineStart: `${row.treeDepth * 1.25}rem` }}>
+              <div className="flex min-w-0 items-center gap-1" style={{ paddingInlineStart: `${row.treeDepth * 1.25}rem` }}>
                 {row.treeHasChildren ? (
                   <Button
                     type="button"
@@ -156,12 +156,13 @@ export default function ChartOfAccounts() {
             id: "type",
             header: a.headers.type,
             kind: "status",
-            cell: (row) => <Badge variant="outline" className={`capitalize border-0 ${TYPE_BADGE[row.type]} ${row.isActive ? "" : "opacity-50"}`}>{a.accountTypes[row.type]}</Badge>,
+            cell: (row) => <Badge variant="outline" className={`capitalize border-0 ${TYPE_BADGE[row.type]}`}>{a.accountTypes[row.type]}</Badge>,
           },
-          { id: "normalBalance", header: a.headers.normal, kind: "text", cell: (row) => <span className={`capitalize text-xs text-muted-foreground ${row.isActive ? "" : "opacity-50"}`}>{a.normalBalances[row.normalBalance]}</span> },
-          { id: "currency", header: a.headers.currency, kind: "text", cell: (row) => <span className={`text-xs ${row.isActive ? "" : "opacity-50"}`}>{row.currency}</span> },
-          { id: "linkedCash", header: a.headers.linkedCash, kind: "text", cell: (row) => <span className={`text-xs text-muted-foreground ${row.isActive ? "" : "opacity-50"}`}>{row.cashAccount?.name ?? "—"}</span> },
+          { id: "normalBalance", header: a.headers.normal, kind: "text", cell: (row) => <span className="capitalize text-xs text-muted-foreground">{a.normalBalances[row.normalBalance]}</span> },
+          { id: "currency", header: a.headers.currency, kind: "text", cell: (row) => <span className="text-xs">{row.currency}</span> },
+          { id: "linkedCash", header: a.headers.linkedCash, kind: "text", cell: (row) => <span className="text-xs text-muted-foreground">{row.cashAccount?.name ?? "—"}</span> },
         ]}
+        rowClassName={(row) => (row.isActive ? undefined : "opacity-50")}
         onRowClick={(row) => navigate(`/accounting/chart-of-accounts/${row._id}`)}
         renderActions={(row, handleDelete) => (
           <div className="flex items-center gap-1">

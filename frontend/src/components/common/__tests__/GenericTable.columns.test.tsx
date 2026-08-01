@@ -25,7 +25,10 @@ const rows: Row[] = [
 const nameCol: TableColumn<Row> = { id: "name", header: "Customer", sortKey: "customerName", kind: "text", cell: (r) => r.name };
 const amountCol: TableColumn<Row> = { id: "amount", header: "Total", sortKey: "total", kind: "number", cell: (r) => String(r.amount) };
 
-function renderTable(columns: TableColumn<Row>[]) {
+function renderTable(
+  columns: TableColumn<Row>[],
+  extra: Partial<{ onRowClick: (item: Row) => void; rowClassName: (item: Row) => string | undefined }> = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter>
@@ -37,6 +40,7 @@ function renderTable(columns: TableColumn<Row>[]) {
             columns={columns}
             title="Test"
             description="Test table"
+            {...extra}
           />
         </LanguageProvider>
       </QueryClientProvider>
@@ -85,5 +89,38 @@ describe("GenericTable — column contract", () => {
     const numeric = await screen.findByText("1500");
     expect(numeric.className).toContain("tabular-nums");
     expect(numeric.className).toContain("text-end");
+  });
+
+  /**
+   * The deleted *Row.tsx components each supplied `cursor-pointer` themselves,
+   * so migrating to `columns` silently left every clickable row looking inert.
+   * TableRow now derives the affordance from `onClick`, which is the only place
+   * it cannot drift away from the behaviour again.
+   */
+  it("makes a clickable row look and behave clickable", async () => {
+    const onRowClick = vi.fn();
+    renderTable([nameCol], { onRowClick });
+
+    const row = (await screen.findByText("Acme")).closest("tr")!;
+    expect(row.className).toContain("cursor-pointer");
+    expect(row).toHaveAttribute("tabindex", "0");
+  });
+
+  it("leaves a non-clickable row without the pointer affordance", async () => {
+    renderTable([nameCol]);
+    const row = (await screen.findByText("Acme")).closest("tr")!;
+    expect(row.className).not.toContain("cursor-pointer");
+    expect(row).not.toHaveAttribute("tabindex");
+  });
+
+  it("applies row-level state styling once, not per cell", async () => {
+    renderTable([nameCol, amountCol], { rowClassName: (r) => (r.amount > 1000 ? "opacity-50" : undefined) });
+
+    const dimmed = (await screen.findByText("Acme")).closest("tr")!;
+    const normal = (await screen.findByText("Globex")).closest("tr")!;
+    expect(dimmed.className).toContain("opacity-50");
+    expect(normal.className).not.toContain("opacity-50");
+    // The point of the prop: the cells stay free of the conditional class.
+    expect(screen.getByText("Acme").className).not.toContain("opacity-50");
   });
 });
