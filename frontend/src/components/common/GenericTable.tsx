@@ -1,9 +1,9 @@
-import { Children, cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from "react";
 import type { JSX, ReactElement, ReactNode } from "react";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceSettings } from "@/hooks/useWorkspaceSettings";
 import { useSearchParams } from "react-router-dom";
-import { PlusCircle, Search, Download, Upload, SlidersHorizontal, X, ArrowUpDown, ArrowUp, ArrowDown, Users, Bookmark, Save, Trash2 } from "lucide-react";
+import { PlusCircle, Search, Download, Upload, SlidersHorizontal, X, ArrowUpDown, ArrowUp, ArrowDown, Users, Bookmark, Save, Trash2, Columns3, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +33,7 @@ import {
 import { getSavedViews, createSavedView, deleteSavedView, type SavedView } from "@/utils/api";
 import { Pagination } from "@/components/ui/pagination";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -168,6 +169,107 @@ type GenericTableProps<T extends DataItem> = {
 const SKELETON_WIDTHS = ["w-28", "w-20", "w-24", "w-16", "w-32", "w-12"];
 const SELECTION_CELL_CLASS = "w-10 min-w-10 max-w-10 p-0 text-center";
 const SELECTION_CHECKBOX_WRAP_CLASS = "flex h-full min-h-9 items-center justify-center";
+const COLUMN_LAYOUT_VERSION = 1;
+const COLUMN_LAYOUT_STORAGE_PREFIX = "ui-table-layout:";
+const COLUMN_ORDER_PARAM = "cols";
+const COLUMN_HIDDEN_PARAM = "hiddenCols";
+const COLUMN_VERSION_PARAM = "colsVersion";
+
+type ColumnLayout = {
+  order: string[];
+  hidden: string[];
+};
+
+type StoredColumnLayout = ColumnLayout & {
+  version: typeof COLUMN_LAYOUT_VERSION;
+};
+
+const columnLayoutStorageKey = (queryKey: string) => `${COLUMN_LAYOUT_STORAGE_PREFIX}${queryKey}`;
+
+/**
+ * Reconciles persisted ids against the current contract. Unknown ids are
+ * discarded and ids introduced after the layout was saved are appended in
+ * definition order. Visibility is kept separately so a missing order id means
+ * "new column", not "the user hid this column".
+ */
+function normalizeColumnLayout<T>(columns: TableColumn<T>[], layout?: Partial<ColumnLayout> | null): ColumnLayout {
+  const columnById = new Map(columns.map((column) => [column.id, column]));
+  const order: string[] = [];
+  const seen = new Set<string>();
+
+  for (const id of layout?.order ?? []) {
+    if (columnById.has(id) && !seen.has(id)) {
+      order.push(id);
+      seen.add(id);
+    }
+  }
+  for (const column of columns) {
+    if (!seen.has(column.id)) {
+      order.push(column.id);
+      seen.add(column.id);
+    }
+  }
+
+  const hidden: string[] = [];
+  const hiddenSeen = new Set<string>();
+  for (const id of layout?.hidden ?? []) {
+    const column = columnById.get(id);
+    if (column && column.hideable !== false && !hiddenSeen.has(id)) {
+      hidden.push(id);
+      hiddenSeen.add(id);
+    }
+  }
+
+  return { order, hidden };
+}
+
+function readStoredColumnLayout(queryKey: string): ColumnLayout | null {
+  try {
+    const value = localStorage.getItem(columnLayoutStorageKey(queryKey));
+    if (!value) return null;
+    const parsed = JSON.parse(value) as Partial<StoredColumnLayout>;
+    if (
+      parsed.version !== COLUMN_LAYOUT_VERSION ||
+      !Array.isArray(parsed.order) ||
+      !parsed.order.every((id) => typeof id === "string") ||
+      !Array.isArray(parsed.hidden) ||
+      !parsed.hidden.every((id) => typeof id === "string")
+    ) return null;
+    return { order: parsed.order, hidden: parsed.hidden };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredColumnLayout(queryKey: string, layout: ColumnLayout) {
+  try {
+    const stored: StoredColumnLayout = { version: COLUMN_LAYOUT_VERSION, ...layout };
+    localStorage.setItem(columnLayoutStorageKey(queryKey), JSON.stringify(stored));
+  } catch {
+    // Storage can be unavailable (privacy mode/quota). The in-memory layout
+    // remains usable for the current visit.
+  }
+}
+
+const parseColumnIds = (value: string | null) =>
+  value?.split(",").map((id) => id.trim()).filter(Boolean) ?? [];
+
+function readColumnLayoutParams(params: URLSearchParams): ColumnLayout | null {
+  if (!params.has(COLUMN_ORDER_PARAM)) return null;
+  const version = params.get(COLUMN_VERSION_PARAM);
+  if (version && version !== String(COLUMN_LAYOUT_VERSION)) return null;
+  return {
+    order: parseColumnIds(params.get(COLUMN_ORDER_PARAM)),
+    hidden: parseColumnIds(params.get(COLUMN_HIDDEN_PARAM)),
+  };
+}
+
+function writeColumnLayoutParams(params: URLSearchParams, layout: ColumnLayout) {
+  params.set(COLUMN_VERSION_PARAM, String(COLUMN_LAYOUT_VERSION));
+  params.set(COLUMN_ORDER_PARAM, layout.order.join(","));
+  if (layout.hidden.length > 0) params.set(COLUMN_HIDDEN_PARAM, layout.hidden.join(","));
+  else params.delete(COLUMN_HIDDEN_PARAM);
+}
 
 function withMobileLabels(row: JSX.Element, headers: string[], hasSelection: boolean) {
   if (!isValidElement(row)) return row;
@@ -239,6 +341,7 @@ export function GenericTable<T extends DataItem>({
   const { getFilterableCustomFields } = useWorkspaceSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [exporting, setExporting] = useState(false);
+  const columnMenuId = useId();
 
   // Export handler: prefer a full-dataset backend stream when `entity` is set;
   // otherwise fall back to a client-side CSV of the rows currently loaded.
@@ -268,10 +371,62 @@ export function GenericTable<T extends DataItem>({
   const sortBy        = searchParams.get("sort") ?? "";
   const sortDir       = (searchParams.get("dir") ?? "asc") as "asc" | "desc";
 
-  // `columns` supersedes the legacy props. Header labels are derived from the
-  // definitions so the two can never drift apart.
   const usingColumns = Boolean(columns?.length);
-  const headers = usingColumns ? columns!.map((c) => c.header) : (legacyHeaders ?? []);
+  const [columnLayout, setColumnLayout] = useState<ColumnLayout>(() =>
+    normalizeColumnLayout(
+      columns ?? [],
+      readColumnLayoutParams(searchParams) ?? readStoredColumnLayout(queryKey),
+    ),
+  );
+  const normalizedColumnLayout = useMemo(
+    () => normalizeColumnLayout(columns ?? [], columnLayout),
+    [columns, columnLayout],
+  );
+  const columnOrderKey = normalizedColumnLayout.order.join(",");
+  const hiddenColumnsKey = normalizedColumnLayout.hidden.join(",");
+  const hiddenColumnIds = new Set(normalizedColumnLayout.hidden);
+  const columnById = useMemo(
+    () => new Map((columns ?? []).map((column) => [column.id, column])),
+    [columns],
+  );
+  const orderedColumns = normalizedColumnLayout.order
+    .map((id) => columnById.get(id))
+    .filter((column): column is TableColumn<T> => Boolean(column));
+  const visibleColumns = orderedColumns.filter((column) => !hiddenColumnIds.has(column.id));
+
+  // `columns` supersedes the legacy props. Header labels are derived from the
+  // active definitions so header, desktop cells and mobile labels stay paired.
+  const headers = usingColumns ? visibleColumns.map((column) => column.header) : (legacyHeaders ?? []);
+
+  useEffect(() => {
+    if (usingColumns) writeStoredColumnLayout(queryKey, normalizedColumnLayout);
+    // Persist only when the reconciled id lists (or table) actually change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey, usingColumns, columnOrderKey, hiddenColumnsKey]);
+
+  const commitColumnLayout = (layout: ColumnLayout) => {
+    const next = normalizeColumnLayout(columns ?? [], layout);
+    setColumnLayout(next);
+    writeStoredColumnLayout(queryKey, next);
+  };
+
+  const setColumnVisible = (id: string, visible: boolean) => {
+    const column = columnById.get(id);
+    if (!column || column.hideable === false) return;
+    const hidden = new Set(normalizedColumnLayout.hidden);
+    if (visible) hidden.delete(id);
+    else hidden.add(id);
+    commitColumnLayout({ ...normalizedColumnLayout, hidden: [...hidden] });
+  };
+
+  const moveColumn = (id: string, offset: -1 | 1) => {
+    const currentIndex = normalizedColumnLayout.order.indexOf(id);
+    const nextIndex = currentIndex + offset;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= normalizedColumnLayout.order.length) return;
+    const order = [...normalizedColumnLayout.order];
+    [order[currentIndex], order[nextIndex]] = [order[nextIndex], order[currentIndex]];
+    commitColumnLayout({ ...normalizedColumnLayout, order });
+  };
 
   const toggleSort = (header: string) => {
     setSearchParams((prev) => {
@@ -347,14 +502,31 @@ export function GenericTable<T extends DataItem>({
   });
   const savedViews: SavedView[] = savedViewsQuery.data?.data ?? [];
 
-  const applySavedView = (view: SavedView) =>
-    setSearchParams(new URLSearchParams(view.query), { replace: true });
+  const applySavedView = (view: SavedView) => {
+    const nextParams = new URLSearchParams(view.query);
+    const savedLayout = readColumnLayoutParams(nextParams);
+    if (savedLayout) commitColumnLayout(savedLayout);
+    setLocalSearch(nextParams.get("q") ?? "");
+    // A named view is a complete route-state snapshot, not a patch over the
+    // filters/sort currently on screen.
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const saveCurrentView = async () => {
     const name = window.prompt(tr.tools.views.namePrompt);
     if (!name?.trim() || !module) return;
-    await createSavedView({ module, name: name.trim(), query: searchParams.toString() });
-    saveViewMutationDone();
+    const viewParams = new URLSearchParams(searchParams);
+    // Page and page size are transient reading preferences. Density supplies
+    // the default size, so neither belongs in a reusable/shared view.
+    viewParams.delete("page");
+    viewParams.delete("limit");
+    writeColumnLayoutParams(viewParams, normalizedColumnLayout);
+    try {
+      await createSavedView({ module, name: name.trim(), query: viewParams.toString() });
+      saveViewMutationDone();
+    } catch {
+      toast({ title: tr.tools.views.saveFailed, variant: "destructive" });
+    }
   };
   const saveViewMutationDone = () => queryClient.invalidateQueries({ queryKey: ["saved-views", module] });
   const removeSavedView = async (id: string) => { await deleteSavedView(id); saveViewMutationDone(); };
@@ -684,6 +856,71 @@ export function GenericTable<T extends DataItem>({
             </Sheet>
           )}
 
+          {usingColumns && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-sm">
+                  <Columns3 className="h-3.5 w-3.5" />
+                  {tr.table.columns}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" aria-label={tr.table.columnLayout} className="w-80 p-2">
+                <div className="px-2 py-1.5 text-sm font-semibold">{tr.table.columnLayout}</div>
+                <div className="mt-1 space-y-1" role="group" aria-label={tr.table.columnLayout}>
+                  {orderedColumns.map((column, index) => {
+                    const isPinned = column.hideable === false;
+                    const isVisible = !hiddenColumnIds.has(column.id);
+                    const checkboxId = `${columnMenuId}-${index}`;
+                    return (
+                      <div key={column.id} className="flex min-h-9 items-center gap-2 rounded-md px-2 hover:bg-muted/60">
+                        <Checkbox
+                          id={checkboxId}
+                          checked={isVisible}
+                          disabled={isPinned}
+                          aria-label={isPinned ? tr.table.requiredColumn(column.header) : tr.table.showColumn(column.header)}
+                          onCheckedChange={(checked) => setColumnVisible(column.id, checked === true)}
+                        />
+                        <Label htmlFor={checkboxId} className={cn("min-w-0 flex-1 truncate text-sm font-normal", !isPinned && "cursor-pointer")}>
+                          {column.header}
+                        </Label>
+                        {isPinned && (
+                          <span className="text-muted-foreground" title={tr.table.requiredColumn(column.header)}>
+                            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="sr-only">{tr.table.requiredColumn(column.header)}</span>
+                          </span>
+                        )}
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label={tr.table.moveColumnUp(column.header)}
+                            disabled={index === 0}
+                            onClick={() => moveColumn(column.id, -1)}
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label={tr.table.moveColumnDown(column.header)}
+                            disabled={index === orderedColumns.length - 1}
+                            onClick={() => moveColumn(column.id, 1)}
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
           {module && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -809,7 +1046,7 @@ export function GenericTable<T extends DataItem>({
                 </TableHead>
               )}
               {headers.map((header, hi) => {
-                const col = usingColumns ? columns![hi] : undefined;
+                const col = usingColumns ? visibleColumns[hi] : undefined;
                 // With `columns`, sort identity is the stable `sortKey` — not the
                 // translated label, which changes with the UI language.
                 const sortId    = col ? col.sortKey : header;
@@ -871,7 +1108,7 @@ export function GenericTable<T extends DataItem>({
                 <TableRow key={i} className="hover:bg-transparent animate-pulse max-md:block max-md:border max-md:rounded-md max-md:mb-2">
                   {bulkConfig && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                   {headers.map((h, hi) => (
-                    <TableCell key={h}>
+                    <TableCell key={usingColumns ? visibleColumns[hi].id : h}>
                       <Skeleton className={cn("h-4", SKELETON_WIDTHS[(i + hi) % SKELETON_WIDTHS.length])} />
                     </TableCell>
                   ))}
@@ -928,7 +1165,7 @@ export function GenericTable<T extends DataItem>({
                     </div>
                   </TableCell>
                 )}
-                {columns!.map((col) => (
+                {visibleColumns.map((col) => (
                   <TableCell
                     key={col.id}
                     data-label={col.mobileLabel ?? col.header}
